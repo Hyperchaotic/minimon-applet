@@ -6,9 +6,9 @@ use sysinfo::System;
 use cosmic::app::{Command, Core};
 use cosmic::iced::wayland::popup::{destroy_popup, get_popup};
 use cosmic::iced::window::Id;
-use cosmic::iced::{Limits, subscription};
+use cosmic::iced::{subscription, Limits};
 use cosmic::iced_style::application;
-use cosmic::widget::{self, settings};
+use cosmic::widget::{self, settings, svg};
 use cosmic::{Element, Theme};
 
 //use chrono::{Datelike, DurationRound, Timelike};
@@ -19,16 +19,14 @@ use cosmic::{
         Alignment, Length, Subscription,
     },
     iced_widget::Column,
-    widget::{
-        container, horizontal_space,
-    },
+    widget::{container, horizontal_space},
 };
 
 use crate::fl;
+use crate::svgstat::SvgStat;
 
 /// This is the struct that represents your application.
 /// It is used to define the data that will be used by your application.
-#[derive(Default)]
 pub struct Minimon {
     /// Application state which is managed by the COSMIC runtime.
     core: Core,
@@ -38,10 +36,16 @@ pub struct Minimon {
     cpu_load: f32,
     /// Current Mem usage in GB
     mem_usage: f64,
+    /// The svg image to draw
+    svgstat: super::svgstat::SvgStat,
     /// The popup id.
     popup: Option<Id>,
-    /// Example row toggler.
-    example_row: bool,
+    /// Text mode toggler.
+    text_only: bool,
+    /// CPU load toggler.
+    enable_cpu: bool,
+    /// Memory load toggler.
+    enable_mem: bool,
 }
 
 /// This is the enum that contains all the possible variants that your application will need to transmit messages.
@@ -52,7 +56,10 @@ pub enum Message {
     TogglePopup,
     Tick,
     PopupClosed(Id),
-    ToggleExampleRow(bool),
+    ToggleTextMode(bool),
+    ToggleCpu(bool),
+    ToggleMemory(bool),
+
 }
 
 /// Implement the `Application` trait for your application.
@@ -65,7 +72,7 @@ pub enum Message {
 /// - `APP_ID` is the unique identifier of your application.
 impl cosmic::Application for Minimon {
     type Executor = cosmic::SingleThreadExecutor;
-//    type Executor = cosmic::executor::Default;
+    //    type Executor = cosmic::executor::Default;
 
     type Flags = ();
 
@@ -86,7 +93,14 @@ impl cosmic::Application for Minimon {
         let app = Minimon {
             core,
             system,
-            ..Default::default()
+            cpu_load: 0.0,
+            mem_usage: 0.0,
+            svgstat: super::svgstat::SvgStat::new(),
+            popup: None,
+            text_only: false,
+            enable_cpu: true,
+            enable_mem: true,
+
         };
 
         (app, Command::none())
@@ -114,10 +128,7 @@ impl cosmic::Application for Minimon {
             })
         }
 
-        Subscription::batch(vec![
-            time_subscription().map(|_| Message::Tick),
-
-        ])
+        Subscription::batch(vec![time_subscription().map(|_| Message::Tick)])
     }
 
     fn on_close_requested(&self, id: Id) -> Option<Message> {
@@ -130,94 +141,106 @@ impl cosmic::Application for Minimon {
             PanelAnchor::Top | PanelAnchor::Bottom
         );
 
-        let button = cosmic::widget::button(if horizontal {
-            let formated = format!("{:.2}% {:.1}GB", self.cpu_load, self.mem_usage);
-            Element::from(
-                row!(
-                    self.core.applet.text(formated),
-                    container(vertical_space(Length::Fixed(
-                        (self.core.applet.suggested_size(true).1
-                            + 2 * self.core.applet.suggested_padding(true))
-                            as f32
-                    )))
-                )
-                .align_items(Alignment::Center),
-            )
+        let button: cosmic::widget::Button<Message>;
+
+/* 
+    let s = match core::str::from_utf8(self.svgstat.as_bytes()) {
+        Ok(v) => v,
+        Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+    };
+
+        println!("SVG: {}", s);*/
+
+        if !self.text_only {
+            let handle = cosmic::widget::icon::from_svg_bytes(self.svgstat.as_bytes().to_owned());
+
+            button = self
+                .core
+                .applet
+                .icon_button_from_handle(handle)
+                .on_press(Message::TogglePopup)
+                .style(cosmic::theme::Button::AppletIcon);
         } else {
-            let formated_cpu: String;
-            if self.cpu_load <10 as f32{
-                formated_cpu = format!("{:.2}%", self.cpu_load);
+            button = cosmic::widget::button(if horizontal {
+                let formated = format!("{:.2}% {:.1}GB", self.cpu_load, self.mem_usage);
+                Element::from(
+                    row!(
+                        self.core.applet.text(formated),
+                        container(vertical_space(Length::Fixed(
+                            (self.core.applet.suggested_size(true).1
+                                + 2 * self.core.applet.suggested_padding(true))
+                                as f32
+                        )))
+                    )
+                    .align_items(Alignment::Center),
+                )
             } else {
-                formated_cpu = format!("{:.1}%", self.cpu_load);
-            }
-            let formated_mem = format!("{:.1}GB", self.mem_usage);
+                let formated_cpu: String;
+                if self.cpu_load < 10 as f32 {
+                    formated_cpu = format!("{:.2}%", self.cpu_load);
+                } else {
+                    formated_cpu = format!("{:.1}%", self.cpu_load);
+                }
+                let formated_mem = format!("{:.1}GB", self.mem_usage);
 
-            // vertical layout
-            let mut elements = Vec::new();
+                // vertical layout
+                let mut elements = Vec::new();
 
-            elements.push(self.core.applet.text(formated_cpu.to_owned()).into());
-            elements.push(self.core.applet.text(formated_mem.to_owned()).into());
+                elements.push(self.core.applet.text(formated_cpu.to_owned()).into());
+                elements.push(self.core.applet.text(formated_mem.to_owned()).into());
 
-            let col = Column::with_children(elements)
-                .align_items(Alignment::Center)
-                .spacing(0);
+                let col = Column::with_children(elements)
+                    .align_items(Alignment::Center)
+                    .spacing(0);
 
-            Element::from(
-                column!(
-                    col,
-                    horizontal_space(Length::Fixed(
-                        (self.core.applet.suggested_size(true).0
-                            + 2 * self.core.applet.suggested_padding(true))
-                            as f32
-                    ))
+                Element::from(
+                    column!(
+                        col,
+                        horizontal_space(Length::Fixed(
+                            (self.core.applet.suggested_size(true).0
+                                + 2 * self.core.applet.suggested_padding(true))
+                                as f32
+                        ))
+                    )
+                    .align_items(Alignment::Center),
                 )
-                .align_items(Alignment::Center),
-            )
-        })
-        .padding(if horizontal {
-            [0, self.core.applet.suggested_padding(true)]
-        } else {
-            [self.core.applet.suggested_padding(true), 0]
-        })
-        .on_press(Message::TogglePopup)
-        .style(cosmic::theme::Button::AppletIcon);
+            })
+            .padding(if horizontal {
+                [0, self.core.applet.suggested_padding(true)]
+            } else {
+                [self.core.applet.suggested_padding(true), 0]
+            })
+            .on_press(Message::TogglePopup)
+            .style(cosmic::theme::Button::AppletIcon);
+        }
 
-//        if let Some(tracker) = self.rectangle_tracker.as_ref() {
-  //          tracker.container(0, button).ignore_bounds(true).into()
-    //    } else {
-            button.into()
-      //  }
+        //        if let Some(tracker) = self.rectangle_tracker.as_ref() {
+        //          tracker.container(0, button).ignore_bounds(true).into()
+        //    } else {
+        button.into()
+        //  }
     }
-    
 
-
-
-
-    /// This is the main view of your application, it is the root of your widget tree.
-    ///
-    /// The `Element` type is used to represent the visual elements of your application,
-    /// it has a `Message` associated with it, which dictates what type of message it can send.
-    ///
-    /// To get a better sense of which widgets are available, check out the `widget` module.
-    /// 
-    /* 
-    fn view(&self) -> Element<Self::Message> {
-
-        let load = format!("{}%", self.cpu_load);
-        self.core
-            .applet
-            .text(load)
-            .into()
-    }
-*/
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
         let content_list = widget::list_column()
             .padding(5)
             .spacing(0)
             .add(settings::item(
-                fl!("example-row"),
-                widget::toggler(None, self.example_row, |value| {
-                    Message::ToggleExampleRow(value)
+                fl!("text-only"),
+                widget::toggler(None, self.text_only, |value| {
+                    Message::ToggleTextMode(value)
+                }),
+            ))
+            .add(settings::item(
+                fl!("enable-cpu"),
+                widget::toggler(None, self.enable_cpu, |value| {
+                    Message::ToggleCpu(value)
+                }),
+            ))
+            .add(settings::item(
+                fl!("enable-memory"),
+                widget::toggler(None, self.enable_mem, |value| {
+                    Message::ToggleMemory(value)
                 }),
             ));
 
@@ -249,26 +272,40 @@ impl cosmic::Application for Minimon {
                 }
             }
             Message::Tick => {
-
                 self.system.refresh_cpu_usage(); // Refreshing CPU usage.
                 self.system.refresh_memory();
-        
-                self.cpu_load =
-                self.system.cpus().iter().map(|p| p.cpu_usage()).sum::<f32>() / self.system.cpus().len() as f32;
+
+                self.cpu_load = self
+                    .system
+                    .cpus()
+                    .iter()
+                    .map(|p| p.cpu_usage())
+                    .sum::<f32>()
+                    / self.system.cpus().len() as f32;
                 self.mem_usage = self.system.used_memory() as f64 / (1073741824) as f64;
 
-                
+                self.svgstat.set_variable(self.cpu_load);
                 println!("Message::Tick {}% - {}GB ", self.cpu_load, self.mem_usage);
-
             }
             Message::PopupClosed(id) => {
                 if self.popup.as_ref() == Some(&id) {
                     self.popup = None;
                 }
             }
-            Message::ToggleExampleRow(toggled) => self.example_row = toggled,
+            Message::ToggleTextMode(toggled) => self.text_only = toggled,
+            Message::ToggleCpu(toggled) => {
+                self.enable_cpu = toggled;
+                if toggled == false {
+                    self.enable_mem = true;    
+                }
+            },
+            Message::ToggleMemory(toggled) => {
+                self.enable_mem = toggled;
+                if toggled == false {
+                    self.enable_cpu = true;    
+                }
+            },
         }
         Command::none()
     }
-
 }
