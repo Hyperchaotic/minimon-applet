@@ -1,6 +1,6 @@
 [Desktop Entry]
-Name=COSMIC Applet Template
-Exec=cosmic-applet-template %F
+Name=Minimon
+Exec=Minimon %F
 Terminal=false
 Type=Application
 StartupNotify=true

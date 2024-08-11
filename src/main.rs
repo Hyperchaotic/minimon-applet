@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-use app::YourApp;
+use app::Minimon;
 /// The `app` module is used by convention to indicate the main component of our application.
 mod app;
 mod core;
@@ -11,5 +11,5 @@ mod core;
 /// - `()` is the flags that your app needs to use before it starts.
 ///  If your app does not need any flags, you can pass in `()`.
 fn main() -> cosmic::iced::Result {
-    cosmic::applet::run::<YourApp>(true, ())
+    cosmic::applet::run::<Minimon>(true, ())
 }

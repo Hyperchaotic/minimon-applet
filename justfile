@@ -1,5 +1,5 @@
-name := 'cosmic-applet-template'
-export APPID := 'com.example.CosmicAppletTemplate'
+name := 'Minimon'
+export APPID := 'com.github.hyperchaotic.Minimon'
 
 rootdir := ''
 prefix := '/usr'
@@ -22,8 +22,10 @@ metainfo := APPID + '.metainfo.xml'
 metainfo-src := 'res' / metainfo
 metainfo-dst := clean(rootdir / prefix) / 'share' / 'metainfo' / metainfo
 
-icons-src := 'res' / 'icons' / 'hicolor'
-icons-dst := clean(rootdir / prefix) / 'share' / 'icons' / 'hicolor'
+icons-src := 'res' / 'icons'
+icons-dst := clean(rootdir / prefix) / 'share' / 'icons' / 'hicolor' / 'scalable'
+
+#/hicolor/scalable/apps/com.system76.CosmicAppletTime-symbolic.svg
 
 # Default recipe which runs `just build-release`
 default: build-release
@@ -70,7 +72,7 @@ install:
     install -Dm0644 {{desktop-src}} {{desktop-dst}}
     install -Dm0644 {{metainfo-src}} {{metainfo-dst}}
     for size in `ls {{icons-src}}`; do \
-        install -Dm0644 "{{icons-src}}/$size/apps/{{APPID}}.svg" "{{icons-dst}}/$size/apps/{{APPID}}.svg"; \
+        install -Dm0644 "{{icons-src}}/apps/{{APPID}}.svg" "{{icons-dst}}/apps/{{APPID}}.svg"; \
     done
 
 # Installs files
