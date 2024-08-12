@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
+use cosmic::cosmic_config::CosmicConfigEntry;
 use std::time;
 use sysinfo::System;
 
@@ -22,7 +23,7 @@ use cosmic::{
     widget::{container, horizontal_space},
 };
 
-use crate::fl;
+use crate::{config::MinimonConfig, fl};
 
 /// This is the struct that represents your application.
 /// It is used to define the data that will be used by your application.
@@ -41,17 +42,9 @@ pub struct Minimon {
     svgstat_mem: super::svgstat::SvgStat,
     /// The popup id.
     popup: Option<Id>,
-    /// Text mode toggler.
-    text_only: bool,
-    /// CPU load toggler.
-    enable_cpu: bool,
-    /// Memory load toggler.
-    enable_mem: bool,
+    config: MinimonConfig,
 }
 
-/// This is the enum that contains all the possible variants that your application will need to transmit messages.
-/// This is used to communicate between the different parts of your application.
-/// If your application does not need to send messages, you can use an empty enum or `()`.
 #[derive(Debug, Clone)]
 pub enum Message {
     TogglePopup,
@@ -60,6 +53,7 @@ pub enum Message {
     ToggleTextMode(bool),
     ToggleCpu(bool),
     ToggleMemory(bool),
+    ConfigChanged(MinimonConfig),
 }
 
 /// Implement the `Application` trait for your application.
@@ -90,7 +84,7 @@ impl cosmic::Application for Minimon {
     fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
         let mut system = System::new();
         system.refresh_memory();
-        let mem_physical : f64= system.total_memory() as f64 / 1073741824 as f64;
+        let mem_physical: f64 = system.total_memory() as f64 / 1073741824 as f64;
 
         let app = Minimon {
             core,
@@ -100,9 +94,7 @@ impl cosmic::Application for Minimon {
             svgstat_cpu: super::svgstat::SvgStat::new("red", 100.0),
             svgstat_mem: super::svgstat::SvgStat::new("purple", mem_physical),
             popup: None,
-            text_only: false,
-            enable_cpu: true,
-            enable_mem: true,
+            config: MinimonConfig::default(),
         };
 
         (app, Command::none())
@@ -130,7 +122,12 @@ impl cosmic::Application for Minimon {
             })
         }
 
-        Subscription::batch(vec![time_subscription().map(|_| Message::Tick)])
+        Subscription::batch(vec![
+            time_subscription().map(|_| Message::Tick),
+            self.core
+                .watch_config(Self::APP_ID)
+                .map(|u| Message::ConfigChanged(u.config)),
+        ])
     }
 
     fn on_close_requested(&self, id: Id) -> Option<Message> {
@@ -144,12 +141,13 @@ impl cosmic::Application for Minimon {
         );
 
         // If using SVG we go here
-        if !self.text_only {
+        if !self.config.text_only {
             let mut elements = Vec::new();
 
-            if self.enable_cpu {
-                let cpu_handle =
-                    cosmic::widget::icon::from_svg_bytes(self.svgstat_cpu.to_string().as_bytes().to_owned());
+            if self.config.enable_cpu {
+                let cpu_handle = cosmic::widget::icon::from_svg_bytes(
+                    self.svgstat_cpu.to_string().as_bytes().to_owned(),
+                );
                 let cpu = Element::from(
                     self.core
                         .applet
@@ -160,9 +158,10 @@ impl cosmic::Application for Minimon {
                 elements.push(cpu);
             }
 
-            if self.enable_mem {
-                let mem_handle =
-                    cosmic::widget::icon::from_svg_bytes(self.svgstat_mem.to_string().as_bytes().to_owned());
+            if self.config.enable_mem {
+                let mem_handle = cosmic::widget::icon::from_svg_bytes(
+                    self.svgstat_mem.to_string().as_bytes().to_owned(),
+                );
 
                 let mem = Element::from(
                     self.core
@@ -194,7 +193,7 @@ impl cosmic::Application for Minimon {
             // If using text only mode we go here
             let button = cosmic::widget::button(if horizontal {
                 let mut formated = String::new();
-                if self.enable_cpu {
+                if self.config.enable_cpu {
                     formated = format!("{:.2}%", self.cpu_load);
                 }
 
@@ -202,7 +201,7 @@ impl cosmic::Application for Minimon {
                     formated.push(' ');
                 }
 
-                if self.enable_mem {
+                if self.config.enable_mem {
                     formated.push_str(&format!("{:.1}GB", self.mem_usage));
                 }
 
@@ -229,11 +228,11 @@ impl cosmic::Application for Minimon {
                 // vertical layout
                 let mut elements = Vec::new();
 
-                if self.enable_cpu {
+                if self.config.enable_cpu {
                     elements.push(self.core.applet.text(formated_cpu.to_owned()).into());
                 }
 
-                if self.enable_mem {
+                if self.config.enable_mem {
                     elements.push(self.core.applet.text(formated_mem.to_owned()).into());
                 }
 
@@ -270,15 +269,21 @@ impl cosmic::Application for Minimon {
             .spacing(0)
             .add(settings::item(
                 fl!("text-only"),
-                widget::toggler(None, self.text_only, |value| Message::ToggleTextMode(value)),
+                widget::toggler(None, self.config.text_only, |value| {
+                    Message::ToggleTextMode(value)
+                }),
             ))
             .add(settings::item(
                 fl!("enable-cpu"),
-                widget::toggler(None, self.enable_cpu, |value| Message::ToggleCpu(value)),
+                widget::toggler(None, self.config.enable_cpu, |value| {
+                    Message::ToggleCpu(value)
+                }),
             ))
             .add(settings::item(
                 fl!("enable-memory"),
-                widget::toggler(None, self.enable_mem, |value| Message::ToggleMemory(value)),
+                widget::toggler(None, self.config.enable_mem, |value| {
+                    Message::ToggleMemory(value)
+                }),
             ));
 
         self.core.applet.popup_container(content_list).into()
@@ -328,18 +333,45 @@ impl cosmic::Application for Minimon {
                     self.popup = None;
                 }
             }
-            Message::ToggleTextMode(toggled) => self.text_only = toggled,
+            Message::ToggleTextMode(toggled) => {
+                self.config.text_only = toggled;
+                if let Ok(helper) =
+                    cosmic::cosmic_config::Config::new(Self::APP_ID, MinimonConfig::VERSION)
+                {
+                    if let Err(err) = self.config.write_entry(&helper) {
+                        println!("Error writing config {}", err);
+                    }
+                }
+            }
             Message::ToggleCpu(toggled) => {
-                self.enable_cpu = toggled;
+                self.config.enable_cpu = toggled;
                 if toggled == false {
-                    self.enable_mem = true;
+                    self.config.enable_mem = true;
+                }
+                if let Ok(helper) =
+                    cosmic::cosmic_config::Config::new(Self::APP_ID, MinimonConfig::VERSION)
+                {
+                    if let Err(err) = self.config.write_entry(&helper) {
+                        println!("Error writing config {}", err);
+                    }
                 }
             }
             Message::ToggleMemory(toggled) => {
-                self.enable_mem = toggled;
+                self.config.enable_mem = toggled;
                 if toggled == false {
-                    self.enable_cpu = true;
+                    self.config.enable_cpu = true;
                 }
+                if let Ok(helper) =
+                    cosmic::cosmic_config::Config::new(Self::APP_ID, MinimonConfig::VERSION)
+                {
+                    if let Err(err) = self.config.write_entry(&helper) {
+                        println!("Error writing config {}", err);
+                    }
+                }
+            }
+            Message::ConfigChanged(config) => {
+                println!("Message::ConfigChanged {:?}", config);
+                self.config = config;
             }
         }
         Command::none()
