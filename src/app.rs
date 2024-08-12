@@ -8,7 +8,7 @@ use cosmic::iced::wayland::popup::{destroy_popup, get_popup};
 use cosmic::iced::window::Id;
 use cosmic::iced::{subscription, Limits};
 use cosmic::iced_style::application;
-use cosmic::widget::{self, settings, svg};
+use cosmic::widget::{self, settings};
 use cosmic::{Element, Theme};
 
 //use chrono::{Datelike, DurationRound, Timelike};
@@ -18,12 +18,11 @@ use cosmic::{
         widget::{column, row, vertical_space},
         Alignment, Length, Subscription,
     },
-    iced_widget::Column,
+    iced_widget::{Column, Row},
     widget::{container, horizontal_space},
 };
 
 use crate::fl;
-use crate::svgstat::SvgStat;
 
 /// This is the struct that represents your application.
 /// It is used to define the data that will be used by your application.
@@ -32,12 +31,16 @@ pub struct Minimon {
     core: Core,
     /// Lib for retrieving system stats
     system: System,
+    /// physical memory
+    mem_physical: u64,
     /// Current Total Load Avg in %
-    cpu_load: f32,
+    cpu_load: f64,
     /// Current Mem usage in GB
     mem_usage: f64,
-    /// The svg image to draw
-    svgstat: super::svgstat::SvgStat,
+    /// The svg image to draw for the CPU load
+    svgstat_cpu: super::svgstat::SvgStat,
+    /// The svg image to draw for the Memory load
+    svgstat_mem: super::svgstat::SvgStat,
     /// The popup id.
     popup: Option<Id>,
     /// Text mode toggler.
@@ -59,7 +62,6 @@ pub enum Message {
     ToggleTextMode(bool),
     ToggleCpu(bool),
     ToggleMemory(bool),
-
 }
 
 /// Implement the `Application` trait for your application.
@@ -88,19 +90,22 @@ impl cosmic::Application for Minimon {
     /// - `flags` is used to pass in any data that your application needs to use before it starts.
     /// - `Command` type is used to send messages to your application. `Command::none()` can be used to send no messages to your application.
     fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
-        let system = System::new();
+        let mut system = System::new();
+        system.refresh_memory();
+        let mem_physical = system.total_memory();
 
         let app = Minimon {
             core,
             system,
+            mem_physical,
             cpu_load: 0.0,
             mem_usage: 0.0,
-            svgstat: super::svgstat::SvgStat::new(),
+            svgstat_cpu: super::svgstat::SvgStat::new("red"),
+            svgstat_mem: super::svgstat::SvgStat::new("purple"),
             popup: None,
             text_only: false,
             enable_cpu: true,
             enable_mem: true,
-
         };
 
         (app, Command::none())
@@ -141,28 +146,69 @@ impl cosmic::Application for Minimon {
             PanelAnchor::Top | PanelAnchor::Bottom
         );
 
-        let button: cosmic::widget::Button<Message>;
-
-/* 
-    let s = match core::str::from_utf8(self.svgstat.as_bytes()) {
-        Ok(v) => v,
-        Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-    };
-
-        println!("SVG: {}", s);*/
-
+        // If using SVG we go here
         if !self.text_only {
-            let handle = cosmic::widget::icon::from_svg_bytes(self.svgstat.as_bytes().to_owned());
+            let mut elements = Vec::new();
 
-            button = self
-                .core
-                .applet
-                .icon_button_from_handle(handle)
-                .on_press(Message::TogglePopup)
-                .style(cosmic::theme::Button::AppletIcon);
+            if self.enable_cpu {
+                let cpu_handle =
+                    cosmic::widget::icon::from_svg_bytes(self.svgstat_cpu.as_bytes().to_owned());
+                let cpu = Element::from(
+                    self.core
+                        .applet
+                        .icon_button_from_handle(cpu_handle)
+                        .on_press(Message::TogglePopup)
+                        .style(cosmic::theme::Button::AppletIcon),
+                );
+                elements.push(cpu);
+            }
+
+            if self.enable_mem {
+                let mem_handle =
+                    cosmic::widget::icon::from_svg_bytes(self.svgstat_mem.as_bytes().to_owned());
+
+                let mem = Element::from(
+                    self.core
+                        .applet
+                        .icon_button_from_handle(mem_handle)
+                        .on_press(Message::TogglePopup)
+                        .style(cosmic::theme::Button::AppletIcon),
+                );
+
+                elements.push(mem);
+            }
+
+            if horizontal {
+                let row = Row::with_children(elements)
+                    .align_items(Alignment::Center)
+                    .spacing(0);
+
+                let button = Element::from(row!(row));
+                return button.into();
+            } else {
+                let col = Column::with_children(elements)
+                    .align_items(Alignment::Center)
+                    .spacing(0);
+
+                let button = Element::from(row!(col));
+                return button.into();
+            }
         } else {
-            button = cosmic::widget::button(if horizontal {
-                let formated = format!("{:.2}% {:.1}GB", self.cpu_load, self.mem_usage);
+            // If using text only mode we go here
+            let button = cosmic::widget::button(if horizontal {
+                let mut formated = String::new();
+                if self.enable_cpu {
+                    formated = format!("{:.2}%", self.cpu_load);
+                }
+
+                if formated.len() > 0 {
+                    formated.push(' ');
+                }
+
+                if self.enable_mem {
+                    formated.push_str(&format!("{:.1}GB", self.mem_usage));
+                }
+
                 Element::from(
                     row!(
                         self.core.applet.text(formated),
@@ -176,7 +222,7 @@ impl cosmic::Application for Minimon {
                 )
             } else {
                 let formated_cpu: String;
-                if self.cpu_load < 10 as f32 {
+                if self.cpu_load < 10 as f64 {
                     formated_cpu = format!("{:.2}%", self.cpu_load);
                 } else {
                     formated_cpu = format!("{:.1}%", self.cpu_load);
@@ -186,8 +232,13 @@ impl cosmic::Application for Minimon {
                 // vertical layout
                 let mut elements = Vec::new();
 
-                elements.push(self.core.applet.text(formated_cpu.to_owned()).into());
-                elements.push(self.core.applet.text(formated_mem.to_owned()).into());
+                if self.enable_cpu {
+                    elements.push(self.core.applet.text(formated_cpu.to_owned()).into());
+                }
+
+                if self.enable_mem {
+                    elements.push(self.core.applet.text(formated_mem.to_owned()).into());
+                }
 
                 let col = Column::with_children(elements)
                     .align_items(Alignment::Center)
@@ -212,13 +263,8 @@ impl cosmic::Application for Minimon {
             })
             .on_press(Message::TogglePopup)
             .style(cosmic::theme::Button::AppletIcon);
+            return button.into();
         }
-
-        //        if let Some(tracker) = self.rectangle_tracker.as_ref() {
-        //          tracker.container(0, button).ignore_bounds(true).into()
-        //    } else {
-        button.into()
-        //  }
     }
 
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
@@ -227,21 +273,15 @@ impl cosmic::Application for Minimon {
             .spacing(0)
             .add(settings::item(
                 fl!("text-only"),
-                widget::toggler(None, self.text_only, |value| {
-                    Message::ToggleTextMode(value)
-                }),
+                widget::toggler(None, self.text_only, |value| Message::ToggleTextMode(value)),
             ))
             .add(settings::item(
                 fl!("enable-cpu"),
-                widget::toggler(None, self.enable_cpu, |value| {
-                    Message::ToggleCpu(value)
-                }),
+                widget::toggler(None, self.enable_cpu, |value| Message::ToggleCpu(value)),
             ))
             .add(settings::item(
                 fl!("enable-memory"),
-                widget::toggler(None, self.enable_mem, |value| {
-                    Message::ToggleMemory(value)
-                }),
+                widget::toggler(None, self.enable_mem, |value| Message::ToggleMemory(value)),
             ));
 
         self.core.applet.popup_container(content_list).into()
@@ -251,7 +291,6 @@ impl cosmic::Application for Minimon {
     /// what message was received. Commands may be returned for asynchronous execution on a
     /// background thread managed by the application's executor.
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
-        println!("Tick");
         match message {
             Message::TogglePopup => {
                 return if let Some(p) = self.popup.take() {
@@ -279,13 +318,13 @@ impl cosmic::Application for Minimon {
                     .system
                     .cpus()
                     .iter()
-                    .map(|p| p.cpu_usage())
-                    .sum::<f32>()
-                    / self.system.cpus().len() as f32;
+                    .map(|p| p.cpu_usage() as f64)
+                    .sum::<f64>()
+                    / self.system.cpus().len() as f64;
                 self.mem_usage = self.system.used_memory() as f64 / (1073741824) as f64;
 
-                self.svgstat.set_variable(self.cpu_load);
-                println!("Message::Tick {}% - {}GB ", self.cpu_load, self.mem_usage);
+                self.svgstat_cpu.set_variable(self.cpu_load, 100);
+                self.svgstat_mem.set_variable(self.mem_usage, self.mem_physical/1073741824);
             }
             Message::PopupClosed(id) => {
                 if self.popup.as_ref() == Some(&id) {
@@ -296,15 +335,15 @@ impl cosmic::Application for Minimon {
             Message::ToggleCpu(toggled) => {
                 self.enable_cpu = toggled;
                 if toggled == false {
-                    self.enable_mem = true;    
+                    self.enable_mem = true;
                 }
-            },
+            }
             Message::ToggleMemory(toggled) => {
                 self.enable_mem = toggled;
                 if toggled == false {
-                    self.enable_cpu = true;    
+                    self.enable_cpu = true;
                 }
-            },
+            }
         }
         Command::none()
     }
