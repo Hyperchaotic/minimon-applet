@@ -55,13 +55,13 @@ impl SvgStat {
     }
 
     pub fn to_string(&self) -> String {
-        let formated_val;
+        let formatted_val;
         if self.current_val < 10.0 {
-            formated_val = format!("{:.2}", self.current_val);
+            formatted_val = format!("{:.2}", self.current_val);
         } else if self.current_val < 100.0 {
-            formated_val = format!("{:.1}", self.current_val);
+            formatted_val = format!("{:.1}", self.current_val);
         } else {
-            formated_val = format!("{}", self.current_val);
+            formatted_val = format!("{}", self.current_val);
         }
         
         let percentage: u64 = ((self.current_val / self.max_val as f64) * 100 as f64) as u64;
@@ -72,7 +72,7 @@ impl SvgStat {
         svg.push_str(SVGSTATPART2);
         svg.push_str(&format!("{}", percentage));
         svg.push_str(SVGSTATPART3);
-        svg.push_str(&formated_val);
+        svg.push_str(&formatted_val);
         svg.push_str(SVGSTATPART4);
         svg
       }
