@@ -31,8 +31,6 @@ pub struct Minimon {
     core: Core,
     /// Lib for retrieving system stats
     system: System,
-    /// physical memory
-    mem_physical: u64,
     /// Current Total Load Avg in %
     cpu_load: f64,
     /// Current Mem usage in GB
@@ -92,16 +90,15 @@ impl cosmic::Application for Minimon {
     fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
         let mut system = System::new();
         system.refresh_memory();
-        let mem_physical = system.total_memory();
+        let mem_physical : f64= system.total_memory() as f64 / 1073741824 as f64;
 
         let app = Minimon {
             core,
             system,
-            mem_physical,
             cpu_load: 0.0,
             mem_usage: 0.0,
-            svgstat_cpu: super::svgstat::SvgStat::new("red"),
-            svgstat_mem: super::svgstat::SvgStat::new("purple"),
+            svgstat_cpu: super::svgstat::SvgStat::new("red", 100.0),
+            svgstat_mem: super::svgstat::SvgStat::new("purple", mem_physical),
             popup: None,
             text_only: false,
             enable_cpu: true,
@@ -152,7 +149,7 @@ impl cosmic::Application for Minimon {
 
             if self.enable_cpu {
                 let cpu_handle =
-                    cosmic::widget::icon::from_svg_bytes(self.svgstat_cpu.as_bytes().to_owned());
+                    cosmic::widget::icon::from_svg_bytes(self.svgstat_cpu.to_string().as_bytes().to_owned());
                 let cpu = Element::from(
                     self.core
                         .applet
@@ -165,7 +162,7 @@ impl cosmic::Application for Minimon {
 
             if self.enable_mem {
                 let mem_handle =
-                    cosmic::widget::icon::from_svg_bytes(self.svgstat_mem.as_bytes().to_owned());
+                    cosmic::widget::icon::from_svg_bytes(self.svgstat_mem.to_string().as_bytes().to_owned());
 
                 let mem = Element::from(
                     self.core
@@ -323,8 +320,8 @@ impl cosmic::Application for Minimon {
                     / self.system.cpus().len() as f64;
                 self.mem_usage = self.system.used_memory() as f64 / (1073741824) as f64;
 
-                self.svgstat_cpu.set_variable(self.cpu_load, 100);
-                self.svgstat_mem.set_variable(self.mem_usage, self.mem_physical/1073741824);
+                self.svgstat_cpu.set_variable(self.cpu_load);
+                self.svgstat_mem.set_variable(self.mem_usage);
             }
             Message::PopupClosed(id) => {
                 if self.popup.as_ref() == Some(&id) {

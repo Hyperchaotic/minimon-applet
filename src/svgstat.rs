@@ -1,4 +1,3 @@
-
 const SVGSTATSTART: &'static str = "
 <svg height=\"36\" width=\"36\" viewBox=\"0 0 36 36\" xmlns=\"http://www.w3.org/2000/svg\">
  <path
@@ -15,10 +14,12 @@ const SVGSTATSTART: &'static str = "
       a 15.9155 15.9155 0 0 1 0 31.831\"
     fill=\"none\" 
     stroke=\"";
-    
-const SVGSTATMID: &'static str = "\"
+
+const SVGSTATPART2: &'static str = "\"
     stroke-width=\"2\"
-    stroke-dasharray=\"XXX, 100\"
+    stroke-dasharray=\"";
+
+const SVGSTATPART3: &'static str = ", 100\"
   />
   <style>
 .percentage {
@@ -30,88 +31,45 @@ const SVGSTATMID: &'static str = "\"
 </style>
   <text x=\"18\" y=\"23.35\" class=\"percentage\">";
 
-const SVGSTATEND: &'static str = "</text></svg>";
-const SVGSTATPAD: &'static str = "    ";
-const SVGSTATGUARD: &'static str = "<!-- svg end -->";
+const SVGSTATPART4: &'static str = "</text></svg>";
 
 pub struct SvgStat {
-    // Current degrees of rotation
-    //variable: f64,
-    svg: String,
-    // Location to modify the string in-place
-    range_val: core::ops::Range<usize>,
-    // Location to modify the circle in-place
-    range_circle: core::ops::Range<usize>,
+    current_val: f64,
+    max_val: f64,
+    color: String,
 }
 
 impl SvgStat {
-    pub fn new(color: &str) -> Self {
-
-      let color_len = color.len();
-      let location = SVGSTATSTART.len()+color_len+SVGSTATMID.find("XXX").unwrap();
-        let mut s = SvgStat {
-      //      variable: 0.0,
-            // We add extra spaces here so the string is long enough we can safely replace
-            // the number in-place later, including the following xml, without writing
-            // into unallocated memory.
-            svg: SVGSTATSTART.to_owned() + color+SVGSTATMID+"   0" + SVGSTATEND + SVGSTATPAD + SVGSTATGUARD,
-            range_val: SVGSTATSTART.len()+color_len+SVGSTATMID.len()..SVGSTATSTART.len()+color_len+SVGSTATMID.len() + 4 + SVGSTATEND.len() + SVGSTATPAD.len(),
-            range_circle: location..location+3
-        };
-
-        // Making sure to format the svg, remove the XXX...
-        s.set_variable(0.0, 100);
-
-        s
+    pub fn new(color: &str, max_val: f64) -> Self {
+        SvgStat {
+            current_val: 0.0,
+            max_val: max_val,
+            color: color.to_string(),
+        }
     }
 
-    // Updates the status (cpu load or memory use). Also updates the SVG string in-place.
-    pub fn set_variable(&mut self, val: f64, total: u64) {
-
-            let formated_val: String;
-
-            let variable = val;
-            let percentage: f64 = (val/total as f64)*100 as f64;
-
-            println!("HHHHHHHHHHHHHHHHHH-->{}-{}-{}", val, total, percentage);
-
-            if variable < 10.0 {
-                formated_val = format!("{:.2}{}{}", variable, SVGSTATEND, SVGSTATPAD);
-            } else if variable < 100.0 {
-                formated_val = format!("{:.1}{}{}", variable, SVGSTATEND, SVGSTATPAD);
-            } else {
-                formated_val = format!("{}{}{}", variable, SVGSTATEND, SVGSTATPAD);
-            }
-
-            println!("BEFORE: {}", self.svg);
-
-            // Be a lot simpler just building a new SVG without unsafe.
-            // This is faster but not really necessary on a modern CPU.
-            // The code is safe as long as the original SVG is not altered,
-            // which is why it's included in this file.
-
-            let formated_circle = format!("{:03}", percentage as u32);
-            let range = self.range_val.clone();
-            let range_circle = self.range_circle.clone();
-            unsafe {
-                core::ptr::copy_nonoverlapping(
-                    formated_val.as_ptr(),
-                    self.svg[range].as_mut_ptr(),
-                    formated_val.len(),
-                );
-                core::ptr::copy_nonoverlapping(
-                    formated_circle.as_ptr(),
-                    self.svg[range_circle].as_mut_ptr(),
-                    formated_circle.len(),
-                );
-            }
-      
-          println!("AFTER: {}", self.svg);
-
-
+    pub fn set_variable(&mut self, val: f64) {
+        self.current_val = val;
     }
 
-    pub fn as_bytes(&self) -> &[u8] {
-        self.svg.as_bytes()
+    pub fn to_string(&self) -> String {
+        let formated_val;
+        if self.current_val < 10.0 {
+            formated_val = format!("{:.2}", self.current_val);
+        } else if self.current_val < 100.0 {
+            formated_val = format!("{:.1}", self.current_val);
+        } else {
+            formated_val = format!("{}", self.current_val);
+        }
+
+        let percentage: u64 = ((self.current_val / self.max_val as f64) * 100 as f64) as u64;
+
+        SVGSTATSTART.to_owned()
+            + &self.color
+            + SVGSTATPART2
+            + &format!("{}", percentage)
+            + SVGSTATPART3
+            + &formated_val
+            + SVGSTATPART4
     }
 }
