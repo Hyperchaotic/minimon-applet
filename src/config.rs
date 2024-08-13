@@ -15,6 +15,6 @@ impl Default for MinimonConfig {
             text_only: false,
             enable_cpu: true,
             enable_mem: true,
-                }
+        }
     }
 }
