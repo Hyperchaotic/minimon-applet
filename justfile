@@ -1,4 +1,4 @@
-name := 'Minimon'
+name := 'minimon-applet'
 export APPID := 'com.github.hyperchaotic.Minimon'
 
 rootdir := ''
@@ -90,7 +90,7 @@ uninstall:
     rm {{desktop-dst}}
     rm {{metainfo-dst}}
     for size in `ls {{icons-src}}`; do \
-        rm "{{icons-dst}}/$size/apps/{{APPID}}.svg"; \
+        rm "{{icons-dst}}/apps/{{APPID}}.svg"; \
     done
 
 # Vendor dependencies locally

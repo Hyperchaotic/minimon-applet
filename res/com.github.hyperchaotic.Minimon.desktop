@@ -1,10 +1,10 @@
 [Desktop Entry]
 Name=Minimon
-Exec=Minimon %F
+Exec=minimon-applet %F
 Terminal=false
 Type=Application
 StartupNotify=true
-Icon=com.example.CosmicAppletTemplate
+Icon=com.github.hyperchaotic.Minimon
 Categories=COSMIC;Utility;
 Keywords=Folder;Manager;
 MimeType=inode/directory;
