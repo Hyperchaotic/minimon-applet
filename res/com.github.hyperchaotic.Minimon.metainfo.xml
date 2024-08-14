@@ -4,7 +4,7 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-only</project_license>
   <project_group>COSMIC</project_group>
-  <developer_name>Klaus Nielsen</developer_name>
+  <developer_name>hyperchaotic</developer_name>
   <update_contact>hyperchaotic@gmail.com</update_contact>
   <url type="homepage"></url>
   <url type="bugtracker"></url>
@@ -14,7 +14,7 @@
     <p>A System Monitor applet for Cosmic</p>
   </description>
   <launchable type="desktop-id">com.github.hyperchaotic.Minimon.desktop</launchable>
-  <icon type="remote" height="256" width="256">https://raw.githubusercontent.com/edfloreshz/cosmic-applet-template/master/res/icons/hicolor/256x256/apps/com.example.CosmicAppletTemplate.svg</icon>
+  <icon height="256" width="256">com.github.hyperchaotic.Minimon.svg</icon>
   <screenshots>
   </screenshots>
   <provides>
@@ -22,7 +22,7 @@
       <mimetype>text/plain</mimetype>
     </mimetypes>
     <binaries>
-      <binary>Minimon</binary>
+      <binary>minimon-applet</binary>
     </binaries>
   </provides>
 </component>

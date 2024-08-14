@@ -1,5 +1,15 @@
-name := 'minimon-applet'
-export APPID := 'com.github.hyperchaotic.Minimon'
+name := `grep -m 1 -oP '(?<=<binary>).*?(?=</binary>)' $(ls ./res/*.xml | head -n 1)`
+
+architecture := if arch() == "x86_64" { "amd64" } else { arch() }
+version := `sed -En 's/version[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' Cargo.toml | head -1`
+debname := name+'_'+version+'_'+architecture
+debcontrol := debname / 'DEBIAN' / 'control'
+id := `grep -m 1 -oP '(?<=<id>).*?(?=</id>)' $(ls ./res/*.xml | head -n 1)`
+summary := `grep -m 1 -oP '(?<=<summary>).*?(?=</summary>)' $(ls ./res/*.xml | head -n 1)`
+dev_name := `grep -m 1 -oP '(?<=<developer_name>).*?(?=</developer_name>)' $(ls ./res/*.xml | head -n 1)`
+email := `grep -m 1 -oP '(?<=<update_contact>).*?(?=</update_contact>)' $(ls ./res/*.xml | head -n 1)`
+
+export APPID := id
 
 rootdir := ''
 prefix := '/usr'
@@ -25,9 +35,6 @@ metainfo-dst := clean(rootdir / prefix) / 'share' / 'metainfo' / metainfo
 icons-src := 'res' / 'icons'
 icons-dst := clean(rootdir / prefix) / 'share' / 'icons' / 'hicolor' / 'scalable'
 
-#/hicolor/scalable/apps/com.system76.CosmicAppletTime-symbolic.svg
-
-# Default recipe which runs `just build-release`
 default: build-release
 
 # Runs `cargo clean`
@@ -75,15 +82,6 @@ install:
         install -Dm0644 "{{icons-src}}/apps/{{APPID}}.svg" "{{icons-dst}}/apps/{{APPID}}.svg"; \
     done
 
-# Installs files
-flatpak:
-    install -Dm0755 {{bin-src}} {{flatpak-bin-dst}}
-    install -Dm0644 {{desktop-src}} {{desktop-dst}}
-    install -Dm0644 {{metainfo-src}} {{metainfo-dst}}
-    for size in `ls {{icons-src}}`; do \
-        install -Dm0644 "{{icons-src}}/$size/apps/{{APPID}}.svg" "{{icons-dst}}/$size/apps/{{APPID}}.svg"; \
-    done
-
 # Uninstalls installed files
 uninstall:
     rm {{bin-dst}}
@@ -117,3 +115,17 @@ vendor:
 vendor-extract:
     rm -rf vendor
     tar pxf vendor.tar
+    
+deb:
+    install -D {{bin-src}} {{debname}}{{bin-dst}}
+    install -D {{desktop-src}} {{debname}}{{desktop-dst}}
+    install -D {{metainfo-src}} {{debname}}{{metainfo-dst}}
+    install -D {{icons-src}}/apps/{{APPID}}.svg {{debname}}{{icons-dst}}/apps/{{APPID}}.svg
+    install -D res/DEBIAN/control {{debname}}/DEBIAN/control	
+    echo "Package: {{name}}" > {{debcontrol}}
+    echo "Version: {{version}}" >> {{debcontrol}}
+    echo "Architecture: {{architecture}}" >> {{debcontrol}}
+    echo "Maintainer: {{dev_name}} <{{email}}>" >> {{debcontrol}}
+    echo "Description: {{summary}}" >> {{debcontrol}}
+    dpkg-deb --build --root-owner-group {{debname}}
+    rm -Rf {{debname}}/
