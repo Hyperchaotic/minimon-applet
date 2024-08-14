@@ -121,7 +121,6 @@ deb:
     install -D {{desktop-src}} {{debname}}{{desktop-dst}}
     install -D {{metainfo-src}} {{debname}}{{metainfo-dst}}
     install -D {{icons-src}}/apps/{{APPID}}.svg {{debname}}{{icons-dst}}/apps/{{APPID}}.svg
-    install -D res/DEBIAN/control {{debname}}/DEBIAN/control	
     echo "Package: {{name}}" > {{debcontrol}}
     echo "Version: {{version}}" >> {{debcontrol}}
     echo "Architecture: {{architecture}}" >> {{debcontrol}}
