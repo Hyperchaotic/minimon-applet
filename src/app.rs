@@ -44,7 +44,9 @@ pub struct Minimon {
     /// The popup id.
     popup: Option<Id>,
     config: MinimonConfig,
-    ///
+    /// Countdown timer, as the subscription tick is 250ms
+    /// this counter can be set higher and controls refresh/update rate.
+    /// Refreshes machine stats when reaching 0 and is reset to configured rate.
     tick_timer: u64,
 }
 

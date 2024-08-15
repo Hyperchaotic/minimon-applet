@@ -3,7 +3,9 @@ name := `grep -m 1 -oP '(?<=<binary>).*?(?=</binary>)' $(ls ./res/*.xml | head -
 architecture := if arch() == "x86_64" { "amd64" } else { arch() }
 version := `sed -En 's/version[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' Cargo.toml | head -1`
 debname := name+'_'+version+'_'+architecture
-debcontrol := debname / 'DEBIAN' / 'control'
+debdir := debname / 'DEBIAN'
+debcontrol := debdir / 'control'
+
 id := `grep -m 1 -oP '(?<=<id>).*?(?=</id>)' $(ls ./res/*.xml | head -n 1)`
 summary := `grep -m 1 -oP '(?<=<summary>).*?(?=</summary>)' $(ls ./res/*.xml | head -n 1)`
 dev_name := `grep -m 1 -oP '(?<=<developer_name>).*?(?=</developer_name>)' $(ls ./res/*.xml | head -n 1)`
@@ -121,6 +123,7 @@ deb:
     install -D {{desktop-src}} {{debname}}{{desktop-dst}}
     install -D {{metainfo-src}} {{debname}}{{metainfo-dst}}
     install -D {{icons-src}}/apps/{{APPID}}.svg {{debname}}{{icons-dst}}/apps/{{APPID}}.svg
+    mkdir -p {{debdir}}
     echo "Package: {{name}}" > {{debcontrol}}
     echo "Version: {{version}}" >> {{debcontrol}}
     echo "Architecture: {{architecture}}" >> {{debcontrol}}
