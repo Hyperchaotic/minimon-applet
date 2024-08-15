@@ -6,7 +6,8 @@ Based on the COSMIC Applet template.
 
 ![dock-circles](https://github.com/user-attachments/assets/96128ad5-32ac-459b-9f5f-f66357a2c0e0)
 ![panel-circles](https://github.com/user-attachments/assets/5ad4fa80-d461-4cd3-aa92-ea25a09339d3)
-![panel-text](https://github.com/user-attachments/assets/b2fabd77-039a-4250-8130-fec53f1e307e)
+![screenshot-2024-08-15-00-50-20](https://github.com/user-attachments/assets/4a99da4b-326d-4462-8430-154335390096)
+assets/5ad4fa80-d461-4cd3-aa92-ea25a09339d3)
 
 ## Install
 
