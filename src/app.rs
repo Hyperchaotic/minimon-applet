@@ -83,13 +83,13 @@ impl cosmic::Application for Minimon {
             system,
             cpu_load: 0.0,
             mem_usage: 0.0,
-            svgstat_cpu: super::svgstat::SvgStat::new("red", 100),
-            svgstat_mem: super::svgstat::SvgStat::new("purple", mem_physical / 1_073_741_824),
+            svgstat_cpu: super::svgstat::SvgStat::new(100),
+            svgstat_mem: super::svgstat::SvgStat::new(mem_physical / 1_073_741_824),
             popup: None,
             config: MinimonConfig::default(),
             tick_timer: 1000,
         };
-
+        
         (app, Command::none())
     }
 
@@ -140,7 +140,7 @@ impl cosmic::Application for Minimon {
                 let cpu_widget = Element::from(
                     self.core
                         .applet
-                        .icon_button_from_handle(self.make_icon_handle(&self.svgstat_cpu))
+                        .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_cpu))
                         .on_press(Message::TogglePopup)
                         .style(cosmic::theme::Button::AppletIcon),
                 );
@@ -151,7 +151,7 @@ impl cosmic::Application for Minimon {
                 let mem_widget = Element::from(
                     self.core
                         .applet
-                        .icon_button_from_handle(self.make_icon_handle(&self.svgstat_mem))
+                        .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_mem))
                         .on_press(Message::TogglePopup)
                         .style(cosmic::theme::Button::AppletIcon),
                 );
@@ -250,7 +250,7 @@ impl cosmic::Application for Minimon {
         cpu_elements.push(Element::from(
             self.core
                 .applet
-                .icon_button_from_handle(self.make_icon_handle(&self.svgstat_cpu))
+                .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_cpu))
                 .on_press(Message::TogglePopup)
                 .style(cosmic::theme::Button::AppletIcon),
         ));
@@ -268,7 +268,7 @@ impl cosmic::Application for Minimon {
         mem_elements.push(Element::from(
             self.core
                 .applet
-                .icon_button_from_handle(self.make_icon_handle(&self.svgstat_mem))
+                .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_mem))
                 .on_press(Message::TogglePopup)
                 .style(cosmic::theme::Button::AppletIcon),
         ));
@@ -387,6 +387,8 @@ impl cosmic::Application for Minimon {
                 println!("Message::ConfigChanged {config:?}");
                 self.config = config;
                 self.tick_timer = self.config.refresh_rate;
+                self.svgstat_cpu.set_colors(&self.config.cpu_colors);
+                self.svgstat_mem.set_colors(&self.config.mem_colors);
             }            
         }
         Command::none()
@@ -395,7 +397,7 @@ impl cosmic::Application for Minimon {
 
 use cosmic::Application;
 impl Minimon {
-    fn make_icon_handle(&self, svgstat: &SvgStat) -> cosmic::widget::icon::Handle {
+    fn make_icon_handle(svgstat: &SvgStat) -> cosmic::widget::icon::Handle {
         cosmic::widget::icon::from_svg_bytes(svgstat.to_string().as_bytes().to_owned())
     }
 
