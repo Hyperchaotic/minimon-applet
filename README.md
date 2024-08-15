@@ -13,9 +13,17 @@ Based on the COSMIC Applet template.
 
 Thanks to [@edfloreshz](https://github.com/edfloreshz) for the applet template :)
 
-## Install
+## Installing
+If you're on a .deb based distibution download [latest version](https://github.com/Hyperchaotic/minimon-applet/releases) and install with the following commands:
 
-To install your COSMIC applet, you will need [just](https://github.com/casey/just), if you're on Pop!\_OS, you can install it with the following command:
+```sh
+unzip ./cosmic-applet-minimon_0.1.1_amd64.deb.zip
+dpkg -i cosmic-applet-minimon_0.1.1_amd64.deb
+```
+
+## Building
+
+To build your COSMIC applet, you will need [just](https://github.com/casey/just) and probably xkbcommon, if you're on Pop!\_OS, you can install it with the following command:
 
 ```sh
 sudo apt install just libxkbcommon-dev
