@@ -71,7 +71,7 @@ impl cosmic::Application for Minimon {
 
     type Message = Message;
 
-    const APP_ID: &'static str = "com.github.hyperchaotic.Minimon";
+    const APP_ID: &'static str = "com.github.hyperchaotic.cosmic-applet-minimon";
 
     fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
         let mut system = System::new();
