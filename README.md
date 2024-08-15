@@ -9,6 +9,8 @@ Based on the COSMIC Applet template.
 ![screenshot-2024-08-15-00-50-20](https://github.com/user-attachments/assets/4a99da4b-326d-4462-8430-154335390096)
 assets/5ad4fa80-d461-4cd3-aa92-ea25a09339d3)
 
+![screenshot-2024-08-15-01-02-19](https://github.com/user-attachments/assets/c1e8bc40-d678-44d0-ae6e-e3036102f4a1)
+
 ## Install
 
 To install your COSMIC applet, you will need [just](https://github.com/casey/just), if you're on Pop!\_OS, you can install it with the following command:
