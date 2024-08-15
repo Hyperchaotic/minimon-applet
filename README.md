@@ -14,7 +14,7 @@ assets/5ad4fa80-d461-4cd3-aa92-ea25a09339d3)
 To install your COSMIC applet, you will need [just](https://github.com/casey/just), if you're on Pop!\_OS, you can install it with the following command:
 
 ```sh
-sudo apt install just
+sudo apt install just libxkbcommon-dev
 ```
 
 After you install it, you can run the following commands to build and install your applet:
@@ -23,3 +23,15 @@ After you install it, you can run the following commands to build and install yo
 just build-release
 sudo just install
 ```
+
+Alternatively generate a deb file for installation:
+
+```sh
+just deb
+```
+and install with:
+
+```sh
+sudo dpkg -i <name_of.deb>
+```
+
