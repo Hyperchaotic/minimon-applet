@@ -7,6 +7,7 @@ pub struct MinimonConfig {
     pub text_only: bool,
     pub enable_cpu: bool,
     pub enable_mem: bool,
+    pub refresh_rate: u64,
 }
 
 impl Default for MinimonConfig {
@@ -15,6 +16,7 @@ impl Default for MinimonConfig {
             text_only: false,
             enable_cpu: true,
             enable_mem: true,
+            refresh_rate: 1000,
         }
     }
 }

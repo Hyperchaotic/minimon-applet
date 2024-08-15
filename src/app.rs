@@ -24,6 +24,8 @@ use cosmic::{
 use crate::svgstat::SvgStat;
 use crate::{config::MinimonConfig, fl};
 
+const TICK: u64 = 250;
+
 /// This is the struct that represents your application.
 /// It is used to define the data that will be used by your application.
 pub struct Minimon {
@@ -42,6 +44,8 @@ pub struct Minimon {
     /// The popup id.
     popup: Option<Id>,
     config: MinimonConfig,
+    ///
+    tick_timer: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -53,11 +57,13 @@ pub enum Message {
     ToggleCpu(bool),
     ToggleMemory(bool),
     ConfigChanged(MinimonConfig),
+    RefreshRateUp,
+    RefreshRateDown,
 }
 
 impl cosmic::Application for Minimon {
-//    type Executor = cosmic::SingleThreadExecutor;
-        type Executor = cosmic::executor::Default;
+    //    type Executor = cosmic::SingleThreadExecutor;
+    type Executor = cosmic::executor::Default;
 
     type Flags = ();
 
@@ -79,6 +85,7 @@ impl cosmic::Application for Minimon {
             svgstat_mem: super::svgstat::SvgStat::new("purple", mem_physical / 1_073_741_824),
             popup: None,
             config: MinimonConfig::default(),
+            tick_timer: 1000,
         };
 
         (app, Command::none())
@@ -99,7 +106,7 @@ impl cosmic::Application for Minimon {
     fn subscription(&self) -> Subscription<Message> {
         fn time_subscription() -> Subscription<()> {
             subscription::unfold("time-sub", (), move |()| async move {
-                let duration = time::Duration::from_millis(1000);
+                let duration = time::Duration::from_millis(TICK);
                 tokio::time::sleep(duration).await;
                 ((), ())
             })
@@ -175,7 +182,7 @@ impl cosmic::Application for Minimon {
             if !formated.is_empty() {
                 formated.push(' ');
             }
-            
+
             if self.config.enable_mem {
                 formated.push_str(&format!("{:.1}GB", self.mem_usage));
             }
@@ -273,6 +280,19 @@ impl cosmic::Application for Minimon {
             .align_items(Alignment::Center)
             .spacing(0);
 
+        let mut refresh_elements = Vec::new();
+
+        let button_plus = cosmic::widget::button(Element::from(self.core.applet.text("-"))).on_press(Message::RefreshRateDown);
+        let button_minus = cosmic::widget::button(Element::from(self.core.applet.text("+"))).on_press(Message::RefreshRateUp);
+        let rate_str = format!(" {:.2} ", self.config.refresh_rate as f64/1000.0 );
+        refresh_elements.push(button_plus.into());
+        refresh_elements.push(Element::from(self.core.applet.text(rate_str)));
+        refresh_elements.push(button_minus.into());
+
+        let refresh_row = Row::with_children(refresh_elements)
+        .align_items(Alignment::Center)
+        .spacing(0);
+
         let content_list = widget::list_column()
             .padding(5)
             .spacing(0)
@@ -283,7 +303,11 @@ impl cosmic::Application for Minimon {
                 }),
             ))
             .add(Element::from(cpu_row))
-            .add(Element::from(mem_row));
+            .add(Element::from(mem_row))
+            .add(settings::item(
+                fl!("refresh-rate"),
+                Element::from(refresh_row),
+            ));
 
         self.core.applet.popup_container(content_list).into()
     }
@@ -311,8 +335,14 @@ impl cosmic::Application for Minimon {
                     get_popup(popup_settings)
                 }
             }
+
             Message::Tick => {
-                self.refresh_stats();
+                if self.tick_timer>0 {
+                    self.tick_timer -= TICK;
+                } else {
+                    self.refresh_stats();
+                    self.tick_timer = self.config.refresh_rate;
+                }
             }
             Message::PopupClosed(id) => {
                 if self.popup.as_ref() == Some(&id) {
@@ -337,10 +367,25 @@ impl cosmic::Application for Minimon {
                 }
                 self.save_config();
             }
+
+            Message::RefreshRateUp => {
+                if self.config.refresh_rate < 10000 {
+                    self.config.refresh_rate += TICK;
+                }
+                self.save_config();
+            }
+            Message::RefreshRateDown => {
+                if self.config.refresh_rate >= 2*TICK {
+                    self.config.refresh_rate -= TICK;
+                }
+                self.save_config();
+            }
+
             Message::ConfigChanged(config) => {
                 println!("Message::ConfigChanged {config:?}");
                 self.config = config;
-            }
+                self.tick_timer = self.config.refresh_rate;
+            }            
         }
         Command::none()
     }
@@ -348,7 +393,6 @@ impl cosmic::Application for Minimon {
 
 use cosmic::Application;
 impl Minimon {
-    
     fn make_icon_handle(&self, svgstat: &SvgStat) -> cosmic::widget::icon::Handle {
         cosmic::widget::icon::from_svg_bytes(svgstat.to_string().as_bytes().to_owned())
     }
@@ -374,7 +418,7 @@ impl Minimon {
             .sum::<f64>()
             / self.system.cpus().len() as f64;
 
-            self.mem_usage = self.system.used_memory() as f64 / 1_073_741_824.0;
+        self.mem_usage = self.system.used_memory() as f64 / 1_073_741_824.0;
 
         self.svgstat_cpu.set_variable(self.cpu_load);
         self.svgstat_mem.set_variable(self.mem_usage);
