@@ -121,7 +121,6 @@ vendor-extract:
 deb:
     install -D {{bin-src}} {{debname}}{{bin-dst}}
     install -D {{desktop-src}} {{debname}}{{desktop-dst}}
-    install -D {{metainfo-src}} {{debname}}{{metainfo-dst}}
     install -D {{icons-src}}/apps/{{APPID}}.svg {{debname}}{{icons-dst}}/apps/{{APPID}}.svg
     mkdir -p {{debdir}}
     echo "Package: {{name}}" > {{debcontrol}}
