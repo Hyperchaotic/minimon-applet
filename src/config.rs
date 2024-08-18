@@ -3,7 +3,6 @@ use cosmic::{
     cosmic_theme::palette::{self, Srgb},
 };
 use serde::{Deserialize, Serialize};
-use sysinfo::Cpu;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum GraphColorVariant {
