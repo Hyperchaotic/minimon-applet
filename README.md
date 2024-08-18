@@ -11,6 +11,8 @@ Based on the COSMIC Applet template.
 
 ![screenshot-2024-08-15-01-02-19](https://github.com/user-attachments/assets/c1e8bc40-d678-44d0-ae6e-e3036102f4a1)
 
+![color-picker](https://github.com/user-attachments/assets/67c3e091-4a42-4a9f-aa15-a0603f6ce0e5)
+
 Thanks to [@edfloreshz](https://github.com/edfloreshz) for the applet template :)
 
 ## Installing
