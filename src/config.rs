@@ -3,6 +3,7 @@ use cosmic::{
     cosmic_theme::palette::{self, Srgb},
 };
 use serde::{Deserialize, Serialize};
+use sysinfo::Cpu;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum GraphColorVariant {
@@ -15,10 +16,10 @@ pub enum GraphColorVariant {
 impl GraphColorVariant {
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Background => "Back.  ",
-            Self::Text => "Text.  ",
-            Self::RingBack => "Ring1.  ",
-            Self::RingFront => "Ring2.  ",
+            Self::Background => "Back.   ",
+            Self::Text => "Text.",
+            Self::RingBack => "Ring2.   ",
+            Self::RingFront => "Ring1.   ",
         }
     }
 }
@@ -29,6 +30,14 @@ pub enum GraphKind {
     Memory,
 }
 
+impl std::fmt::Display for GraphKind {
+   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    match self {
+        GraphKind::Cpu => write!(f, "CPU"),
+        GraphKind::Memory => write!(f, "Memory"),
+    }
+}
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
 #[version = 1]

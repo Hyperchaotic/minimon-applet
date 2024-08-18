@@ -70,6 +70,10 @@ impl SvgStat {
         self.colors = *colors;
     }
 
+    pub fn colors(&self) -> GraphColors {
+        self.colors
+    }
+
     pub fn to_string(&self) -> String {
         let formatted_val;
         if self.current_val < 10.0 {
