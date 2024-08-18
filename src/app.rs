@@ -59,7 +59,7 @@ impl ColorPicker {
         ))
     }
 
-    pub fn set_sliders(&mut self, color: &Srgb<u8>) {
+    pub fn set_sliders(&mut self, color: Srgb<u8>) {
         self.slider_red_val = color.red;
         self.slider_green_val = color.green;
         self.slider_blue_val = color.blue;
@@ -195,8 +195,11 @@ impl cosmic::Application for Minimon {
             .unwrap()
             .join(",");
 
-        info.push_str(&format!("        Total memory: {} bytes\n", mem));
-        info.push_str(&format!("        Number of CPU cores: {}\n ", system.cpus().len()));
+        info.push_str(&format!("        Total memory: {mem} bytes\n"));
+        info.push_str(&format!(
+            "        Number of CPU cores: {}\n ",
+            system.cpus().len()
+        ));
 
         let app = Minimon {
             core,
@@ -421,8 +424,7 @@ impl cosmic::Application for Minimon {
                 .spacing(0);
 
             let content_list = widget::list_column()
-                .padding(5)
-                .spacing(0)
+                .spacing(5)
                 .add(
                     widget::text::body(self.information.clone())
                         .width(Length::Fill)
@@ -440,22 +442,15 @@ impl cosmic::Application for Minimon {
                     fl!("refresh-rate"),
                     Element::from(refresh_row),
                 ))
-                .add(
-                    row!(
-                        widget::horizontal_space(Length::Fill),
-                        cosmic::widget::button(Element::from(
-                            self.core.applet.text(" CPU colors ")
-                        ))
+                .add(row!(
+                    widget::horizontal_space(Length::Fill),
+                    cosmic::widget::button(Element::from(self.core.applet.text(" CPU colors ")))
                         .on_press(Message::ColorPickerOpen(GraphKind::Cpu)),
-                        widget::horizontal_space(Length::Fill),
-                        cosmic::widget::button(Element::from(
-                            self.core.applet.text(" Mem colors ")
-                        ))
+                    widget::horizontal_space(Length::Fill),
+                    cosmic::widget::button(Element::from(self.core.applet.text(" Mem colors ")))
                         .on_press(Message::ColorPickerOpen(GraphKind::Memory)),
-                        widget::horizontal_space(Length::Fill)
-                    )
-                    .padding(10),
-                );
+                    widget::horizontal_space(Length::Fill)
+                ));
 
             return self.core.applet.popup_container(content_list).into();
         }
@@ -618,7 +613,7 @@ impl cosmic::Application for Minimon {
                 if kind == GraphKind::Cpu {
                     self.colorpicker.set_colors(self.config.cpu_colors);
                 } else {
-                    self.colorpicker.set_colors(self.config.mem_colors)
+                    self.colorpicker.set_colors(self.config.mem_colors);
                 }
 
                 self.colorpicker.graph_kind = kind;
@@ -628,7 +623,7 @@ impl cosmic::Application for Minimon {
                     .colorpicker
                     .colors()
                     .to_srgb(self.colorpicker.color_variant);
-                self.colorpicker.set_sliders(&col);
+                self.colorpicker.set_sliders(col);
             }
 
             Message::ColorPickerClose(save) => {
@@ -648,25 +643,25 @@ impl cosmic::Application for Minimon {
                     .colorpicker
                     .colors()
                     .to_srgb(self.colorpicker.color_variant);
-                self.colorpicker.set_sliders(&col);
+                self.colorpicker.set_sliders(col);
             }
 
             Message::ColorPickerSliderRedChanged(val) => {
                 let mut col = self.colorpicker.sliders();
                 col.red = val;
-                self.colorpicker.set_sliders(&col);
+                self.colorpicker.set_sliders(col);
             }
 
             Message::ColorPickerSliderGreenChanged(val) => {
                 let mut col = self.colorpicker.sliders();
                 col.green = val;
-                self.colorpicker.set_sliders(&col);
+                self.colorpicker.set_sliders(col);
             }
 
             Message::ColorPickerSliderBlueChanged(val) => {
                 let mut col = self.colorpicker.sliders();
                 col.blue = val;
-                self.colorpicker.set_sliders(&col);
+                self.colorpicker.set_sliders(col);
             }
 
             Message::ColorPickerSelectVariant(variant) => {
