@@ -4,7 +4,33 @@ use cosmic::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
+pub enum GraphColorVariant {
+    Background,
+    Text,
+    RingBack,
+    RingFront,
+}
+
+impl GraphColorVariant {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Background => "Back.  ",
+            Self::Text => "Text.  ",
+            Self::RingBack => "Ring1.  ",
+            Self::RingFront => "Ring2.  ",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphKind {
+    Cpu,
+    Memory,
+}
+
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
 #[version = 1]
 pub struct GraphColors {
     pub background: Option<u32>,
@@ -25,6 +51,17 @@ impl Default for GraphColors {
 }
 
 impl GraphColors {
+
+    pub fn new(kind: GraphKind) -> GraphColors {
+        let mut n = GraphColors::default();
+        if kind==GraphKind::Cpu {
+            n.ringfont = Some(palette::named::RED.into());
+        } else {
+            n.ringfont = Some(palette::named::PURPLE.into());
+        }
+        n
+    }
+
     pub fn background_to_string(&self) -> String {
         GraphColors::to_string(self.background)
     }
@@ -49,6 +86,42 @@ impl GraphColors {
             "rgba(0,0,0,0.0)".to_string()
         }
     }
+
+    pub fn set_color(&mut self, srgb: Srgb<u8>, variant: GraphColorVariant) {
+        match variant {
+            GraphColorVariant::Background => self.background = Some(srgb.into()),
+            GraphColorVariant::Text => self.text = Some(srgb.into()),
+            GraphColorVariant::RingBack => self.ringback = Some(srgb.into()),
+            GraphColorVariant::RingFront => self.ringfont = Some(srgb.into()),
+        }
+    }
+
+    pub fn to_srgb(self, variant: GraphColorVariant) -> Srgb<u8> {
+        let mut res = Srgb::from_components((0, 0, 0));
+        match variant {
+            GraphColorVariant::Background => {
+                if let Some(c) = self.background {
+                    res = Srgb::from(c);
+                }
+            }
+            GraphColorVariant::Text => {
+                if let Some(c) = self.text {
+                    res = Srgb::from(c);
+                }
+            }
+            GraphColorVariant::RingBack => {
+                if let Some(c) = self.ringback {
+                    res = Srgb::from(c);
+                }
+            }
+            GraphColorVariant::RingFront => {
+                if let Some(c) = self.ringfont {
+                    res = Srgb::from(c);
+                }
+            }
+        }
+        res
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
@@ -70,7 +143,10 @@ impl Default for MinimonConfig {
             enable_mem: true,
             refresh_rate: 1000,
             cpu_colors: GraphColors::default(),
-            mem_colors: GraphColors { ringfont: Some(palette::named::PURPLE.into()), ..Default::default() },
+            mem_colors: GraphColors {
+                ringfont: Some(palette::named::PURPLE.into()),
+                ..Default::default()
+            },
         }
     }
 }

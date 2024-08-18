@@ -37,6 +37,8 @@ const SVGSTATPART5: &str = "
 
 const SVGSTATPART6: &str = "</text></svg>";
 
+#[derive(Debug, Default, Clone, PartialEq)]
+
 pub struct SvgStat {
     current_val: f64,
     max_val: u64,
@@ -65,7 +67,7 @@ impl SvgStat {
     }
 
     pub fn set_colors(&mut self, colors: &GraphColors) {
-        self.colors = colors.clone();
+        self.colors = *colors;
     }
 
     pub fn to_string(&self) -> String {

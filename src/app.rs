@@ -1,4 +1,6 @@
 use cosmic::cosmic_config::CosmicConfigEntry;
+use cosmic::cosmic_theme::palette::Srgb;
+use cosmic::iced::alignment::Horizontal;
 use std::time;
 use sysinfo::System;
 
@@ -21,10 +23,50 @@ use cosmic::{
     widget::{container, horizontal_space},
 };
 
+use crate::config::{GraphColorVariant, GraphColors, GraphKind};
 use crate::svgstat::SvgStat;
 use crate::{config::MinimonConfig, fl};
 
 const TICK: u64 = 250;
+
+const RED_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"red\" /></svg>";
+const GREEN_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"green\" /></svg>";
+const BLUE_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"blue\" /></svg>";
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ColorPicker {
+    /// If dialog is active this is not None
+    pub active: bool,
+    /// Type current displaying
+    pub graph_kind: GraphKind,
+    /// Colors for the example svg @todo should the svg class embed the graphcolors class?
+    pub graph_colors: GraphColors,
+    // Current field being adjusted
+    pub color_variant: GraphColorVariant,
+    /// An example SVG to show the changes
+    pub example_svg: SvgStat,
+    ///Current slider values
+    pub slider_red_val: u8,
+    pub slider_green_val: u8,
+    pub slider_blue_val: u8,
+}
+
+impl Default for ColorPicker {
+    fn default() -> Self {
+        let mut dev = SvgStat::new(100);
+        dev.set_variable(50.0);
+        Self {
+            active: false,
+            graph_kind: GraphKind::Cpu,
+            graph_colors: GraphColors::default(),
+            color_variant: GraphColorVariant::RingFront,
+            example_svg: dev,
+            slider_red_val: 0,
+            slider_green_val: 0,
+            slider_blue_val: 0,
+        }
+    }
+}
 
 /// This is the struct that represents your application.
 /// It is used to define the data that will be used by your application.
@@ -43,6 +85,7 @@ pub struct Minimon {
     svgstat_mem: super::svgstat::SvgStat,
     /// The popup id.
     popup: Option<Id>,
+    colorpicker: ColorPicker,
     config: MinimonConfig,
     /// Countdown timer, as the subscription tick is 250ms
     /// this counter can be set higher and controls refresh/update rate.
@@ -53,6 +96,16 @@ pub struct Minimon {
 #[derive(Debug, Clone)]
 pub enum Message {
     TogglePopup,
+
+    ColorPickerOpen(GraphKind),
+    ColorPickerClose(bool),
+    ColorPickerDefaults,
+
+    ColorPickerSliderRedChanged(u8),
+    ColorPickerSliderGreenChanged(u8),
+    ColorPickerSliderBlueChanged(u8),
+    ColorPickerSelectVariant(GraphColorVariant),
+
     Tick,
     PopupClosed(Id),
     ToggleTextMode(bool),
@@ -74,6 +127,7 @@ impl cosmic::Application for Minimon {
     const APP_ID: &'static str = "com.github.hyperchaotic.cosmic-applet-minimon";
 
     fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
+        println!("=====init=====");
         let mut system = System::new();
         system.refresh_memory();
         let mem_physical = system.total_memory(); // To GB
@@ -86,10 +140,11 @@ impl cosmic::Application for Minimon {
             svgstat_cpu: super::svgstat::SvgStat::new(100),
             svgstat_mem: super::svgstat::SvgStat::new(mem_physical / 1_073_741_824),
             popup: None,
+            colorpicker: ColorPicker::default(),
             config: MinimonConfig::default(),
             tick_timer: 1000,
         };
-        
+
         (app, Command::none())
     }
 
@@ -127,6 +182,8 @@ impl cosmic::Application for Minimon {
     }
 
     fn view(&self) -> Element<Message> {
+        // println!("=====view=====");
+
         let horizontal = matches!(
             self.core.applet.anchor,
             PanelAnchor::Top | PanelAnchor::Bottom
@@ -246,81 +303,225 @@ impl cosmic::Application for Minimon {
     }
 
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
-        let mut cpu_elements = Vec::new();
-        cpu_elements.push(Element::from(
-            self.core
-                .applet
-                .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_cpu))
-                .on_press(Message::TogglePopup)
-                .style(cosmic::theme::Button::AppletIcon),
-        ));
-        cpu_elements.push(Element::from(settings::item(
-            fl!("enable-cpu"),
-            widget::toggler(None, self.config.enable_cpu, |value| {
-                Message::ToggleCpu(value)
-            }),
-        )));
-        let cpu_row = Row::with_children(cpu_elements)
-            .align_items(Alignment::Center)
-            .spacing(0);
-
-        let mut mem_elements = Vec::new();
-        mem_elements.push(Element::from(
-            self.core
-                .applet
-                .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_mem))
-                .on_press(Message::TogglePopup)
-                .style(cosmic::theme::Button::AppletIcon),
-        ));
-        mem_elements.push(Element::from(settings::item(
-            fl!("enable-memory"),
-            widget::toggler(None, self.config.enable_mem, |value| {
-                Message::ToggleMemory(value)
-            }),
-        )));
-        let mem_row = Row::with_children(mem_elements)
-            .align_items(Alignment::Center)
-            .spacing(0);
-
-        let mut refresh_elements = Vec::new();
-
-        let button_plus = cosmic::widget::button(Element::from(self.core.applet.text("-"))).on_press(Message::RefreshRateDown);
-        let button_minus = cosmic::widget::button(Element::from(self.core.applet.text("+"))).on_press(Message::RefreshRateUp);
-        let rate_str = format!(" {:.2} ", self.config.refresh_rate as f64/1000.0 );
-        refresh_elements.push(button_plus.into());
-        refresh_elements.push(Element::from(self.core.applet.text(rate_str)));
-        refresh_elements.push(button_minus.into());
-
-        let refresh_row = Row::with_children(refresh_elements)
-        .align_items(Alignment::Center)
-        .spacing(0);
-
-        let content_list = widget::list_column()
-            .padding(5)
-            .spacing(0)
-            .add(settings::item(
-                fl!("text-only"),
-                widget::toggler(None, self.config.text_only, |value| {
-                    Message::ToggleTextMode(value)
-                }),
-            ))
-            .add(Element::from(cpu_row))
-            .add(Element::from(mem_row))
-            .add(settings::item(
-                fl!("refresh-rate"),
-                Element::from(refresh_row),
+        //println!("=====view_window=====");
+        if !self.colorpicker.active {
+            let mut cpu_elements = Vec::new();
+            cpu_elements.push(Element::from(
+                self.core
+                    .applet
+                    .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_cpu))
+                    .on_press(Message::TogglePopup)
+                    .style(cosmic::theme::Button::AppletIcon),
             ));
+            cpu_elements.push(Element::from(settings::item(
+                fl!("enable-cpu"),
+                widget::toggler(None, self.config.enable_cpu, |value| {
+                    Message::ToggleCpu(value)
+                }),
+            )));
+            let cpu_row = Row::with_children(cpu_elements)
+                .align_items(Alignment::Center)
+                .spacing(0);
 
-        self.core.applet.popup_container(content_list).into()
+            let mut mem_elements = Vec::new();
+            mem_elements.push(Element::from(
+                self.core
+                    .applet
+                    .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_mem))
+                    .on_press(Message::TogglePopup)
+                    .style(cosmic::theme::Button::AppletIcon),
+            ));
+            mem_elements.push(Element::from(settings::item(
+                fl!("enable-memory"),
+                widget::toggler(None, self.config.enable_mem, |value| {
+                    Message::ToggleMemory(value)
+                }),
+            )));
+            let mem_row = Row::with_children(mem_elements)
+                .align_items(Alignment::Center)
+                .spacing(0);
+
+            let mut refresh_elements = Vec::new();
+
+            let button_plus =
+                cosmic::widget::button(Element::from(self.core.applet.text(" - "))).on_press(
+                    Message::RefreshRateDown,
+                );
+            let button_minus = cosmic::widget::button(Element::from(self.core.applet.text(" + ")))
+                .on_press(Message::RefreshRateUp);
+            let rate_str = format!(" {:.2} ", self.config.refresh_rate as f64 / 1000.0);
+            refresh_elements.push(button_plus.into());
+            refresh_elements.push(Element::from(self.core.applet.text(rate_str)));
+            refresh_elements.push(button_minus.into());
+
+            let refresh_row = Row::with_children(refresh_elements)
+                .align_items(Alignment::Center)
+                .spacing(0);
+
+            let content_list = widget::list_column()
+                .padding(5)
+                .spacing(0)
+                .add(settings::item(
+                    fl!("text-only"),
+                    widget::toggler(None, self.config.text_only, |value| {
+                        Message::ToggleTextMode(value)
+                    }),
+                ))
+                .add(Element::from(cpu_row))
+                .add(Element::from(mem_row))
+                .add(settings::item(
+                    fl!("refresh-rate"),
+                    Element::from(refresh_row),
+                ))
+                .add(row!(
+                    widget::horizontal_space(Length::Fill),
+                    cosmic::widget::button(Element::from(self.core.applet.text(" CPU colors ")))
+                    .on_press(Message::ColorPickerOpen(GraphKind::Cpu)),
+                    widget::horizontal_space(Length::Fill),
+                    cosmic::widget::button(Element::from(self.core.applet.text(" Mem colors ")))
+                    .on_press(Message::ColorPickerOpen(GraphKind::Memory)),
+                    widget::horizontal_space(Length::Fill)
+
+                ).padding(10));
+
+            return self.core.applet.popup_container(content_list).into();
+        }
+        let title = format!("{:?} colors", self.colorpicker.graph_kind);
+        let red_val = format!("  {}", self.colorpicker.slider_red_val);
+        let green_val = format!("  {}", self.colorpicker.slider_green_val);
+        let blue_val = format!("  {}", self.colorpicker.slider_blue_val);
+
+        let current_variant = self.colorpicker.color_variant;
+
+        let c = widget::list_column()
+            .padding(5)
+            .spacing(5)
+            .add(
+                widget::text::title2(title)
+                    .width(Length::Fill)
+                    .horizontal_alignment(Horizontal::Center),
+            )
+            .add(
+                widget::svg(widget::svg::Handle::from_memory(
+                    self.colorpicker.example_svg.to_string().into_bytes(),
+                ))
+                .width(Length::Fill)
+                .height(100),
+            )
+            .add(row!(
+                widget::svg(widget::svg::Handle::from_memory(RED_RECT.as_bytes()))
+                    .width(Length::Fill)
+                    .height(20),
+                widget::slider(
+                    0..=255,
+                    self.colorpicker.slider_red_val,
+                    Message::ColorPickerSliderRedChanged
+                )
+                .width(Length::Fixed(250.0))
+                .height(38),
+                widget::text("  "),
+                widget::text_input("", red_val).width(50)
+            ))
+            .add(row!(
+                widget::svg(widget::svg::Handle::from_memory(GREEN_RECT.as_bytes()))
+                    
+                    .height(20),
+                widget::slider(
+                    0..=255,
+                    self.colorpicker.slider_green_val,
+                    Message::ColorPickerSliderGreenChanged
+                )
+                .width(Length::Fixed(250.0))
+                .height(38),
+                widget::text("  "),
+                widget::text_input("", green_val).width(50)
+            ))
+            .add(row!(
+                widget::svg(widget::svg::Handle::from_memory(BLUE_RECT.as_bytes()))
+                    .width(Length::Fill)
+                    .height(20),
+                widget::slider(
+                    0..=255,
+                    self.colorpicker.slider_blue_val,
+                    Message::ColorPickerSliderBlueChanged
+                )
+                .width(Length::Fixed(250.0))
+                .height(38),
+                widget::text("  "),
+                widget::text_input("", blue_val).width(50)
+            ))
+            .add(row!(
+                widget::radio(
+                    GraphColorVariant::RingFront.as_str(),
+                    GraphColorVariant::RingFront,
+                    if current_variant == GraphColorVariant::RingFront {
+                        Some(GraphColorVariant::RingFront)
+                    } else {
+                        None
+                    },
+                    |m| { Message::ColorPickerSelectVariant(m) }
+                ),
+                widget::radio(
+                    GraphColorVariant::RingBack.as_str(),
+                    GraphColorVariant::RingBack,
+                    if current_variant == GraphColorVariant::RingBack {
+                        Some(GraphColorVariant::RingBack)
+                    } else {
+                        None
+                    },
+                    |m| { Message::ColorPickerSelectVariant(m) }
+                ),
+                widget::radio(
+                    GraphColorVariant::Background.as_str(),
+                    GraphColorVariant::Background,
+                    if current_variant == GraphColorVariant::Background {
+                        Some(GraphColorVariant::Background)
+                    } else {
+                        None
+                    },
+                    |m| { Message::ColorPickerSelectVariant(m) }
+                ),
+                widget::radio(
+                    GraphColorVariant::Text.as_str(),
+                    GraphColorVariant::Text,
+                    if current_variant == GraphColorVariant::Text {
+                        Some(GraphColorVariant::Text)
+                    } else {
+                        None
+                    },
+                    |m| { Message::ColorPickerSelectVariant(m) }
+                )
+            ))
+            .add(
+                row!(
+                    widget::button::standard("Defaults").on_press(Message::ColorPickerDefaults),
+                    row!(
+                        widget::horizontal_space(Length::Fill),
+                        widget::button::destructive("Cancel")
+                            .on_press(Message::ColorPickerClose(false)),
+                        widget::button::suggested("Save").on_press(Message::ColorPickerClose(true))
+                    )
+                    .width(Length::Fill)
+                    .spacing(5)
+                    .align_items(Alignment::End)
+                )
+                .padding(5)
+                .spacing(5)
+                .width(Length::Fill),
+            );
+
+        return self.core.applet.popup_container(c).into();
     }
 
     /// Application messages are handled here. The application state can be modified based on
     /// what message was received. Commands may be returned for asynchronous execution on a
     /// background thread managed by the application's executor.
     fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
+        //        println!("=====update {:?}=====", message);
         match message {
             Message::TogglePopup => {
                 return if let Some(p) = self.popup.take() {
+                    self.colorpicker.active = false;
                     destroy_popup(p)
                 } else {
                     let new_id = Id::unique();
@@ -337,9 +538,113 @@ impl cosmic::Application for Minimon {
                     get_popup(popup_settings)
                 }
             }
+            Message::ColorPickerOpen(kind) => {
+                
+                if kind == GraphKind::Cpu {
+                    self.colorpicker.graph_colors = self.config.cpu_colors;
+                } else {
+                    self.colorpicker.graph_colors = self.config.mem_colors;
+                }
+                
+                self.colorpicker.graph_kind = kind;
+                self.colorpicker.active = true;
+                let col = self
+                    .colorpicker
+                    .graph_colors
+                    .to_srgb(self.colorpicker.color_variant);
+                self.colorpicker.slider_red_val = col.red;
+                self.colorpicker.slider_green_val = col.green;
+                self.colorpicker.slider_blue_val = col.blue;
+                self.colorpicker
+                    .example_svg
+                    .set_colors(&self.colorpicker.graph_colors);
+            }
 
+            Message::ColorPickerClose(save) => {
+                self.colorpicker.active = false;
+
+                if save {
+                    if self.colorpicker.graph_kind == GraphKind::Cpu {
+                        self.config.cpu_colors = self.colorpicker.graph_colors;
+                        self.svgstat_cpu.set_colors(&self.config.cpu_colors);
+                    } else {
+                        self.config.mem_colors = self.colorpicker.graph_colors;
+                        self.svgstat_mem.set_colors(&self.config.mem_colors);
+                    }
+                }
+
+                self.save_config();
+            }
+
+            Message::ColorPickerDefaults => {
+                self.colorpicker.graph_colors = GraphColors::new(self.colorpicker.graph_kind);
+                self.colorpicker
+                    .example_svg
+                    .set_colors(&self.colorpicker.graph_colors);
+                let col = self
+                    .colorpicker
+                    .graph_colors
+                    .to_srgb(self.colorpicker.color_variant);
+                self.colorpicker.slider_red_val = col.red;
+                self.colorpicker.slider_green_val = col.green;
+                self.colorpicker.slider_blue_val = col.blue;
+            }
+
+            Message::ColorPickerSliderRedChanged(val) => {
+                self.colorpicker.slider_red_val = val;
+                self.colorpicker.graph_colors.set_color(
+                    Srgb::from_components((
+                        self.colorpicker.slider_red_val,
+                        self.colorpicker.slider_green_val,
+                        self.colorpicker.slider_blue_val,
+                    )),
+                    self.colorpicker.color_variant,
+                );
+                self.colorpicker
+                    .example_svg
+                    .set_colors(&self.colorpicker.graph_colors);
+            }
+
+            Message::ColorPickerSliderGreenChanged(val) => {
+                self.colorpicker.slider_green_val = val;
+                self.colorpicker.graph_colors.set_color(
+                    Srgb::from_components((
+                        self.colorpicker.slider_red_val,
+                        self.colorpicker.slider_green_val,
+                        self.colorpicker.slider_blue_val,
+                    )),
+                    self.colorpicker.color_variant,
+                );
+                self.colorpicker
+                    .example_svg
+                    .set_colors(&self.colorpicker.graph_colors);
+            }
+
+            Message::ColorPickerSliderBlueChanged(val) => {
+                self.colorpicker.slider_blue_val = val;
+                self.colorpicker.graph_colors.set_color(
+                    Srgb::from_components((
+                        self.colorpicker.slider_red_val,
+                        self.colorpicker.slider_green_val,
+                        self.colorpicker.slider_blue_val,
+                    )),
+                    self.colorpicker.color_variant,
+                );
+                self.colorpicker
+                    .example_svg
+                    .set_colors(&self.colorpicker.graph_colors);
+            }
+
+            Message::ColorPickerSelectVariant(e) => {
+                self.colorpicker.color_variant = e;
+                let col = self.colorpicker.graph_colors.to_srgb(e);
+                println!("e: {e:?}. col: {col:?}");
+                self.colorpicker.slider_red_val = col.red;
+                self.colorpicker.slider_green_val = col.green;
+                self.colorpicker.slider_blue_val = col.blue;
+            }
             Message::Tick => {
-                if self.tick_timer>0 {
+                if self.tick_timer > 0 {
                     self.tick_timer -= TICK;
                 } else {
                     self.refresh_stats();
@@ -377,7 +682,7 @@ impl cosmic::Application for Minimon {
                 self.save_config();
             }
             Message::RefreshRateDown => {
-                if self.config.refresh_rate >= 2*TICK {
+                if self.config.refresh_rate >= 2 * TICK {
                     self.config.refresh_rate -= TICK;
                 }
                 self.save_config();
@@ -389,8 +694,9 @@ impl cosmic::Application for Minimon {
                 self.tick_timer = self.config.refresh_rate;
                 self.svgstat_cpu.set_colors(&self.config.cpu_colors);
                 self.svgstat_mem.set_colors(&self.config.mem_colors);
-            }            
+            }
         }
+        //println!("=====/update=====");
         Command::none()
     }
 }
