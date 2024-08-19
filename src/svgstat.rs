@@ -50,31 +50,75 @@ pub struct SvgStat {
     current_val: f64,
     max_val: u64,
     colors: GraphColors,
-    svg: String,
+
+    /// current value cpu/ram load shown. 
+    value: String,
+    /// the percentage of the ring to be filled
+    percentage: String,
+    /// colors
+    ringfront_color: String,
+    text_color: String,
+    circle_colors: String,
 }
+
+use std::fmt::Write;
 
 impl SvgStat {
     pub fn new(max_val: u64) -> Self {
+
+        // value and percentage are pre-allocated and reused as they're changed often.
+        let mut percentage = String::with_capacity(6);
+        write!(percentage, "0").unwrap();
+
+        let mut value = String::with_capacity(6);
+        write!(value, "0").unwrap();
+
         let mut svg = SvgStat {
             current_val: 0.0,
             max_val,
             colors: GraphColors::default(),
-            svg: String::with_capacity(SVG_LEN),
+
+            value: value,
+            percentage: percentage,
+
+            ringfront_color: String::new(),
+            text_color: String::new(),
+            circle_colors: String::new(),
         };
-        svg.generate_svg();
+        svg.set_colors(GraphColors::default());
         svg
     }
 
     pub fn set_variable(&mut self, val: f64) {
         if self.current_val != val {
+
             self.current_val = val;
-            self.generate_svg();
-        }
+
+            self.value.clear();
+            if self.current_val < 10.0 {
+                write!(self.value, "{:.2}", self.current_val).unwrap();
+            } else if self.current_val < 100.0 {
+                write!(self.value, "{:.1}", self.current_val).unwrap();
+            } else {
+                write!(self.value, "{}", self.current_val).unwrap();
+            }
+
+            #[allow(clippy::cast_possible_truncation)]
+            let percentage: u64 = ((self.current_val / self.max_val as f64) * 100.0) as u64;
+            self.percentage.clear();
+            write!(self.percentage, "{percentage}").unwrap();
+            }
     }
 
-    pub fn set_colors(&mut self, colors: &GraphColors) {
-        self.colors = *colors;
-        self.generate_svg();
+    pub fn set_colors(&mut self, colors: GraphColors) {
+        self.colors = colors;
+        self.ringfront_color = self.colors.ringfront_to_string();
+        self.text_color = format!(" fill:{};", &self.colors.text_to_string());
+        self.circle_colors = format!(
+            "fill=\"{}\" stroke=\"{}\"",
+            self.colors.background_to_string(),
+            self.colors.ringback_to_string()
+        );
     }
 
     pub fn colors(&self) -> GraphColors {
@@ -82,39 +126,20 @@ impl SvgStat {
     }
 
     pub fn svg(&self) -> String {
-        self.svg.clone()
-    }
 
-    fn generate_svg(&mut self) {
-        let formatted_val;
-        if self.current_val < 10.0 {
-            formatted_val = format!("{:.2}", self.current_val);
-        } else if self.current_val < 100.0 {
-            formatted_val = format!("{:.1}", self.current_val);
-        } else {
-            formatted_val = format!("{}", self.current_val);
-        }
+        let mut svg = String::with_capacity(SVG_LEN);
+        svg.push_str(SVGSTATSTART);
+        svg.push_str(&self.circle_colors);
+        svg.push_str(SVGSTATPART2);
+        svg.push_str(&self.ringfront_color);
+        svg.push_str(SVGSTATPART3);
+        svg.push_str(&self.percentage);
+        svg.push_str(SVGSTATPART4);
+        svg.push_str(&self.text_color);
+        svg.push_str(SVGSTATPART5);
+        svg.push_str(&self.value);
+        svg.push_str(SVGSTATPART6);
 
-        #[allow(clippy::cast_possible_truncation)]
-        let percentage: u64 = ((self.current_val / self.max_val as f64) * 100.0) as u64;
-
-        self.svg.clear();
-        self.svg.push_str(SVGSTATSTART);
-        self.svg.push_str(&format!(
-            "fill=\"{}\" stroke=\"{}\"",
-            self.colors.background_to_string(),
-            self.colors.ringback_to_string()
-        ));
-
-        self.svg.push_str(SVGSTATPART2);
-        self.svg.push_str(&self.colors.ringfront_to_string());
-        self.svg.push_str(SVGSTATPART3);
-        self.svg.push_str(&format!("{percentage}"));
-        self.svg.push_str(SVGSTATPART4);
-        self.svg
-            .push_str(&format!(" fill: {};", self.colors.text_to_string()));
-        self.svg.push_str(SVGSTATPART5);
-        self.svg.push_str(&formatted_val);
-        self.svg.push_str(SVGSTATPART6);
+        svg
     }
 }

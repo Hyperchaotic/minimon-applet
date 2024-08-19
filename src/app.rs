@@ -66,11 +66,11 @@ impl ColorPicker {
 
         let mut col = self.example_svg.colors();
         col.set_color(self.sliders(), self.color_variant);
-        self.example_svg.set_colors(&col);
+        self.example_svg.set_colors(col);
     }
 
     pub fn set_colors(&mut self, colors: GraphColors) {
-        self.example_svg.set_colors(&colors);
+        self.example_svg.set_colors(colors);
     }
 
     pub fn set_variant(&mut self, variant: GraphColorVariant) {
@@ -679,8 +679,8 @@ impl cosmic::Application for Minimon {
             Message::ConfigChanged(config) => {
                 self.config = config;
                 self.tick_timer = self.config.refresh_rate;
-                self.svgstat_cpu.set_colors(&self.config.cpu_colors);
-                self.svgstat_mem.set_colors(&self.config.mem_colors);
+                self.svgstat_cpu.set_colors(self.config.cpu_colors);
+                self.svgstat_mem.set_colors(self.config.mem_colors);
             }
         }
         Command::none()
@@ -706,11 +706,11 @@ impl Minimon {
         match kind {
             GraphKind::Cpu => {
                 self.config.cpu_colors = colors;
-                self.svgstat_cpu.set_colors(&colors);
+                self.svgstat_cpu.set_colors(colors);
             }
             GraphKind::Memory => {
                 self.config.mem_colors = colors;
-                self.svgstat_mem.set_colors(&colors);
+                self.svgstat_mem.set_colors(colors);
             }
         }
     }
