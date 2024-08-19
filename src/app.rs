@@ -129,7 +129,6 @@ pub struct Minimon {
     /// this counter can be set higher and controls refresh/update rate.
     /// Refreshes machine stats when reaching 0 and is reset to configured rate.
     tick_timer: u64,
-    information: String,
 }
 
 #[derive(Debug, Clone)]
@@ -171,36 +170,6 @@ impl cosmic::Application for Minimon {
         system.refresh_cpu_all();
         let mem_physical = system.total_memory();
 
-        let mut info = String::new();
-
-        info.push_str(&format!(
-            "    {} {}\n",
-            System::name().unwrap_or_default(),
-            System::os_version().unwrap_or_default(),
-        ));
-
-        info.push_str(&format!(
-            "        Kernel version:   {}\n",
-            System::kernel_version().unwrap_or_default()
-        ));
-
-        let mem = system
-            .total_memory()
-            .to_string()
-            .as_bytes()
-            .rchunks(3)
-            .rev()
-            .map(std::str::from_utf8)
-            .collect::<Result<Vec<&str>, _>>()
-            .unwrap()
-            .join(",");
-
-        info.push_str(&format!("        Total memory: {mem} bytes\n"));
-        info.push_str(&format!(
-            "        Number of CPU cores: {}\n ",
-            system.cpus().len()
-        ));
-
         let app = Minimon {
             core,
             system,
@@ -212,7 +181,6 @@ impl cosmic::Application for Minimon {
             colorpicker: ColorPicker::default(),
             config: MinimonConfig::default(),
             tick_timer: 1000,
-            information: info,
         };
 
         (app, Command::none())
@@ -425,11 +393,6 @@ impl cosmic::Application for Minimon {
 
             let content_list = widget::list_column()
                 .spacing(5)
-                .add(
-                    widget::text::body(self.information.clone())
-                        .width(Length::Fill)
-                        .horizontal_alignment(Horizontal::Left),
-                )
                 .add(settings::item(
                     fl!("text-only"),
                     widget::toggler(None, self.config.text_only, |value| {
