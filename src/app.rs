@@ -220,6 +220,7 @@ impl cosmic::Application for Minimon {
     }
 
     fn view(&self) -> Element<Message> {
+
         let horizontal = matches!(
             self.core.applet.anchor,
             PanelAnchor::Top | PanelAnchor::Bottom
@@ -437,7 +438,7 @@ impl cosmic::Application for Minimon {
             )
             .add(
                 widget::svg(widget::svg::Handle::from_memory(
-                    self.colorpicker.example_svg.to_string().into_bytes(),
+                    self.colorpicker.example_svg.svg().into_bytes(),
                 ))
                 .width(Length::Fill)
                 .height(100),
@@ -689,7 +690,7 @@ impl cosmic::Application for Minimon {
 use cosmic::Application;
 impl Minimon {
     fn make_icon_handle(svgstat: &SvgStat) -> cosmic::widget::icon::Handle {
-        cosmic::widget::icon::from_svg_bytes(svgstat.to_string().as_bytes().to_owned())
+        cosmic::widget::icon::from_svg_bytes(svgstat.svg().into_bytes())
     }
 
     fn save_config(&self) {
@@ -715,20 +716,24 @@ impl Minimon {
     }
 
     fn refresh_stats(&mut self) {
-        self.system.refresh_cpu_usage();
-        self.system.refresh_memory();
 
-        self.cpu_load = self
-            .system
-            .cpus()
-            .iter()
-            .map(|p| f64::from(p.cpu_usage()))
-            .sum::<f64>()
-            / self.system.cpus().len() as f64;
+        if self.config.enable_cpu {
+            self.system.refresh_cpu_usage();
+            self.cpu_load = self
+                .system
+                .cpus()
+                .iter()
+                .map(|p| f64::from(p.cpu_usage()))
+                .sum::<f64>()
+                / self.system.cpus().len() as f64;
 
-        self.mem_usage = self.system.used_memory() as f64 / 1_073_741_824.0;
+            self.mem_usage = self.system.used_memory() as f64 / 1_073_741_824.0;
+            self.svgstat_cpu.set_variable(self.cpu_load);
+        }
 
-        self.svgstat_cpu.set_variable(self.cpu_load);
-        self.svgstat_mem.set_variable(self.mem_usage);
+        if self.config.enable_cpu {
+            self.system.refresh_memory();
+            self.svgstat_mem.set_variable(self.mem_usage);
+        }
     }
 }
