@@ -12,6 +12,10 @@ use cosmic::iced_style::application;
 use cosmic::widget::{self, settings};
 use cosmic::{Element, Theme};
 
+use std::sync::atomic::{self, AtomicU64};
+use std::sync::Arc;
+
+
 //use chrono::{Datelike, DurationRound, Timelike};
 use cosmic::{
     applet::cosmic_panel_config::PanelAnchor,
@@ -129,6 +133,8 @@ pub struct Minimon {
     /// this counter can be set higher and controls refresh/update rate.
     /// Refreshes machine stats when reaching 0 and is reset to configured rate.
     tick_timer: u64,
+    /// tick can be 250, 500 or 1000, depending on refresh rate modolu tick
+    tick: Arc<AtomicU64>,
 }
 
 #[derive(Debug, Clone)]
@@ -180,7 +186,8 @@ impl cosmic::Application for Minimon {
             popup: None,
             colorpicker: ColorPicker::default(),
             config: MinimonConfig::default(),
-            tick_timer: 1000,
+            tick_timer: TICK,
+            tick: Arc::new(AtomicU64::new(TICK)),
         };
 
         (app, Command::none())
@@ -199,16 +206,20 @@ impl cosmic::Application for Minimon {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        fn time_subscription() -> Subscription<()> {
-            subscription::unfold("time-sub", (), move |()| async move {
-                let duration = time::Duration::from_millis(TICK);
-                tokio::time::sleep(duration).await;
-                ((), ())
+        fn time_subscription(tick: std::sync::Arc<AtomicU64>) -> Subscription<()> {
+            subscription::unfold("time-sub", (), move |()| {
+                let atomic = tick.clone();
+                async move {
+                    let val = atomic.load(atomic::Ordering::Relaxed);
+                    let duration = time::Duration::from_millis(val);
+                    tokio::time::sleep(duration).await;
+                    ((), ())
+                }
             })
         }
 
         Subscription::batch(vec![
-            time_subscription().map(|()| Message::Tick),
+            time_subscription(self.tick.clone()).map(|()| Message::Tick),
             self.core
                 .watch_config(Self::APP_ID)
                 .map(|u| Message::ConfigChanged(u.config)),
@@ -220,7 +231,6 @@ impl cosmic::Application for Minimon {
     }
 
     fn view(&self) -> Element<Message> {
-
         let horizontal = matches!(
             self.core.applet.anchor,
             PanelAnchor::Top | PanelAnchor::Bottom
@@ -632,12 +642,20 @@ impl cosmic::Application for Minimon {
                 self.colorpicker.set_variant(variant);
             }
             Message::Tick => {
-                if self.tick_timer > 0 {
-                    self.tick_timer -= TICK;
-                } else {
-                    self.refresh_stats();
+                let tick = self.tick.load(atomic::Ordering::Relaxed);
+                println!(
+                    "Message::Tick. refresh_rate: {}. tick_timer: {}. tick: {}",
+                    self.config.refresh_rate, self.tick_timer, tick
+                );
+                if self.tick_timer == 0 {
                     self.tick_timer = self.config.refresh_rate;
-                }
+                    self.refresh_stats();
+                    println!(" Updating! ");
+                } else if self.tick_timer > tick {
+                    self.tick_timer -= tick;
+                } else {
+                    self.tick_timer = 0;
+                };
             }
             Message::PopupClosed(id) => {
                 if self.popup.as_ref() == Some(&id) {
@@ -665,14 +683,16 @@ impl cosmic::Application for Minimon {
 
             Message::RefreshRateUp => {
                 if self.config.refresh_rate < 10000 {
-                    self.config.refresh_rate += TICK;
+                    self.config.refresh_rate += 250;
                 }
+                self.set_tick();
                 self.save_config();
             }
             Message::RefreshRateDown => {
-                if self.config.refresh_rate >= 2 * TICK {
-                    self.config.refresh_rate -= TICK;
+                if self.config.refresh_rate >= 500 {
+                    self.config.refresh_rate -= 250;
                 }
+                self.set_tick();
                 self.save_config();
             }
 
@@ -681,6 +701,7 @@ impl cosmic::Application for Minimon {
                 self.tick_timer = self.config.refresh_rate;
                 self.svgstat_cpu.set_colors(self.config.cpu_colors);
                 self.svgstat_mem.set_colors(self.config.mem_colors);
+                self.set_tick();
             }
         }
         Command::none()
@@ -715,8 +736,17 @@ impl Minimon {
         }
     }
 
-    fn refresh_stats(&mut self) {
+    fn set_tick(&mut self) {
+        self.tick.store(if self.config.refresh_rate % 1000 == 0 {
+            1000
+        } else if self.config.refresh_rate % 500 == 0 {
+            500
+        } else {
+            250
+        }, atomic::Ordering::Relaxed);
+    }
 
+    fn refresh_stats(&mut self) {
         if self.config.enable_cpu {
             self.system.refresh_cpu_usage();
             self.cpu_load = self
