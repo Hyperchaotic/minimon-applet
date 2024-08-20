@@ -77,10 +77,8 @@ impl SvgStat {
             current_val: 0.0,
             max_val,
             colors: GraphColors::default(),
-
-            value: value,
-            percentage: percentage,
-
+            value,
+            percentage,
             ringfront_color: String::new(),
             text_color: String::new(),
             circle_colors: String::new(),

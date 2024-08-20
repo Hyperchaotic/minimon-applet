@@ -15,8 +15,6 @@ use cosmic::{Element, Theme};
 use std::sync::atomic::{self, AtomicU64};
 use std::sync::Arc;
 
-
-//use chrono::{Datelike, DurationRound, Timelike};
 use cosmic::{
     applet::cosmic_panel_config::PanelAnchor,
     iced::{
@@ -161,7 +159,6 @@ pub enum Message {
 }
 
 impl cosmic::Application for Minimon {
-    //    type Executor = cosmic::SingleThreadExecutor;
     type Executor = cosmic::executor::Default;
 
     type Flags = ();
@@ -458,25 +455,17 @@ impl cosmic::Application for Minimon {
                     widget::svg(widget::svg::Handle::from_memory(RED_RECT.as_bytes()))
                         .width(Length::Fill)
                         .height(20),
-                    widget::slider(
-                        0..=255,
-                        self.colorpicker.slider_red_val,
-                        Message::ColorPickerSliderRedChanged
-                    )
-                    .width(Length::Fixed(250.0))
-                    .height(38),
+                    widget::slider(0..=255, color.red, Message::ColorPickerSliderRedChanged)
+                        .width(Length::Fixed(250.0))
+                        .height(38),
                     widget::text("  "),
                     widget::text_input("", red_val).width(50)
                 ),
                 row!(
                     widget::svg(widget::svg::Handle::from_memory(GREEN_RECT.as_bytes())).height(20),
-                    widget::slider(
-                        0..=255,
-                        self.colorpicker.slider_green_val,
-                        Message::ColorPickerSliderGreenChanged
-                    )
-                    .width(Length::Fixed(250.0))
-                    .height(38),
+                    widget::slider(0..=255, color.green, Message::ColorPickerSliderGreenChanged)
+                        .width(Length::Fixed(250.0))
+                        .height(38),
                     widget::text("  "),
                     widget::text_input("", green_val).width(50)
                 ),
@@ -484,13 +473,9 @@ impl cosmic::Application for Minimon {
                     widget::svg(widget::svg::Handle::from_memory(BLUE_RECT.as_bytes()))
                         .width(Length::Fill)
                         .height(20),
-                    widget::slider(
-                        0..=255,
-                        self.colorpicker.slider_blue_val,
-                        Message::ColorPickerSliderBlueChanged
-                    )
-                    .width(Length::Fixed(250.0))
-                    .height(38),
+                    widget::slider(0..=255, color.blue, Message::ColorPickerSliderBlueChanged)
+                        .width(Length::Fixed(250.0))
+                        .height(38),
                     widget::text("  "),
                     widget::text_input("", blue_val).width(50)
                 )
@@ -643,14 +628,9 @@ impl cosmic::Application for Minimon {
             }
             Message::Tick => {
                 let tick = self.tick.load(atomic::Ordering::Relaxed);
-                println!(
-                    "Message::Tick. refresh_rate: {}. tick_timer: {}. tick: {}",
-                    self.config.refresh_rate, self.tick_timer, tick
-                );
                 if self.tick_timer == 0 {
                     self.tick_timer = self.config.refresh_rate;
                     self.refresh_stats();
-                    println!(" Updating! ");
                 } else if self.tick_timer > tick {
                     self.tick_timer -= tick;
                 } else {
@@ -737,13 +717,16 @@ impl Minimon {
     }
 
     fn set_tick(&mut self) {
-        self.tick.store(if self.config.refresh_rate % 1000 == 0 {
-            1000
-        } else if self.config.refresh_rate % 500 == 0 {
-            500
-        } else {
-            250
-        }, atomic::Ordering::Relaxed);
+        self.tick.store(
+            if self.config.refresh_rate % 1000 == 0 {
+                1000
+            } else if self.config.refresh_rate % 500 == 0 {
+                500
+            } else {
+                250
+            },
+            atomic::Ordering::Relaxed,
+        );
     }
 
     fn refresh_stats(&mut self) {
