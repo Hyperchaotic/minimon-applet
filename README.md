@@ -10,7 +10,7 @@ A little applet for displaying total CPU load and/or memory usage. Can sit in th
 
 ![screenshot-2024-08-15-01-02-19](https://github.com/user-attachments/assets/c1e8bc40-d678-44d0-ae6e-e3036102f4a1)
 
-![color-picker](https://github.com/user-attachments/assets/9a40ce00-cf8e-4c03-ae1d-602e4904a601)
+![color-picker](https://github.com/user-attachments/assets/5d7e23f3-cdf2-488c-8dbd-eb3cede16188)
 
 
 Thanks to [@edfloreshz](https://github.com/edfloreshz) for the applet template :)
