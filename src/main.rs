@@ -7,6 +7,7 @@ mod app;
 mod core;
 mod svgstat;
 mod config;
+mod colorpicker;
 
 /// The `cosmic::app::run()` function is the starting point of your application.
 /// It takes two arguments:

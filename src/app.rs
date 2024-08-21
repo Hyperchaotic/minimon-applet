@@ -1,5 +1,4 @@
 use cosmic::cosmic_config::CosmicConfigEntry;
-use cosmic::cosmic_theme::palette::Srgb;
 use cosmic::iced::alignment::Horizontal;
 use std::time;
 use sysinfo::System;
@@ -9,7 +8,11 @@ use cosmic::iced::wayland::popup::{destroy_popup, get_popup};
 use cosmic::iced::window::Id;
 use cosmic::iced::{subscription, Limits};
 use cosmic::iced_style::application;
-use cosmic::widget::{self, settings};
+use cosmic::widget::settings;
+use cosmic::{
+    iced::{gradient::ColorStop, Color, Length},
+    widget,
+};
 use cosmic::{Element, Theme};
 
 use std::sync::atomic::{self, AtomicU64};
@@ -19,92 +22,53 @@ use cosmic::{
     applet::cosmic_panel_config::PanelAnchor,
     iced::{
         widget::{column, row, vertical_space},
-        Alignment, Length, Subscription,
+        Alignment, Subscription,
     },
     iced_widget::{Column, Row},
     widget::{container, horizontal_space},
 };
 
+use crate::colorpicker::ColorPicker;
 use crate::config::{GraphColorVariant, GraphColors, GraphKind};
 use crate::svgstat::SvgStat;
 use crate::{config::MinimonConfig, fl};
 
 const TICK: u64 = 250;
 
-const RED_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"red\" /></svg>";
-const GREEN_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"green\" /></svg>";
-const BLUE_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"blue\" /></svg>";
+pub const RED_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"red\" /></svg>";
+pub const GREEN_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"green\" /></svg>";
+pub const BLUE_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"blue\" /></svg>";
 
-/// Data for managing the colorpicker dialog
-#[derive(Debug)]
-struct ColorPicker {
-    /// If dialog is active this is not None
-    active: bool,
-    /// Type of current displaying device CPU or Memory
-    graph_kind: GraphKind,
-    // Current field being adjusted background/text/etc.
-    color_variant: GraphColorVariant,
-    /// An example SVG to show the changes
-    example_svg: SvgStat,
-    ///Current slider values
-    slider_red_val: u8,
-    slider_green_val: u8,
-    slider_blue_val: u8,
-}
-
-impl ColorPicker {
-    pub fn sliders(&self) -> Srgb<u8> {
-        Srgb::from_components((
-            self.slider_red_val,
-            self.slider_green_val,
-            self.slider_blue_val,
-        ))
-    }
-
-    pub fn set_sliders(&mut self, color: Srgb<u8>) {
-        self.slider_red_val = color.red;
-        self.slider_green_val = color.green;
-        self.slider_blue_val = color.blue;
-
-        let mut col = self.example_svg.colors();
-        col.set_color(self.sliders(), self.color_variant);
-        self.example_svg.set_colors(col);
-    }
-
-    pub fn set_colors(&mut self, colors: GraphColors) {
-        self.example_svg.set_colors(colors);
-    }
-
-    pub fn set_variant(&mut self, variant: GraphColorVariant) {
-        self.color_variant = variant;
-
-        let col = self.example_svg.colors().to_srgb(variant);
-
-        self.slider_red_val = col.red;
-        self.slider_green_val = col.green;
-        self.slider_blue_val = col.blue;
-    }
-
-    pub fn colors(&self) -> GraphColors {
-        self.example_svg.colors()
-    }
-}
-
-impl Default for ColorPicker {
-    fn default() -> Self {
-        let mut dev = SvgStat::new(100);
-        dev.set_variable(50.0);
-        Self {
-            active: false,
-            graph_kind: GraphKind::Cpu,
-            color_variant: GraphColorVariant::RingFront,
-            example_svg: dev,
-            slider_red_val: 0,
-            slider_green_val: 0,
-            slider_blue_val: 0,
-        }
-    }
-}
+const COLOR_STOPS_RED: [ColorStop; 2] = [
+    ColorStop {
+        offset: 0.0,
+        color: Color::from_rgb(0.0, 0.0, 0.0),
+    },
+    ColorStop {
+        offset: 1.0,
+        color: Color::from_rgb(1.0, 0.0, 0.0),
+    },
+];
+const COLOR_STOPS_GREEN: [ColorStop; 2] = [
+    ColorStop {
+        offset: 0.0,
+        color: Color::from_rgb(0.0, 0.0, 0.0),
+    },
+    ColorStop {
+        offset: 1.0,
+        color: Color::from_rgb(0.0, 1.0, 0.0),
+    },
+];
+const COLOR_STOPS_BLUE: [ColorStop; 2] = [
+    ColorStop {
+        offset: 0.0,
+        color: Color::from_rgb(0.0, 0.0, 0.0),
+    },
+    ColorStop {
+        offset: 1.0,
+        color: Color::from_rgb(0.0, 0.0, 1.0),
+    },
+];
 
 /// This is the struct that represents your application.
 /// It is used to define the data that will be used by your application.
@@ -351,7 +315,7 @@ impl cosmic::Application for Minimon {
     }
 
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
-        if !self.colorpicker.active {
+        if !self.colorpicker.is_active() {
             let mut cpu_elements = Vec::new();
             cpu_elements.push(Element::from(
                 self.core
@@ -451,40 +415,66 @@ impl cosmic::Application for Minimon {
                 .height(100),
             )
             .add(column!(
-                row!(
-                    widget::svg(widget::svg::Handle::from_memory(RED_RECT.as_bytes()))
-                        .width(Length::Fill)
-                        .height(20),
-                    widget::slider(0..=255, color.red, Message::ColorPickerSliderRedChanged)
-                        .width(Length::Fixed(250.0))
-                        .height(38),
-                    widget::text("  "),
-                    widget::text_input("", color.red.to_string())
-                        .width(50)
-                        .on_input(Message::TextInputRedChanged)
+                Element::from(
+                    row!(
+                        widget::horizontal_space(Length::Fill),
+                        widget::svg(widget::svg::Handle::from_memory(RED_RECT.as_bytes()))
+                            .height(20),
+                        widget::horizontal_space(Length::Fill),
+                        ColorPicker::color_slider(
+                            0..=255,
+                            color.red,
+                            Message::ColorPickerSliderRedChanged,
+                            &COLOR_STOPS_RED
+                        ),
+                        widget::horizontal_space(Length::Fill),
+                        widget::text_input("", color.red.to_string())
+                            .width(50)
+                            .on_input(Message::TextInputRedChanged),
+                        widget::horizontal_space(Length::Fill),
+                    )
+                    .align_items(Alignment::Center)
                 ),
-                row!(
-                    widget::svg(widget::svg::Handle::from_memory(GREEN_RECT.as_bytes())).height(20),
-                    widget::slider(0..=255, color.green, Message::ColorPickerSliderGreenChanged)
-                        .width(Length::Fixed(250.0))
-                        .height(38),
-                    widget::text("  "),
-                    widget::text_input("", color.green.to_string())
-                        .width(50)
-                        .on_input(Message::TextInputGreenChanged)
+                Element::from(
+                    row!(
+                        widget::horizontal_space(Length::Fill),
+                        widget::svg(widget::svg::Handle::from_memory(GREEN_RECT.as_bytes()))
+                            .height(20),
+                        widget::horizontal_space(Length::Fill),
+                        ColorPicker::color_slider(
+                            0..=255,
+                            color.green,
+                            Message::ColorPickerSliderGreenChanged,
+                            &COLOR_STOPS_GREEN
+                        ),
+                        widget::horizontal_space(Length::Fill),
+                        widget::text_input("", color.green.to_string())
+                            .width(50)
+                            .on_input(Message::TextInputGreenChanged),
+                        widget::horizontal_space(Length::Fill),
+                    )
+                    .align_items(Alignment::Center)
                 ),
-                row!(
-                    widget::svg(widget::svg::Handle::from_memory(BLUE_RECT.as_bytes()))
-                        .width(Length::Fill)
-                        .height(20),
-                    widget::slider(0..=255, color.blue, Message::ColorPickerSliderBlueChanged)
-                        .width(Length::Fixed(250.0))
-                        .height(38),
-                    widget::text("  "),
-                    widget::text_input("", color.blue.to_string())
-                        .width(50)
-                        .on_input(Message::TextInputBlueChanged)
-                )
+                Element::from(
+                    row!(
+                        widget::horizontal_space(Length::Fill),
+                        widget::svg(widget::svg::Handle::from_memory(BLUE_RECT.as_bytes()))
+                            .height(20),
+                        widget::horizontal_space(Length::Fill),
+                        ColorPicker::color_slider(
+                            0..=255,
+                            color.blue,
+                            Message::ColorPickerSliderBlueChanged,
+                            &COLOR_STOPS_BLUE
+                        ),
+                        widget::horizontal_space(Length::Fill),
+                        widget::text_input("", color.blue.to_string())
+                            .width(50)
+                            .on_input(Message::TextInputBlueChanged),
+                        widget::horizontal_space(Length::Fill),
+                    )
+                    .align_items(Alignment::Center)
+                ),
             ))
             .add(row!(
                 widget::radio(
@@ -557,7 +547,7 @@ impl cosmic::Application for Minimon {
         match message {
             Message::TogglePopup => {
                 return if let Some(p) = self.popup.take() {
-                    self.colorpicker.active = false;
+                    self.colorpicker.set_active(false);
                     destroy_popup(p)
                 } else {
                     let new_id = Id::unique();
@@ -582,7 +572,7 @@ impl cosmic::Application for Minimon {
                 }
 
                 self.colorpicker.graph_kind = kind;
-                self.colorpicker.active = true;
+                self.colorpicker.set_active(true);
 
                 let col = self
                     .colorpicker
@@ -592,7 +582,7 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ColorPickerClose(save) => {
-                self.colorpicker.active = false;
+                self.colorpicker.set_active(false);
 
                 if save {
                     self.set_colors(self.colorpicker.colors(), self.colorpicker.graph_kind);
