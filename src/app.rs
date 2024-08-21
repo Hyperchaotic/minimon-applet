@@ -156,6 +156,10 @@ pub enum Message {
     ConfigChanged(MinimonConfig),
     RefreshRateUp,
     RefreshRateDown,
+
+    TextInputRedChanged(String),
+    TextInputGreenChanged(String),
+    TextInputBlueChanged(String),
 }
 
 impl cosmic::Application for Minimon {
@@ -429,10 +433,6 @@ impl cosmic::Application for Minimon {
 
         let title = format!("{} colors", self.colorpicker.graph_kind);
 
-        let red_val = format!("  {}", color.red);
-        let green_val = format!("  {}", color.green);
-        let blue_val = format!("  {}", color.blue);
-
         let current_variant = self.colorpicker.color_variant;
 
         let c = widget::list_column()
@@ -459,7 +459,9 @@ impl cosmic::Application for Minimon {
                         .width(Length::Fixed(250.0))
                         .height(38),
                     widget::text("  "),
-                    widget::text_input("", red_val).width(50)
+                    widget::text_input("", color.red.to_string())
+                        .width(50)
+                        .on_input(Message::TextInputRedChanged)
                 ),
                 row!(
                     widget::svg(widget::svg::Handle::from_memory(GREEN_RECT.as_bytes())).height(20),
@@ -467,7 +469,9 @@ impl cosmic::Application for Minimon {
                         .width(Length::Fixed(250.0))
                         .height(38),
                     widget::text("  "),
-                    widget::text_input("", green_val).width(50)
+                    widget::text_input("", color.green.to_string())
+                        .width(50)
+                        .on_input(Message::TextInputGreenChanged)
                 ),
                 row!(
                     widget::svg(widget::svg::Handle::from_memory(BLUE_RECT.as_bytes()))
@@ -477,7 +481,9 @@ impl cosmic::Application for Minimon {
                         .width(Length::Fixed(250.0))
                         .height(38),
                     widget::text("  "),
-                    widget::text_input("", blue_val).width(50)
+                    widget::text_input("", color.blue.to_string())
+                        .width(50)
+                        .on_input(Message::TextInputBlueChanged)
                 )
             ))
             .add(row!(
@@ -683,6 +689,16 @@ impl cosmic::Application for Minimon {
                 self.svgstat_mem.set_colors(self.config.mem_colors);
                 self.set_tick();
             }
+
+            Message::TextInputRedChanged(value) => {
+                Minimon::update_slider_val(&value, &mut self.colorpicker.slider_red_val);
+            }
+            Message::TextInputGreenChanged(value) => {
+                Minimon::update_slider_val(&value, &mut self.colorpicker.slider_green_val);
+            }
+            Message::TextInputBlueChanged(value) => {
+                Minimon::update_slider_val(&value, &mut self.colorpicker.slider_blue_val);
+            }
         }
         Command::none()
     }
@@ -727,6 +743,14 @@ impl Minimon {
             },
             atomic::Ordering::Relaxed,
         );
+    }
+
+    fn update_slider_val(value: &str, slider: &mut u8) {
+        if value.is_empty() {
+            *slider = 0;
+        } else if let Ok(num) = value.parse::<u8>() {
+            *slider = num;
+        }
     }
 
     fn refresh_stats(&mut self) {
