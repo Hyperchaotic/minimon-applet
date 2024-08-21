@@ -11,7 +11,7 @@ rust-embed = "8.3.0"
 tokio = { version = "1.36.0", features = ["time"] }
 sysinfo = "0.31"
 serde = "1.0.197"
-rgb = "*"
+rgb = "0.8"
 
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"
