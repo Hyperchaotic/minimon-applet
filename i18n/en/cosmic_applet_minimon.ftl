@@ -6,3 +6,4 @@ use-adaptive = Use adaptive scale
 net-bandwidth = Network speed
 refresh-rate = Refresh rate (seconds)
 network-colors = Network Colors
+change-colors = Change colors

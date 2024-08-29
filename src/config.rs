@@ -34,9 +34,9 @@ pub enum LineGraphColorVariant {
 impl LineGraphColorVariant {
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Background => "Back.   ",
-            Self::Download => "Download.",
-            Self::Upload => "Upload.   ",
+            Self::Background => "Back. ",
+            Self::Download => "Download.    ",
+            Self::Upload => "Upload.     ",
         }
     }
 }

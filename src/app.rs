@@ -418,7 +418,7 @@ impl cosmic::Application for Minimon {
                 ),
                 row!(
                     widget::horizontal_space(Length::Fill),
-                    cosmic::widget::button(Element::from(self.core.applet.text(" Change colors ")))
+                    cosmic::widget::button(Element::from(self.core.applet.text(fl!("change-colors"))))
                         .on_press(Message::CircleColorPickerOpen(CircleGraphKind::Cpu)),
                     widget::horizontal_space(Length::Fill)
                 )
@@ -451,7 +451,7 @@ impl cosmic::Application for Minimon {
                 ),
                 row!(
                     widget::horizontal_space(Length::Fill),
-                    cosmic::widget::button(Element::from(self.core.applet.text(" Change colors ")))
+                    cosmic::widget::button(Element::from(self.core.applet.text(fl!("change-colors"))))
                         .on_press(Message::CircleColorPickerOpen(CircleGraphKind::Memory)),
                     widget::horizontal_space(Length::Fill)
                 )
@@ -536,7 +536,7 @@ impl cosmic::Application for Minimon {
                 ),
                 row!(
                     widget::horizontal_space(Length::Fill),
-                    cosmic::widget::button(Element::from(self.core.applet.text(" Change colors ")))
+                    cosmic::widget::button(Element::from(self.core.applet.text(fl!("change-colors"))))
                         .on_press(Message::LineColorPickerOpen()),
                     widget::horizontal_space(Length::Fill)
                 ),
