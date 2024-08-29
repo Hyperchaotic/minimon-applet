@@ -130,6 +130,7 @@ impl NetMon {
         download: &VecDeque<u64>,
         upload: &VecDeque<u64>,
         colors: &LineGraphColors,
+        max_y: Option<u64>
     ) -> String {
         let mut sname: String = String::new();
         {
@@ -154,7 +155,7 @@ impl NetMon {
 
             if !download.is_empty() {
                 // Configured max or adaptive
-                let max: u64 = if let Some(m) = self.max_y {
+                let max: u64 = if let Some(m) = max_y {
                     m
                 } else {
                     *std::cmp::max(
@@ -207,7 +208,7 @@ impl NetMon {
                 let _ = chart.draw_series(AreaSeries::new(
                     indexed_vec_ul.clone(),
                     0.0,
-                    ul_color.mix(0.3), // Rust color with some transparency
+                    ul_color.mix(0.5), // Rust color with some transparency
                 ));
 
                 let _ = chart.draw_series(LineSeries::new(indexed_vec_dl, &dl_color));
@@ -223,20 +224,20 @@ impl NetMon {
     pub fn svg_demo(&self, colors: &LineGraphColors) -> String {
         let download = VecDeque::from(DL_DEMO);
         let upload = VecDeque::from(UL_DEMO);
-        self.svg_draw(&download, &upload, colors)
+        self.svg_draw(&download, &upload, colors, None)
     }
 
     pub fn svg(&self) -> String {
-        self.svg_draw(&self.download, &self.upload, &self.colors)
+        self.svg_draw(&self.download, &self.upload, &self.colors, self.max_y)
     }
 }
 
 const DL_DEMO: [u64; 21] = [
-    208, 2071, 0, 1056588, 12575, 1637, 1128015, 1599, 1397, 1173024, 1228, 6910, 2493, 1102101,
+    208, 2071, 0, 1056588, 912575, 912875, 912975, 912600, 1397, 1173024, 1228, 6910, 2493, 1102101,
     380, 2287, 1109656, 1541, 3798, 1132822, 68479,
 ];
 const UL_DEMO: [u64; 21] = [
-    0, 1687, 0, 9417, 9161, 838, 6739, 1561, 3943, 7826, 750, 5353, 3947, 12372, 200, 638, 9379,
+    0, 1687, 0, 9417, 9161, 838, 6739, 1561, 212372, 312372, 412372, 512372, 512372, 512372, 412372, 312372, 112372,
     864, 0, 8587, 760,
 ];
 
