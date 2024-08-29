@@ -1,16 +1,14 @@
 # Minimon COSMIC Applet
 
 A little applet for displaying total CPU load and/or memory usage. Can sit in the panel or Dock. Can display as icons or text.  
+![cosmic-applet-minimon](https://github.com/user-attachments/assets/3228c65d-967c-453a-a022-080a95b0a65f)
 
-![Dock](https://github.com/user-attachments/assets/a0314649-3ffd-49a6-88cb-ae655a293977)
+![screenshot-2024-08-29-22-02-21](https://github.com/user-attachments/assets/679a2026-a0ee-455a-8d1d-b0eda7ab9719)
 
-![panel-circles](https://github.com/user-attachments/assets/5ad4fa80-d461-4cd3-aa92-ea25a09339d3)
-
-![settings](https://github.com/user-attachments/assets/b5c5c238-c751-4811-9c53-7660d99287b6)
 
 ![screenshot-2024-08-15-01-02-19](https://github.com/user-attachments/assets/c1e8bc40-d678-44d0-ae6e-e3036102f4a1)
 
-![color-picker](https://github.com/user-attachments/assets/5d7e23f3-cdf2-488c-8dbd-eb3cede16188)
+)
 
 
 Thanks to [@edfloreshz](https://github.com/edfloreshz) for the applet template :)
