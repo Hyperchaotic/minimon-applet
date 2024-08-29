@@ -8,6 +8,7 @@ use crate::config::{LineGraphColorVariant, LineGraphColors};
 const MAX_SAMPLES: usize = 30;
 const GRAPH_SAMPLES: usize = 21;
 const UNITS: [&str; 5] = ["B", "K", "M", "G", "T"];
+const UNITS_LONG: [&str; 5] = ["bps", "Kbps", "Mbps", "Gbps", "Tbps"];
 
 #[derive(Debug)]
 pub struct NetMon {
@@ -51,7 +52,7 @@ impl NetMon {
         let start = if ticks > len { 0 } else { len - ticks };
         // Sum the last `ticks` elements
         let bps = self.download.iter().skip(start).sum();
-        NetMon::makestr(bps)
+        NetMon::makestr_bps(bps)
     }
 
     // Get bits per second
@@ -61,7 +62,7 @@ impl NetMon {
         let start = if ticks > len { 0 } else { len - ticks };
         // Sum the last `ticks` elements
         let bps = self.upload.iter().skip(start).sum();
-        NetMon::makestr(bps)
+        NetMon::makestr_bps(bps)
     }
 
     /// Retrieve the amount of data transmitted since last update.
@@ -84,6 +85,25 @@ impl NetMon {
             self.upload.pop_front();
         }
         self.upload.push_back(ul);
+    }
+
+    fn makestr_bps(val: u64) -> String {
+        let mut value = val as f64;
+        let mut unit_index = 0;
+
+        // Find the appropriate unit
+        while value >= 999.0 && unit_index < UNITS_LONG.len() - 1 {
+            value /= 1024.0;
+            unit_index += 1;
+        }
+
+        if value < 10.0 {
+            format!("{:.2}{}", value, UNITS_LONG[unit_index])
+        } else if value < 99.0 {
+            format!("{:.1}{}", value, UNITS_LONG[unit_index])
+        } else {
+            format!("{:.0}{}", value, UNITS_LONG[unit_index])
+        }
     }
 
     fn makestr(val: u64) -> String {

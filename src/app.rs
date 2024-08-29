@@ -401,8 +401,8 @@ impl cosmic::Application for Minimon {
                 column!(widget::svg(widget::svg::Handle::from_memory(
                     self.svgstat_cpu.svg().as_bytes().to_owned(),
                 ))
-                .width(50)
-                .height(50))
+                .width(60)
+                .height(60))
                 .padding(5),
             ));
 
@@ -434,8 +434,8 @@ impl cosmic::Application for Minimon {
                 column!(widget::svg(widget::svg::Handle::from_memory(
                     self.svgstat_mem.svg().as_bytes().to_owned(),
                 ))
-                .width(50)
-                .height(50))
+                .width(60)
+                .height(60))
                 .padding(5),
             ));
 
@@ -486,8 +486,8 @@ impl cosmic::Application for Minimon {
                 column!(widget::svg(widget::svg::Handle::from_memory(
                     self.netmon.svg().as_bytes().to_owned(),
                 ))
-                .width(50)
-                .height(50), 
+                .width(60)
+                .height(60), 
                 cosmic::widget::text::body(""),
                 cosmic::widget::text::body(dlrate),
                 cosmic::widget::text::body(ulrate),
