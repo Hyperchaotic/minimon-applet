@@ -163,8 +163,6 @@ impl NetMon {
                     )
                 };
 
-                println!("Max: {:?}. Max: {}", self.max_y, max);
-
                 let scaling: f32 = 40.0 / max as f32;
 
                 let dl_len = download.len();
