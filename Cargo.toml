@@ -12,6 +12,8 @@ tokio = { version = "1.36.0", features = ["time"] }
 sysinfo = "0.31"
 serde = "1.0.197"
 rgb = "0.8"
+plotters = "*"
+chrono = "*"
 
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"

@@ -1,4 +1,4 @@
-use crate::config::GraphColors;
+use crate::config::CircleGraphColors;
 
 const SVGSTATSTART: &str = "
 <svg viewBox=\"0 0 34 34\" xmlns=\"http://www.w3.org/2000/svg\">
@@ -49,7 +49,7 @@ const SVG_LEN: usize = SVGSTATSTART.len()
 pub struct SvgStat {
     current_val: f64,
     max_val: u64,
-    colors: GraphColors,
+    colors: CircleGraphColors,
 
     /// current value cpu/ram load shown. 
     value: String,
@@ -76,14 +76,14 @@ impl SvgStat {
         let mut svg = SvgStat {
             current_val: 0.0,
             max_val,
-            colors: GraphColors::default(),
+            colors: CircleGraphColors::default(),
             value,
             percentage,
             ringfront_color: String::new(),
             text_color: String::new(),
             circle_colors: String::new(),
         };
-        svg.set_colors(GraphColors::default());
+        svg.set_colors(CircleGraphColors::default());
         svg
     }
 
@@ -108,7 +108,7 @@ impl SvgStat {
             }
     }
 
-    pub fn set_colors(&mut self, colors: GraphColors) {
+    pub fn set_colors(&mut self, colors: CircleGraphColors) {
         self.colors = colors;
         self.ringfront_color = self.colors.ringfront_to_string();
         self.text_color = format!(" fill:{};", &self.colors.text_to_string());
@@ -119,7 +119,7 @@ impl SvgStat {
         );
     }
 
-    pub fn colors(&self) -> GraphColors {
+    pub fn colors(&self) -> CircleGraphColors {
         self.colors
     }
 
