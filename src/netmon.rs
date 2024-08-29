@@ -7,7 +7,7 @@ use crate::config::{LineGraphColorVariant, LineGraphColors};
 
 const MAX_SAMPLES: usize = 30;
 const GRAPH_SAMPLES: usize = 21;
-const UNITS: [&str; 5] = ["B", "K", "M", "G", "T"];
+const UNITS: [&str; 5] = ["b", "K", "M", "G", "T"];
 const UNITS_LONG: [&str; 5] = ["bps", "Kbps", "Mbps", "Gbps", "Tbps"];
 
 #[derive(Debug)]
