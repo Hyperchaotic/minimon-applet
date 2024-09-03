@@ -4,6 +4,7 @@ Exec=cosmic-applet-minimon %F
 Terminal=false
 Type=Application
 StartupNotify=true
+NoDisplay=true 
 Icon=com.github.hyperchaotic.cosmic-applet-minimon
 Categories=COSMIC;Utility;
 Keywords=Folder;Manager;
