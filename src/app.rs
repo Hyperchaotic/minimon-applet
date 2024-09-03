@@ -125,9 +125,9 @@ pub enum Message {
     CircleColorPickerSliderBlueChanged(u8),
     CircleColorPickerSelectVariant(CircleGraphColorVariant),
 
-    TextInputRedChanged(String),
-    TextInputGreenChanged(String),
-    TextInputBlueChanged(String),
+    CircleColorTextInputRedChanged(String),
+    CircleColorTextInputGreenChanged(String),
+    CircleColorTextInputBlueChanged(String),
 
     LineColorPickerOpen(),
     LineColorPickerClose(bool),
@@ -418,8 +418,10 @@ impl cosmic::Application for Minimon {
                 ),
                 row!(
                     widget::horizontal_space(Length::Fill),
-                    cosmic::widget::button(Element::from(self.core.applet.text(fl!("change-colors"))))
-                        .on_press(Message::CircleColorPickerOpen(CircleGraphKind::Cpu)),
+                    cosmic::widget::button(Element::from(
+                        self.core.applet.text(fl!("change-colors"))
+                    ))
+                    .on_press(Message::CircleColorPickerOpen(CircleGraphKind::Cpu)),
                     widget::horizontal_space(Length::Fill)
                 )
             )));
@@ -451,8 +453,10 @@ impl cosmic::Application for Minimon {
                 ),
                 row!(
                     widget::horizontal_space(Length::Fill),
-                    cosmic::widget::button(Element::from(self.core.applet.text(fl!("change-colors"))))
-                        .on_press(Message::CircleColorPickerOpen(CircleGraphKind::Memory)),
+                    cosmic::widget::button(Element::from(
+                        self.core.applet.text(fl!("change-colors"))
+                    ))
+                    .on_press(Message::CircleColorPickerOpen(CircleGraphKind::Memory)),
                     widget::horizontal_space(Length::Fill)
                 )
             )));
@@ -483,15 +487,16 @@ impl cosmic::Application for Minimon {
             let ulrate = self.netmon.get_bitrate_ul(ticks_per_sec);
 
             net_elements.push(Element::from(
-                column!(widget::svg(widget::svg::Handle::from_memory(
-                    self.netmon.svg().as_bytes().to_owned(),
-                ))
-                .width(60)
-                .height(60), 
-                cosmic::widget::text::body(""),
-                cosmic::widget::text::body(dlrate),
-                cosmic::widget::text::body(ulrate),
-            )
+                column!(
+                    widget::svg(widget::svg::Handle::from_memory(
+                        self.netmon.svg().as_bytes().to_owned(),
+                    ))
+                    .width(60)
+                    .height(60),
+                    cosmic::widget::text::body(""),
+                    cosmic::widget::text::body(dlrate),
+                    cosmic::widget::text::body(ulrate),
+                )
                 .padding(5),
             ));
 
@@ -536,8 +541,10 @@ impl cosmic::Application for Minimon {
                 ),
                 row!(
                     widget::horizontal_space(Length::Fill),
-                    cosmic::widget::button(Element::from(self.core.applet.text(fl!("change-colors"))))
-                        .on_press(Message::LineColorPickerOpen()),
+                    cosmic::widget::button(Element::from(
+                        self.core.applet.text(fl!("change-colors"))
+                    ))
+                    .on_press(Message::LineColorPickerOpen()),
                     widget::horizontal_space(Length::Fill)
                 ),
             )));
@@ -807,36 +814,39 @@ impl cosmic::Application for Minimon {
                 self.set_tick();
             }
 
-            Message::TextInputRedChanged(value) => {
-                Minimon::update_slider_val(&value, &mut self.circlecolorpicker.slider_red_val);
+            Message::CircleColorTextInputRedChanged(value) => {
+                let mut col = self.circlecolorpicker.sliders();
+                Minimon::set_color(&value, &mut col.red);
+                self.circlecolorpicker.set_sliders(col);
             }
-            Message::TextInputGreenChanged(value) => {
-                Minimon::update_slider_val(&value, &mut self.circlecolorpicker.slider_green_val);
+            
+            Message::CircleColorTextInputGreenChanged(value) => {
+                let mut col = self.circlecolorpicker.sliders();
+                Minimon::set_color(&value, &mut col.green);
+                self.circlecolorpicker.set_sliders(col);
             }
-            Message::TextInputBlueChanged(value) => {
-                Minimon::update_slider_val(&value, &mut self.circlecolorpicker.slider_blue_val);
+
+            Message::CircleColorTextInputBlueChanged(value) => {
+                let mut col = self.circlecolorpicker.sliders();
+                Minimon::set_color(&value, &mut col.blue);
+                self.circlecolorpicker.set_sliders(col);
             }
 
             Message::LineColorTextInputRedChanged(value) => {
-                if value.is_empty() {
-                    self.linecolorpicker.slider_red_val = 0;
-                } else if let Ok(num) = value.parse::<u8>() {
-                    self.linecolorpicker.slider_red_val = num;
-                }
+                let mut col = self.linecolorpicker.sliders();
+                Minimon::set_color(&value, &mut col.red);
+                self.linecolorpicker.set_sliders(col);
             }
+
             Message::LineColorTextInputGreenChanged(value) => {
-                if value.is_empty() {
-                    self.linecolorpicker.slider_green_val = 0;
-                } else if let Ok(num) = value.parse::<u8>() {
-                    self.linecolorpicker.slider_green_val = num;
-                }
+                let mut col = self.linecolorpicker.sliders();
+                Minimon::set_color(&value, &mut col.green);
+                self.linecolorpicker.set_sliders(col);
             }
             Message::LineColorTextInputBlueChanged(value) => {
-                if value.is_empty() {
-                    self.linecolorpicker.slider_blue_val = 0;
-                } else if let Ok(num) = value.parse::<u8>() {
-                    self.linecolorpicker.slider_blue_val = num;
-                }
+                let mut col = self.linecolorpicker.sliders();
+                Minimon::set_color(&value, &mut col.blue);
+                self.linecolorpicker.set_sliders(col);
             }
         }
         Command::none()
@@ -846,6 +856,15 @@ impl cosmic::Application for Minimon {
 impl Minimon {
     fn make_icon_handle(svgstat: &SvgStat) -> cosmic::widget::icon::Handle {
         cosmic::widget::icon::from_svg_bytes(svgstat.svg().into_bytes())
+    }
+
+    /// Set to 0 if empty, value if valid, but leave unchanged in value is not valid
+    fn set_color(value: &str, color: &mut u8) {
+        if value.is_empty() {
+            *color = 0;
+        } else if let Ok(num) = value.parse::<u8>() {
+            *color = num;
+        }
     }
 
     fn save_config(&self) {
@@ -901,14 +920,6 @@ impl Minimon {
             let multiplier: [u64; 5] = [1, 1000, 1_000_000, 1_000_000_000, 1_000_000_000_000];
             self.netmon
                 .set_max_y(Some(self.config.net_bandwidth * multiplier[unit]));
-        }
-    }
-
-    fn update_slider_val(value: &str, slider: &mut u8) {
-        if value.is_empty() {
-            *slider = 0;
-        } else if let Ok(num) = value.parse::<u8>() {
-            *slider = num;
         }
     }
 
@@ -971,7 +982,7 @@ impl Minimon {
                         widget::horizontal_space(Length::Fill),
                         widget::text_input("", color.red.to_string())
                             .width(50)
-                            .on_input(Message::TextInputRedChanged),
+                            .on_input(Message::CircleColorTextInputRedChanged),
                         widget::horizontal_space(Length::Fill),
                     )
                     .align_items(Alignment::Center)
@@ -991,7 +1002,7 @@ impl Minimon {
                         widget::horizontal_space(Length::Fill),
                         widget::text_input("", color.green.to_string())
                             .width(50)
-                            .on_input(Message::TextInputGreenChanged),
+                            .on_input(Message::CircleColorTextInputGreenChanged),
                         widget::horizontal_space(Length::Fill),
                     )
                     .align_items(Alignment::Center)
@@ -1011,7 +1022,7 @@ impl Minimon {
                         widget::horizontal_space(Length::Fill),
                         widget::text_input("", color.blue.to_string())
                             .width(50)
-                            .on_input(Message::TextInputBlueChanged),
+                            .on_input(Message::CircleColorTextInputBlueChanged),
                         widget::horizontal_space(Length::Fill),
                     )
                     .align_items(Alignment::Center)
