@@ -21,26 +21,9 @@ use crate::{
     netmon::NetMon
 };
 
-/// Data for managing the CircleColorPicker dialog
-#[derive(Debug)]
-pub struct CircleColorPicker {
-    /// If dialog is active this is not None
-    active: bool,
-    /// Type of current displaying device CPU or Memory
-    pub graph_kind: CircleGraphKind,
-    // Current field being adjusted background/text/etc.
-    pub color_variant: CircleGraphColorVariant,
-    /// An example SVG to show the changes
-    pub example_svg: SvgStat,
-    ///Current slider values
-    pub slider_red_val: u8,
-    pub slider_green_val: u8,
-    pub slider_blue_val: u8,
-}
-
-impl CircleColorPicker {
+pub trait ColorPicker {
     // Thanks to PixelDoted/cosmic-color-picker for his cool slider
-    pub fn color_slider<'a, Message>(
+    fn color_slider<'a, Message>(
         range: RangeInclusive<u8>,
         value: u8,
         on_change: impl Fn(u8) -> Message + 'a,
@@ -99,6 +82,28 @@ impl CircleColorPicker {
             .into()
     }
 
+}
+
+/// Data for managing the CircleColorPicker dialog
+#[derive(Debug)]
+pub struct CircleColorPicker {
+    /// If dialog is active this is not None
+    active: bool,
+    /// Type of current displaying device CPU or Memory
+    pub graph_kind: CircleGraphKind,
+    // Current field being adjusted background/text/etc.
+    pub color_variant: CircleGraphColorVariant,
+    /// An example SVG to show the changes
+    pub example_svg: SvgStat,
+    ///Current slider values
+    pub slider_red_val: u8,
+    pub slider_green_val: u8,
+    pub slider_blue_val: u8,
+}
+
+impl ColorPicker for CircleColorPicker { }
+
+impl CircleColorPicker {
     pub fn is_active(&self) -> bool {
         self.active
     }
@@ -176,66 +181,9 @@ pub struct LineColorPicker {
     pub slider_blue_val: u8,
 }
 
+impl ColorPicker for LineColorPicker { }
+
 impl LineColorPicker {
-    // Thanks to PixelDoted/cosmic-color-picker for his cool slider
-    pub fn color_slider<'a, Message>(
-        range: RangeInclusive<u8>,
-        value: u8,
-        on_change: impl Fn(u8) -> Message + 'a,
-        color_stops: &'static [ColorStop],
-    ) -> cosmic::Element<'a, Message>
-    where
-        Message: Clone + 'a,
-    {
-        widget::slider(range, value, on_change)
-            .width(Length::Fixed(220.0))
-            .step(1)
-            .style(theme::iced::Slider::Custom {
-                active: Rc::new(|t| {
-                    let cosmic = t.cosmic();
-                    let mut a = slider::StyleSheet::active(t, &theme::iced::Slider::default());
-                    a.rail.colors = RailBackground::Gradient {
-                        gradient: Linear::new(Radians(0.0)).add_stops(color_stops.iter().copied()),
-                        auto_angle: true,
-                    };
-                    a.rail.width = 8.0;
-                    a.handle.color = Color::TRANSPARENT;
-                    a.handle.shape = HandleShape::Circle { radius: 8.0 };
-                    a.handle.border_color = cosmic.palette.neutral_10.into();
-                    a.handle.border_width = 4.0;
-                    a
-                }),
-                hovered: Rc::new(|t| {
-                    let cosmic = t.cosmic();
-                    let mut a = slider::StyleSheet::active(t, &theme::iced::Slider::default());
-                    a.rail.colors = RailBackground::Gradient {
-                        gradient: Linear::new(Radians(0.0)).add_stops(color_stops.iter().copied()),
-                        auto_angle: true,
-                    };
-                    a.rail.width = 8.0;
-                    a.handle.color = Color::TRANSPARENT;
-                    a.handle.shape = HandleShape::Circle { radius: 8.0 };
-                    a.handle.border_color = cosmic.palette.neutral_10.into();
-                    a.handle.border_width = 4.0;
-                    a
-                }),
-                dragging: Rc::new(|t| {
-                    let cosmic = t.cosmic();
-                    let mut a = slider::StyleSheet::active(t, &theme::iced::Slider::default());
-                    a.rail.colors = RailBackground::Gradient {
-                        gradient: Linear::new(Radians(0.0)).add_stops(color_stops.iter().copied()),
-                        auto_angle: true,
-                    };
-                    a.rail.width = 8.0;
-                    a.handle.color = Color::TRANSPARENT;
-                    a.handle.shape = HandleShape::Circle { radius: 8.0 };
-                    a.handle.border_color = cosmic.palette.neutral_10.into();
-                    a.handle.border_width = 4.0;
-                    a
-                }),
-            })
-            .into()
-    }
 
     pub fn is_active(&self) -> bool {
         self.active

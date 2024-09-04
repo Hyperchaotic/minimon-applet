@@ -29,7 +29,7 @@ use cosmic::{
     widget::{container, horizontal_space},
 };
 
-use crate::colorpicker::{CircleColorPicker, LineColorPicker};
+use crate::colorpicker::{CircleColorPicker, ColorPicker, LineColorPicker};
 use crate::config::{
     CircleGraphColorVariant, CircleGraphColors, CircleGraphKind, LineGraphColorVariant,
     LineGraphColors,
