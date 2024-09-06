@@ -30,21 +30,18 @@ pub trait DemoSvg {
 pub struct ColorPicker {
     demo_svg: Option<Box<dyn DemoSvg>>,
     // Current field being adjusted background/text/etc.
-    pub color_variant: SvgColorVariant,
+    color_variant: SvgColorVariant,
     ///Current slider values
-    pub slider_red_val: u8,
-    pub slider_green_val: u8,
-    pub slider_blue_val: u8,
+    slider_red_val: u8,
+    slider_green_val: u8,
+    slider_blue_val: u8,
 }
 
 impl ColorPicker {
     pub fn new() -> Self {
         ColorPicker {
             demo_svg: None,
-//            graph_kind: kind,
             color_variant: SvgColorVariant::Color1,
-//            svg_ring: SvgStat::new(100),
-//            svg_line: NetMon::new(),
             slider_red_val: 0,
             slider_green_val: 0,
             slider_blue_val: 0,
@@ -154,6 +151,10 @@ impl ColorPicker {
             d.svg_set_colors(colors);
             self.set_sliders(colors.get_color(self.color_variant));
         }
+    }
+
+    pub fn variant(&self) -> SvgColorVariant {
+        self.color_variant
     }
 
     pub fn set_variant(&mut self, variant: SvgColorVariant) {

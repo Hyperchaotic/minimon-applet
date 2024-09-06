@@ -606,7 +606,7 @@ impl cosmic::Application for Minimon {
                 let col = self
                     .colorpicker
                     .colors()
-                    .get_color(self.colorpicker.color_variant);
+                    .get_color(self.colorpicker.variant());
                 self.colorpicker.set_sliders(col);
                 self.colorpicker.active();
             }
@@ -685,8 +685,6 @@ impl cosmic::Application for Minimon {
                 if self.tick_timer <= 0 {
                     self.tick_timer = self.config.refresh_rate as i64;
                     self.refresh_stats();
-                    self.netmon.update_samples();
-                    self.netmon.svg();
                 }
 
                 if self.tick_timer >= tick {
@@ -849,13 +847,17 @@ impl Minimon {
                 .sum::<f64>()
                 / self.system.cpus().len() as f64;
 
-            self.mem_usage = self.system.used_memory() as f64 / 1_073_741_824.0;
             self.svgstat_cpu.set_variable(self.cpu_load);
         }
 
-        if self.config.enable_cpu {
+        if self.config.enable_mem {
             self.system.refresh_memory();
+            self.mem_usage = self.system.used_memory() as f64 / 1_073_741_824.0;
             self.svgstat_mem.set_variable(self.mem_usage);
+        }
+
+        if self.config.enable_net {
+            self.netmon.update_samples();
         }
     }
 
@@ -865,7 +867,7 @@ impl Minimon {
 
         let title = format!("{} colors", self.colorpicker_kind);
 
-        let current_variant = cp.color_variant;
+        let current_variant = cp.variant();
 
         let fields = if self.colorpicker_kind == SvgKind::Network {
             row!(
