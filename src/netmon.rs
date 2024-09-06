@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 
 use sysinfo::Networks;
 
-use crate::config::{SvgColorVariant, SvgColors};
+use crate::{colorpicker::DemoSvg, config::{SvgColorVariant, SvgColors}};
 
 const MAX_SAMPLES: usize = 30;
 const GRAPH_SAMPLES: usize = 21;
@@ -17,6 +17,22 @@ pub struct NetMon {
     upload: VecDeque<u64>,
     max_y: Option<u64>,
     colors: SvgColors,
+}
+
+impl DemoSvg for NetMon {
+    fn svg_demo(&self) -> String {
+        let download = VecDeque::from(DL_DEMO);
+        let upload = VecDeque::from(UL_DEMO);
+        self.svg_draw(&download, &upload, None)
+    }
+
+    fn svg_colors(&self) -> SvgColors {
+        self.colors
+    }
+
+    fn svg_set_colors(&mut self, colors: SvgColors) {
+        self.colors = colors;
+    }
 }
 
 impl NetMon {
@@ -33,16 +49,8 @@ impl NetMon {
         }
     }
 
-    pub fn set_colors(&mut self, colors: SvgColors) {
-        self.colors = colors;
-    }
-
     pub fn set_max_y(&mut self, max: Option<u64>) {
         self.max_y = max;
-    }
-
-    pub fn colors(&self) -> SvgColors {
-        self.colors
     }
 
     // Get bits per second
@@ -136,7 +144,7 @@ impl NetMon {
     }
 
     pub fn ul_to_string(&self) -> String {
-        let ul = if self.upload.len() > 0 {
+        let ul = if !self.upload.is_empty() {
             *self.upload.back().unwrap_or(&0u64)
         } else {
             0
@@ -238,12 +246,6 @@ impl NetMon {
             let _ = root.present();
         }
         sname
-    }
-
-    pub fn svg_demo(&self) -> String {
-        let download = VecDeque::from(DL_DEMO);
-        let upload = VecDeque::from(UL_DEMO);
-        self.svg_draw(&download, &upload, None)
     }
 
     pub fn svg(&self) -> String {

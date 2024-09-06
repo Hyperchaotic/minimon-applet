@@ -29,7 +29,7 @@ use cosmic::{
     widget::{container, horizontal_space},
 };
 
-use crate::colorpicker::ColorPicker;
+use crate::colorpicker::{ColorPicker, DemoSvg};
 use crate::config::{SvgColorVariant, SvgColors, SvgKind};
 use crate::netmon::NetMon;
 use crate::svgstat::SvgStat;
@@ -94,6 +94,7 @@ pub struct Minimon {
     popup: Option<Id>,
     /// The color picker dialog
     colorpicker: ColorPicker,
+    colorpicker_kind: SvgKind,
     dropdown_options: Vec<&'static str>,
 
     /// The network monitor
@@ -167,7 +168,8 @@ impl cosmic::Application for Minimon {
             svgstat_cpu: super::svgstat::SvgStat::new(100),
             svgstat_mem: super::svgstat::SvgStat::new(mem_physical / 1_073_741_824),
             popup: None,
-            colorpicker: ColorPicker::new(SvgKind::Cpu),
+            colorpicker: ColorPicker::new(),
+            colorpicker_kind: SvgKind::Cpu,
             dropdown_options: ["b", "Kb", "Mb", "Gb", "Tb"].into(),
             netmon: NetMon::new(),
             config: MinimonConfig::default(),
@@ -376,7 +378,7 @@ impl cosmic::Application for Minimon {
     }
 
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
-        if self.colorpicker.is_active {
+        if self.colorpicker.active() {
             self.view_colorpicker()
         } else {
             let mut cpu_elements = Vec::new();
@@ -564,7 +566,7 @@ impl cosmic::Application for Minimon {
         match message {
             Message::TogglePopup => {
                 return if let Some(p) = self.popup.take() {
-                    self.colorpicker.is_active = false;
+                    self.colorpicker.active();
                     destroy_popup(p)
                 } else {
                     let new_id = Id::unique();
@@ -584,17 +586,19 @@ impl cosmic::Application for Minimon {
 
             Message::ColorPickerOpen(kind) => {
                 self.colorpicker.set_variant(SvgColorVariant::Color1);
-                self.colorpicker.graph_kind = kind;
+
+                self.colorpicker_kind = kind;
                 match kind {
                     SvgKind::Cpu => {
+                        self.colorpicker.activate(Box::new(SvgStat::new(100)));
                         self.colorpicker.set_colors(self.config.cpu_colors);
-                        self.colorpicker.svg_ring.set_variable(35.0);
                     }
                     SvgKind::Memory => {
+                        self.colorpicker.activate(Box::new(SvgStat::new(100)));
                         self.colorpicker.set_colors(self.config.mem_colors);
-                        self.colorpicker.svg_ring.set_variable(35.0);
                     }
                     SvgKind::Network => {
+                        self.colorpicker.activate(Box::new(NetMon::new()));
                         self.colorpicker.set_colors(self.config.net_colors);
                     }
                 }
@@ -604,20 +608,20 @@ impl cosmic::Application for Minimon {
                     .colors()
                     .get_color(self.colorpicker.color_variant);
                 self.colorpicker.set_sliders(col);
-                self.colorpicker.is_active = true;
+                self.colorpicker.active();
             }
 
             Message::ColorPickerClose(save) => {
                 if save {
-                    self.set_colors(self.colorpicker.colors(), self.colorpicker.graph_kind);
+                    self.set_colors(self.colorpicker.colors(), self.colorpicker_kind);
                     self.save_config();
                 }
-                self.colorpicker.is_active = false;
+                self.colorpicker.deactivate();
             }
 
             Message::ColorPickerDefaults => {
                 self.colorpicker
-                    .set_colors(SvgColors::new(self.colorpicker.graph_kind));
+                    .set_colors(SvgColors::new(self.colorpicker_kind));
             }
 
             Message::ColorPickerSliderRedChanged(val) => {
@@ -731,9 +735,9 @@ impl cosmic::Application for Minimon {
             Message::ConfigChanged(config) => {
                 self.config = config;
                 self.tick_timer = self.config.refresh_rate as i64;
-                self.svgstat_cpu.set_colors(self.config.cpu_colors);
-                self.svgstat_mem.set_colors(self.config.mem_colors);
-                self.netmon.set_colors(self.config.net_colors);
+                self.svgstat_cpu.svg_set_colors(self.config.cpu_colors);
+                self.svgstat_mem.svg_set_colors(self.config.mem_colors);
+                self.netmon.svg_set_colors(self.config.net_colors);
                 self.set_max_y();
                 self.set_tick();
             }
@@ -793,15 +797,15 @@ impl Minimon {
         match kind {
             SvgKind::Cpu => {
                 self.config.cpu_colors = colors;
-                self.svgstat_cpu.set_colors(colors);
+                self.svgstat_cpu.svg_set_colors(colors);
             }
             SvgKind::Memory => {
                 self.config.mem_colors = colors;
-                self.svgstat_mem.set_colors(colors);
+                self.svgstat_mem.svg_set_colors(colors);
             }
             SvgKind::Network => {
                 self.config.net_colors = colors;
-                self.netmon.set_colors(colors);
+                self.netmon.svg_set_colors(colors);
             }
         }
     }
@@ -859,11 +863,11 @@ impl Minimon {
         let cp = &self.colorpicker;
         let color = cp.sliders();
 
-        let title = format!("{} colors", cp.graph_kind);
+        let title = format!("{} colors", self.colorpicker_kind);
 
         let current_variant = cp.color_variant;
 
-        let fields = if cp.graph_kind == SvgKind::Network {
+        let fields = if self.colorpicker_kind == SvgKind::Network {
             row!(
                 widget::radio(
                     "Download.  ",

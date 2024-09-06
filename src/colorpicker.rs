@@ -14,22 +14,23 @@ use cosmic::{
     },
 };
 
-use crate::config::{SvgColorVariant, SvgColors, SvgKind};
-use crate::netmon::NetMon;
-use crate::svgstat::SvgStat;
+use crate::config::{SvgColorVariant, SvgColors};
 
-/// Data for managing the CircleColorPicker dialog
-#[derive(Debug)]
+const ERROR: &str = "<svg width=\"800px\" height=\"800px\" viewBox=\"0 0 25 25\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">
+<path d=\"M12.5 16V14.5M12.5 9V13M20.5 12.5C20.5 16.9183 16.9183 20.5 12.5 20.5C8.08172 20.5 4.5 16.9183 4.5 12.5C4.5 8.08172 8.08172 4.5 12.5 4.5C16.9183 4.5 20.5 8.08172 20.5 12.5Z\" stroke=\"red\" stroke-width=\"1.2\"/>
+</svg>";
+
+pub trait DemoSvg {
+    fn svg_demo(&self) -> String;
+    fn svg_colors(&self) -> SvgColors;
+    fn svg_set_colors(&mut self, colors: SvgColors);
+}
+
+/// Data for managing the `ColorPicker` dialog
 pub struct ColorPicker {
-    pub is_active: bool,
-    /// Type of current displaying device CPU or Memory
-    pub graph_kind: SvgKind,
+    demo_svg: Option<Box<dyn DemoSvg>>,
     // Current field being adjusted background/text/etc.
     pub color_variant: SvgColorVariant,
-    /// An example SVG to show the changes
-    pub svg_ring: SvgStat,
-    pub svg_line: NetMon,
-
     ///Current slider values
     pub slider_red_val: u8,
     pub slider_green_val: u8,
@@ -37,27 +38,39 @@ pub struct ColorPicker {
 }
 
 impl ColorPicker {
-    pub fn new(kind: SvgKind) -> Self {
+    pub fn new() -> Self {
         ColorPicker {
-            is_active: false,
-            graph_kind: kind,
+            demo_svg: None,
+//            graph_kind: kind,
             color_variant: SvgColorVariant::Color1,
-            svg_ring: SvgStat::new(100),
-            svg_line: NetMon::new(),
+//            svg_ring: SvgStat::new(100),
+//            svg_line: NetMon::new(),
             slider_red_val: 0,
             slider_green_val: 0,
             slider_blue_val: 0,
         }
     }
 
-    pub fn color_slider<'a, Message>(
+    pub fn active(&self) -> bool {
+        self.demo_svg.is_some()
+    }
+
+    pub fn activate(&mut self, demo_svg: Box<dyn DemoSvg>) {
+        self.demo_svg = Some(demo_svg);
+    }
+
+    pub fn deactivate(&mut self) {
+        self.demo_svg = None;
+    }
+
+    pub fn color_slider<'b, Message>(
         range: RangeInclusive<u8>,
         value: u8,
-        on_change: impl Fn(u8) -> Message + 'a,
+        on_change: impl Fn(u8) -> Message + 'b,
         color_stops: &'static [ColorStop],
-    ) -> cosmic::Element<'a, Message>
+    ) -> cosmic::Element<'b, Message>
     where
-        Message: Clone + 'a,
+        Message: Clone + 'b,
     {
         widget::slider(range, value, on_change)
             .width(Length::Fixed(220.0))
@@ -118,11 +131,10 @@ impl ColorPicker {
     }
 
     pub fn demo_svg(&self) -> String {
-        if self.graph_kind==SvgKind::Network {
-            self.svg_line.svg_demo()
-        } else {
-            self.svg_ring.svg_demo()
-        }
+        if let Some(d) = self.demo_svg.as_ref() {
+            return d.svg_demo();
+        } 
+        ERROR.to_string()
     }
 
     pub fn set_sliders(&mut self, color: Srgb<u8>) {
@@ -130,48 +142,37 @@ impl ColorPicker {
         self.slider_green_val = color.green;
         self.slider_blue_val = color.blue;
 
-        if self.graph_kind == SvgKind::Network {
-            let mut col = self.svg_line.colors();
-            col.set_color(self.sliders(), self.color_variant);
-            self.svg_line.set_colors(col);
-        } else {
-            let mut col = self.svg_ring.colors();
-            col.set_color(self.sliders(), self.color_variant);
-            self.svg_ring.set_colors(col);
+        if let Some(d) = self.demo_svg.as_mut() {
+            let mut col = d.svg_colors();
+            col.set_color(color, self.color_variant);
+            d.svg_set_colors(col);
         }
     }
 
     pub fn set_colors(&mut self, colors: SvgColors) {
-        if self.graph_kind==SvgKind::Network {
-            self.svg_line.set_colors(colors);
-            self.set_sliders(self.svg_line.colors().get_color(self.color_variant));
-        } else {
-            self.svg_ring.set_colors(colors);
-            self.set_sliders(self.svg_ring.colors().get_color(self.color_variant));
+        if let Some(d) = self.demo_svg.as_mut() {
+            d.svg_set_colors(colors);
+            self.set_sliders(colors.get_color(self.color_variant));
         }
     }
 
     pub fn set_variant(&mut self, variant: SvgColorVariant) {
-        self.color_variant = variant;
 
-        let cols = if self.graph_kind == SvgKind::Network {
-            self.svg_line.colors()
-        } else {
-            self.svg_ring.colors()
-        };
+        if let Some(d) = self.demo_svg.as_mut() {
+            
+            self.color_variant = variant;
+            let color = d.svg_colors().get_color(variant);
 
-        let col = cols.get_color(variant);
-
-        self.slider_red_val = col.red;
-        self.slider_green_val = col.green;
-        self.slider_blue_val = col.blue;
+            self.slider_red_val = color.red;
+            self.slider_green_val = color.green;
+            self.slider_blue_val = color.blue;
+            }
     }
 
     pub fn colors(&self) -> SvgColors {
-        if self.graph_kind == SvgKind::Network {
-            self.svg_line.colors()
-        } else {
-            self.svg_ring.colors()
+        if let Some(d) = self.demo_svg.as_ref() {
+            return d.svg_colors()
         }
+        SvgColors::default()
     }
 }
