@@ -4,162 +4,103 @@ use cosmic::{
 };
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
-pub enum CircleGraphColorVariant {
-    Background,
-    Text,
-    RingBack,
-    RingFront,
-}
-
-impl CircleGraphColorVariant {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Background => "Back.   ",
-            Self::Text => "Text.",
-            Self::RingBack => "Ring2.   ",
-            Self::RingFront => "Ring1.   ",
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
-pub enum LineGraphColorVariant {
-    Background,
-    Download,
-    Upload,
-}
-
-impl LineGraphColorVariant {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Background => "Back. ",
-            Self::Download => "Download.    ",
-            Self::Upload => "Upload.     ",
-        }
-    }
+pub enum SvgColorVariant {
+    Color1,
+    Color2,
+    Color3,
+    Color4,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CircleGraphKind {
+pub enum SvgKind {
     Cpu,
     Memory,
+    Network,
 }
 
-impl std::fmt::Display for CircleGraphKind {
+impl std::fmt::Display for SvgKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            CircleGraphKind::Cpu => write!(f, "CPU"),
-            CircleGraphKind::Memory => write!(f, "Memory"),
+            SvgKind::Cpu => write!(f, "CPU"),
+            SvgKind::Memory => write!(f, "Memory"),
+            SvgKind::Network => write!(f, "Network"),
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
 #[version = 1]
-pub struct CircleGraphColors {
-    pub background: u32,
-    pub text: u32,
-    pub ringback: u32,
-    pub ringfont: u32,
+pub struct SvgColors {
+    pub color1: Srgb<u8>,
+    pub color2: Srgb<u8>,
+    pub color3: Srgb<u8>,
+    pub color4: Srgb<u8>,
 }
 
-impl Default for CircleGraphColors {
+impl Default for SvgColors {
     fn default() -> Self {
         Self {
-            background: Srgb::from_components((0x1b, 0x1b, 0x1b)).into(),
-            text: palette::named::WHITE.into(),
-            ringback: palette::named::WHITE.into(),
-            ringfont: palette::named::RED.into(),
+            color1: Srgb::from_components((0x1b, 0x1b, 0x1b)),
+            color2: palette::named::WHITE,
+            color3: palette::named::WHITE,
+            color4: palette::named::RED,
         }
     }
 }
 
-impl CircleGraphColors {
-    pub fn new(kind: CircleGraphKind) -> CircleGraphColors {
-        let mut n = CircleGraphColors::default();
-        if kind == CircleGraphKind::Cpu {
-            n.ringfont = palette::named::RED.into();
-        } else {
-            n.ringfont = palette::named::PURPLE.into();
+impl SvgColors {
+    pub fn new(kind: SvgKind) -> Self {
+        match kind {
+            SvgKind::Cpu => SvgColors::default(),
+            SvgKind::Memory => SvgColors {
+                color4: palette::named::PURPLE.into(),
+                ..Default::default()
+            },
+            SvgKind::Network => SvgColors {
+                color1: Srgb::from_components((0x1b, 0x1b, 0x1b)),
+                color2: Srgb::from_components((47, 141, 255)),
+                color3: Srgb::from_components((255, 0, 0)),
+                ..Default::default()
+            },
         }
-        n
     }
 
-    pub fn background_to_string(&self) -> String {
-        CircleGraphColors::to_string(self.background)
+    pub fn color1_to_string(&self) -> String {
+        SvgColors::to_string(self.color1)
     }
 
-    pub fn text_to_string(&self) -> String {
-        CircleGraphColors::to_string(self.text)
+    pub fn color2_to_string(&self) -> String {
+        SvgColors::to_string(self.color2)
     }
 
-    pub fn ringfront_to_string(&self) -> String {
-        CircleGraphColors::to_string(self.ringfont)
+    pub fn color3_to_string(&self) -> String {
+        SvgColors::to_string(self.color3)
     }
 
-    pub fn ringback_to_string(&self) -> String {
-        CircleGraphColors::to_string(self.ringback)
+    pub fn color4_to_string(&self) -> String {
+        SvgColors::to_string(self.color4)
     }
 
-    fn to_string(col: u32) -> String {
-        let c = Srgb::from(col);
-        format!("rgba({},{},{},1.0)", c.red, c.green, c.blue)
+    fn to_string(col: Srgb<u8>) -> String {
+        format!("rgba({},{},{})", col.red, col.green, col.blue)
     }
 
-    pub fn set_color(&mut self, srgb: Srgb<u8>, variant: CircleGraphColorVariant) {
+    pub fn set_color(&mut self, srgb: Srgb<u8>, variant: SvgColorVariant) {
         match variant {
-            CircleGraphColorVariant::Background => self.background = srgb.into(),
-            CircleGraphColorVariant::Text => self.text = srgb.into(),
-            CircleGraphColorVariant::RingBack => self.ringback = srgb.into(),
-            CircleGraphColorVariant::RingFront => self.ringfont = srgb.into(),
+            SvgColorVariant::Color1 => self.color1 = srgb,
+            SvgColorVariant::Color2 => self.color2 = srgb,
+            SvgColorVariant::Color3 => self.color3 = srgb,
+            SvgColorVariant::Color4 => self.color4 = srgb,
         }
     }
 
-    pub fn to_srgb(self, variant: CircleGraphColorVariant) -> Srgb<u8> {
+    pub fn get_color(self, variant: SvgColorVariant) -> Srgb<u8> {
         match variant {
-            CircleGraphColorVariant::Background => Srgb::from(self.background),
-            CircleGraphColorVariant::Text => Srgb::from(self.text),
-            CircleGraphColorVariant::RingBack => Srgb::from(self.ringback),
-            CircleGraphColorVariant::RingFront => Srgb::from(self.ringfont),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
-#[version = 1]
-pub struct LineGraphColors {
-    pub background: u32,
-    pub download: u32,
-    pub upload: u32,
-}
-
-impl Default for LineGraphColors {
-    fn default() -> Self {
-        Self {
-            background: Srgb::from_components((0x1b, 0x1b, 0x1b)).into(),
-            download: Srgb::from_components((47, 141, 255)).into(),
-            upload: Srgb::from_components((255, 0, 0)).into(),
-        }
-    }
-}
-
-impl LineGraphColors {
-
-    pub fn set_color(&mut self, srgb: Srgb<u8>, variant: LineGraphColorVariant) {
-        match variant {
-            LineGraphColorVariant::Background => self.background = srgb.into(),
-            LineGraphColorVariant::Download => self.download = srgb.into(),
-            LineGraphColorVariant::Upload => self.upload = srgb.into(),
-        }
-    }
-
-    pub fn to_srgb(self, variant: LineGraphColorVariant) -> Srgb<u8> {
-        match variant {
-            LineGraphColorVariant::Background => Srgb::from(self.background),
-            LineGraphColorVariant::Download => Srgb::from(self.download),
-            LineGraphColorVariant::Upload => Srgb::from(self.upload),
+            SvgColorVariant::Color1 => self.color1,
+            SvgColorVariant::Color2 => self.color2,
+            SvgColorVariant::Color3 => self.color3,
+            SvgColorVariant::Color4 => self.color4,
         }
     }
 }
@@ -175,9 +116,9 @@ pub struct MinimonConfig {
     pub enable_adaptive_net: bool,
     pub net_bandwidth: u64,
     pub net_unit: Option<usize>,
-    pub cpu_colors: CircleGraphColors,
-    pub mem_colors: CircleGraphColors,
-    pub net_colors: LineGraphColors,
+    pub cpu_colors: SvgColors,
+    pub mem_colors: SvgColors,
+    pub net_colors: SvgColors,
 }
 
 impl Default for MinimonConfig {
@@ -191,12 +132,9 @@ impl Default for MinimonConfig {
             enable_adaptive_net: true,
             net_bandwidth: 62_500_000, // 500Mbit/s
             net_unit: Some(0),
-            cpu_colors: CircleGraphColors::default(),
-            mem_colors: CircleGraphColors {
-                ringfont: palette::named::PURPLE.into(),
-                ..Default::default()
-            },
-            net_colors: LineGraphColors::default(),
+            cpu_colors: SvgColors::new(SvgKind::Cpu),
+            mem_colors: SvgColors::new(SvgKind::Memory),
+            net_colors: SvgColors::new(SvgKind::Network),
         }
     }
 }

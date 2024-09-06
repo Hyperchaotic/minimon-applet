@@ -29,11 +29,8 @@ use cosmic::{
     widget::{container, horizontal_space},
 };
 
-use crate::colorpicker::{CircleColorPicker, ColorPicker, LineColorPicker};
-use crate::config::{
-    CircleGraphColorVariant, CircleGraphColors, CircleGraphKind, LineGraphColorVariant,
-    LineGraphColors,
-};
+use crate::colorpicker::ColorPicker;
+use crate::config::{SvgColorVariant, SvgColors, SvgKind};
 use crate::netmon::NetMon;
 use crate::svgstat::SvgStat;
 use crate::{config::MinimonConfig, fl};
@@ -96,8 +93,7 @@ pub struct Minimon {
     /// The popup id.
     popup: Option<Id>,
     /// The color picker dialog
-    circlecolorpicker: CircleColorPicker,
-    linecolorpicker: LineColorPicker,
+    colorpicker: ColorPicker,
     dropdown_options: Vec<&'static str>,
 
     /// The network monitor
@@ -116,31 +112,18 @@ pub struct Minimon {
 pub enum Message {
     TogglePopup,
 
-    CircleColorPickerOpen(CircleGraphKind),
-    CircleColorPickerClose(bool),
-    CircleColorPickerDefaults,
+    ColorPickerOpen(SvgKind),
+    ColorPickerClose(bool),
+    ColorPickerDefaults,
 
-    CircleColorPickerSliderRedChanged(u8),
-    CircleColorPickerSliderGreenChanged(u8),
-    CircleColorPickerSliderBlueChanged(u8),
-    CircleColorPickerSelectVariant(CircleGraphColorVariant),
+    ColorPickerSliderRedChanged(u8),
+    ColorPickerSliderGreenChanged(u8),
+    ColorPickerSliderBlueChanged(u8),
+    ColorPickerSelectVariant(SvgColorVariant),
 
-    CircleColorTextInputRedChanged(String),
-    CircleColorTextInputGreenChanged(String),
-    CircleColorTextInputBlueChanged(String),
-
-    LineColorPickerOpen(),
-    LineColorPickerClose(bool),
-    LineColorPickerDefaults,
-
-    LineColorPickerSliderRedChanged(u8),
-    LineColorPickerSliderGreenChanged(u8),
-    LineColorPickerSliderBlueChanged(u8),
-    LineColorPickerSelectVariant(LineGraphColorVariant),
-
-    LineColorTextInputRedChanged(String),
-    LineColorTextInputGreenChanged(String),
-    LineColorTextInputBlueChanged(String),
+    ColorTextInputRedChanged(String),
+    ColorTextInputGreenChanged(String),
+    ColorTextInputBlueChanged(String),
 
     ToggleAdaptiveNet(bool),
     NetworkSelectUnit(usize),
@@ -184,8 +167,7 @@ impl cosmic::Application for Minimon {
             svgstat_cpu: super::svgstat::SvgStat::new(100),
             svgstat_mem: super::svgstat::SvgStat::new(mem_physical / 1_073_741_824),
             popup: None,
-            circlecolorpicker: CircleColorPicker::default(),
-            linecolorpicker: LineColorPicker::default(),
+            colorpicker: ColorPicker::new(SvgKind::Cpu),
             dropdown_options: ["b", "Kb", "Mb", "Gb", "Tb"].into(),
             netmon: NetMon::new(),
             config: MinimonConfig::default(),
@@ -394,7 +376,9 @@ impl cosmic::Application for Minimon {
     }
 
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
-        if !self.circlecolorpicker.is_active() && !self.linecolorpicker.is_active() {
+        if self.colorpicker.is_active {
+            self.view_colorpicker()
+        } else {
             let mut cpu_elements = Vec::new();
 
             cpu_elements.push(Element::from(
@@ -421,7 +405,7 @@ impl cosmic::Application for Minimon {
                     cosmic::widget::button(Element::from(
                         self.core.applet.text(fl!("change-colors"))
                     ))
-                    .on_press(Message::CircleColorPickerOpen(CircleGraphKind::Cpu)),
+                    .on_press(Message::ColorPickerOpen(SvgKind::Cpu)),
                     widget::horizontal_space(Length::Fill)
                 )
             )));
@@ -456,7 +440,7 @@ impl cosmic::Application for Minimon {
                     cosmic::widget::button(Element::from(
                         self.core.applet.text(fl!("change-colors"))
                     ))
-                    .on_press(Message::CircleColorPickerOpen(CircleGraphKind::Memory)),
+                    .on_press(Message::ColorPickerOpen(SvgKind::Memory)),
                     widget::horizontal_space(Length::Fill)
                 )
             )));
@@ -544,7 +528,7 @@ impl cosmic::Application for Minimon {
                     cosmic::widget::button(Element::from(
                         self.core.applet.text(fl!("change-colors"))
                     ))
-                    .on_press(Message::LineColorPickerOpen()),
+                    .on_press(Message::ColorPickerOpen(SvgKind::Network)),
                     widget::horizontal_space(Length::Fill)
                 ),
             )));
@@ -571,12 +555,6 @@ impl cosmic::Application for Minimon {
 
             return self.core.applet.popup_container(content_list).into();
         }
-
-        if self.circlecolorpicker.is_active() {
-            self.view_circle_colorpicker()
-        } else {
-            self.view_line_colorpicker()
-        }
     }
 
     /// Application messages are handled here. The application state can be modified based on
@@ -586,7 +564,7 @@ impl cosmic::Application for Minimon {
         match message {
             Message::TogglePopup => {
                 return if let Some(p) = self.popup.take() {
-                    self.circlecolorpicker.set_active(false);
+                    self.colorpicker.is_active = false;
                     destroy_popup(p)
                 } else {
                     let new_id = Id::unique();
@@ -604,118 +582,64 @@ impl cosmic::Application for Minimon {
                 }
             }
 
-            Message::CircleColorPickerOpen(kind) => {
-                if kind == CircleGraphKind::Cpu {
-                    self.circlecolorpicker.set_colors(self.config.cpu_colors);
-                } else {
-                    self.circlecolorpicker.set_colors(self.config.mem_colors);
+            Message::ColorPickerOpen(kind) => {
+                self.colorpicker.set_variant(SvgColorVariant::Color1);
+                self.colorpicker.graph_kind = kind;
+                match kind {
+                    SvgKind::Cpu => {
+                        self.colorpicker.set_colors(self.config.cpu_colors);
+                        self.colorpicker.svg_ring.set_variable(35.0);
+                    }
+                    SvgKind::Memory => {
+                        self.colorpicker.set_colors(self.config.mem_colors);
+                        self.colorpicker.svg_ring.set_variable(35.0);
+                    }
+                    SvgKind::Network => {
+                        self.colorpicker.set_colors(self.config.net_colors);
+                    }
                 }
 
-                self.circlecolorpicker.graph_kind = kind;
-                self.circlecolorpicker.set_active(true);
-
                 let col = self
-                    .circlecolorpicker
+                    .colorpicker
                     .colors()
-                    .to_srgb(self.circlecolorpicker.color_variant);
-                self.circlecolorpicker.set_sliders(col);
+                    .get_color(self.colorpicker.color_variant);
+                self.colorpicker.set_sliders(col);
+                self.colorpicker.is_active = true;
             }
 
-            Message::CircleColorPickerClose(save) => {
-                self.circlecolorpicker.set_active(false);
-
+            Message::ColorPickerClose(save) => {
                 if save {
-                    self.set_colors(
-                        self.circlecolorpicker.colors(),
-                        self.circlecolorpicker.graph_kind,
-                    );
+                    self.set_colors(self.colorpicker.colors(), self.colorpicker.graph_kind);
                     self.save_config();
                 }
+                self.colorpicker.is_active = false;
             }
 
-            Message::CircleColorPickerDefaults => {
-                self.circlecolorpicker
-                    .set_colors(CircleGraphColors::new(self.circlecolorpicker.graph_kind));
-
-                let col = self
-                    .circlecolorpicker
-                    .colors()
-                    .to_srgb(self.circlecolorpicker.color_variant);
-                self.circlecolorpicker.set_sliders(col);
+            Message::ColorPickerDefaults => {
+                self.colorpicker
+                    .set_colors(SvgColors::new(self.colorpicker.graph_kind));
             }
 
-            Message::CircleColorPickerSliderRedChanged(val) => {
-                let mut col = self.circlecolorpicker.sliders();
+            Message::ColorPickerSliderRedChanged(val) => {
+                let mut col = self.colorpicker.sliders();
                 col.red = val;
-                self.circlecolorpicker.set_sliders(col);
+                self.colorpicker.set_sliders(col);
             }
 
-            Message::CircleColorPickerSliderGreenChanged(val) => {
-                let mut col = self.circlecolorpicker.sliders();
+            Message::ColorPickerSliderGreenChanged(val) => {
+                let mut col = self.colorpicker.sliders();
                 col.green = val;
-                self.circlecolorpicker.set_sliders(col);
+                self.colorpicker.set_sliders(col);
             }
 
-            Message::CircleColorPickerSliderBlueChanged(val) => {
-                let mut col = self.circlecolorpicker.sliders();
+            Message::ColorPickerSliderBlueChanged(val) => {
+                let mut col = self.colorpicker.sliders();
                 col.blue = val;
-                self.circlecolorpicker.set_sliders(col);
+                self.colorpicker.set_sliders(col);
             }
 
-            Message::LineColorPickerSliderRedChanged(val) => {
-                let mut col = self.linecolorpicker.sliders();
-                col.red = val;
-                self.linecolorpicker.set_sliders(col);
-            }
-
-            Message::LineColorPickerSliderGreenChanged(val) => {
-                let mut col = self.linecolorpicker.sliders();
-                col.green = val;
-                self.linecolorpicker.set_sliders(col);
-            }
-
-            Message::LineColorPickerSliderBlueChanged(val) => {
-                let mut col = self.linecolorpicker.sliders();
-                col.blue = val;
-                self.linecolorpicker.set_sliders(col);
-            }
-
-            Message::CircleColorPickerSelectVariant(variant) => {
-                self.circlecolorpicker.set_variant(variant);
-            }
-
-            Message::LineColorPickerOpen() => {
-                self.linecolorpicker.set_colors(self.config.net_colors);
-                self.linecolorpicker.set_active(true);
-
-                let col = self
-                    .linecolorpicker
-                    .colors()
-                    .to_srgb(self.linecolorpicker.color_variant);
-                self.linecolorpicker.set_sliders(col);
-            }
-
-            Message::LineColorPickerClose(save) => {
-                self.linecolorpicker.set_active(false);
-
-                if save {
-                    self.config.net_colors = self.linecolorpicker.colors();
-                    self.save_config();
-                }
-            }
-
-            Message::LineColorPickerDefaults => {
-                self.linecolorpicker.set_colors(LineGraphColors::default());
-
-                let col = self
-                    .linecolorpicker
-                    .colors()
-                    .to_srgb(self.linecolorpicker.color_variant);
-                self.linecolorpicker.set_sliders(col);
-            }
-
-            Message::LineColorPickerSelectVariant(variant) => {
-                self.linecolorpicker.set_variant(variant);
+            Message::ColorPickerSelectVariant(variant) => {
+                self.colorpicker.set_variant(variant);
             }
 
             Message::ToggleAdaptiveNet(toggle) => {
@@ -814,39 +738,22 @@ impl cosmic::Application for Minimon {
                 self.set_tick();
             }
 
-            Message::CircleColorTextInputRedChanged(value) => {
-                let mut col = self.circlecolorpicker.sliders();
+            Message::ColorTextInputRedChanged(value) => {
+                let mut col = self.colorpicker.sliders();
                 Minimon::set_color(&value, &mut col.red);
-                self.circlecolorpicker.set_sliders(col);
+                self.colorpicker.set_sliders(col);
             }
-            
-            Message::CircleColorTextInputGreenChanged(value) => {
-                let mut col = self.circlecolorpicker.sliders();
+
+            Message::ColorTextInputGreenChanged(value) => {
+                let mut col = self.colorpicker.sliders();
                 Minimon::set_color(&value, &mut col.green);
-                self.circlecolorpicker.set_sliders(col);
+                self.colorpicker.set_sliders(col);
             }
 
-            Message::CircleColorTextInputBlueChanged(value) => {
-                let mut col = self.circlecolorpicker.sliders();
+            Message::ColorTextInputBlueChanged(value) => {
+                let mut col = self.colorpicker.sliders();
                 Minimon::set_color(&value, &mut col.blue);
-                self.circlecolorpicker.set_sliders(col);
-            }
-
-            Message::LineColorTextInputRedChanged(value) => {
-                let mut col = self.linecolorpicker.sliders();
-                Minimon::set_color(&value, &mut col.red);
-                self.linecolorpicker.set_sliders(col);
-            }
-
-            Message::LineColorTextInputGreenChanged(value) => {
-                let mut col = self.linecolorpicker.sliders();
-                Minimon::set_color(&value, &mut col.green);
-                self.linecolorpicker.set_sliders(col);
-            }
-            Message::LineColorTextInputBlueChanged(value) => {
-                let mut col = self.linecolorpicker.sliders();
-                Minimon::set_color(&value, &mut col.blue);
-                self.linecolorpicker.set_sliders(col);
+                self.colorpicker.set_sliders(col);
             }
         }
         Command::none()
@@ -882,15 +789,19 @@ impl Minimon {
         }
     }
 
-    fn set_colors(&mut self, colors: CircleGraphColors, kind: CircleGraphKind) {
+    fn set_colors(&mut self, colors: SvgColors, kind: SvgKind) {
         match kind {
-            CircleGraphKind::Cpu => {
+            SvgKind::Cpu => {
                 self.config.cpu_colors = colors;
                 self.svgstat_cpu.set_colors(colors);
             }
-            CircleGraphKind::Memory => {
+            SvgKind::Memory => {
                 self.config.mem_colors = colors;
                 self.svgstat_mem.set_colors(colors);
+            }
+            SvgKind::Network => {
+                self.config.net_colors = colors;
+                self.netmon.set_colors(colors);
             }
         }
     }
@@ -944,15 +855,94 @@ impl Minimon {
         }
     }
 
-    fn view_circle_colorpicker(&self) -> Element<<Minimon as cosmic::Application>::Message> {
-        let color = self.circlecolorpicker.sliders();
+    fn view_colorpicker(&self) -> Element<<Minimon as cosmic::Application>::Message> {
+        let cp = &self.colorpicker;
+        let color = cp.sliders();
 
-        let title = format!("{} colors", self.circlecolorpicker.graph_kind);
+        let title = format!("{} colors", cp.graph_kind);
 
-        let current_variant = self.circlecolorpicker.color_variant;
+        let current_variant = cp.color_variant;
+
+        let fields = if cp.graph_kind == SvgKind::Network {
+            row!(
+                widget::radio(
+                    "Download.  ",
+                    SvgColorVariant::Color2,
+                    if current_variant == SvgColorVariant::Color2 {
+                        Some(SvgColorVariant::Color2)
+                    } else {
+                        None
+                    },
+                    |m| { Message::ColorPickerSelectVariant(m) }
+                ),
+                widget::radio(
+                    "Upload.  ",
+                    SvgColorVariant::Color3,
+                    if current_variant == SvgColorVariant::Color3 {
+                        Some(SvgColorVariant::Color3)
+                    } else {
+                        None
+                    },
+                    |m| { Message::ColorPickerSelectVariant(m) }
+                ),
+                widget::radio(
+                    "Back.",
+                    SvgColorVariant::Color1,
+                    if current_variant == SvgColorVariant::Color1 {
+                        Some(SvgColorVariant::Color1)
+                    } else {
+                        None
+                    },
+                    |m| { Message::ColorPickerSelectVariant(m) }
+                ),
+            )
+        } else {
+            row!(
+                widget::radio(
+                    "Ring1.  ",
+                    SvgColorVariant::Color4,
+                    if current_variant == SvgColorVariant::Color4 {
+                        Some(SvgColorVariant::Color4)
+                    } else {
+                        None
+                    },
+                    |m| { Message::ColorPickerSelectVariant(m) }
+                ),
+                widget::radio(
+                    "Ring2.  ",
+                    SvgColorVariant::Color3,
+                    if current_variant == SvgColorVariant::Color3 {
+                        Some(SvgColorVariant::Color3)
+                    } else {
+                        None
+                    },
+                    |m| { Message::ColorPickerSelectVariant(m) }
+                ),
+                widget::radio(
+                    "Back.  ",
+                    SvgColorVariant::Color1,
+                    if current_variant == SvgColorVariant::Color1 {
+                        Some(SvgColorVariant::Color1)
+                    } else {
+                        None
+                    },
+                    |m| { Message::ColorPickerSelectVariant(m) }
+                ),
+                widget::radio(
+                    "Text.",
+                    SvgColorVariant::Color2,
+                    if current_variant == SvgColorVariant::Color2 {
+                        Some(SvgColorVariant::Color2)
+                    } else {
+                        None
+                    },
+                    |m| { Message::ColorPickerSelectVariant(m) }
+                )
+            )
+        };
 
         let c = widget::list_column()
-            .padding(5)
+            .padding(0)
             .spacing(0)
             .add(
                 widget::text::title2(title)
@@ -960,11 +950,9 @@ impl Minimon {
                     .horizontal_alignment(Horizontal::Center),
             )
             .add(
-                widget::svg(widget::svg::Handle::from_memory(
-                    self.circlecolorpicker.example_svg.svg().into_bytes(),
-                ))
-                .width(Length::Fill)
-                .height(100),
+                widget::svg(widget::svg::Handle::from_memory(cp.demo_svg().into_bytes()))
+                    .width(Length::Fill)
+                    .height(100),
             )
             .add(column!(
                 Element::from(
@@ -973,16 +961,16 @@ impl Minimon {
                         widget::svg(widget::svg::Handle::from_memory(RED_RECT.as_bytes()))
                             .height(20),
                         widget::horizontal_space(Length::Fill),
-                        CircleColorPicker::color_slider(
+                        ColorPicker::color_slider(
                             0..=255,
                             color.red,
-                            Message::CircleColorPickerSliderRedChanged,
+                            Message::ColorPickerSliderRedChanged,
                             &COLOR_STOPS_RED
                         ),
                         widget::horizontal_space(Length::Fill),
                         widget::text_input("", color.red.to_string())
                             .width(50)
-                            .on_input(Message::CircleColorTextInputRedChanged),
+                            .on_input(Message::ColorTextInputRedChanged),
                         widget::horizontal_space(Length::Fill),
                     )
                     .align_items(Alignment::Center)
@@ -993,16 +981,16 @@ impl Minimon {
                         widget::svg(widget::svg::Handle::from_memory(GREEN_RECT.as_bytes()))
                             .height(20),
                         widget::horizontal_space(Length::Fill),
-                        CircleColorPicker::color_slider(
+                        ColorPicker::color_slider(
                             0..=255,
                             color.green,
-                            Message::CircleColorPickerSliderGreenChanged,
+                            Message::ColorPickerSliderGreenChanged,
                             &COLOR_STOPS_GREEN
                         ),
                         widget::horizontal_space(Length::Fill),
                         widget::text_input("", color.green.to_string())
                             .width(50)
-                            .on_input(Message::CircleColorTextInputGreenChanged),
+                            .on_input(Message::ColorTextInputGreenChanged),
                         widget::horizontal_space(Length::Fill),
                     )
                     .align_items(Alignment::Center)
@@ -1013,213 +1001,31 @@ impl Minimon {
                         widget::svg(widget::svg::Handle::from_memory(BLUE_RECT.as_bytes()))
                             .height(20),
                         widget::horizontal_space(Length::Fill),
-                        CircleColorPicker::color_slider(
+                        ColorPicker::color_slider(
                             0..=255,
                             color.blue,
-                            Message::CircleColorPickerSliderBlueChanged,
+                            Message::ColorPickerSliderBlueChanged,
                             &COLOR_STOPS_BLUE
                         ),
                         widget::horizontal_space(Length::Fill),
                         widget::text_input("", color.blue.to_string())
                             .width(50)
-                            .on_input(Message::CircleColorTextInputBlueChanged),
+                            .on_input(Message::ColorTextInputBlueChanged),
                         widget::horizontal_space(Length::Fill),
                     )
                     .align_items(Alignment::Center)
                 ),
             ))
-            .add(row!(
-                widget::radio(
-                    CircleGraphColorVariant::RingFront.as_str(),
-                    CircleGraphColorVariant::RingFront,
-                    if current_variant == CircleGraphColorVariant::RingFront {
-                        Some(CircleGraphColorVariant::RingFront)
-                    } else {
-                        None
-                    },
-                    |m| { Message::CircleColorPickerSelectVariant(m) }
-                ),
-                widget::radio(
-                    CircleGraphColorVariant::RingBack.as_str(),
-                    CircleGraphColorVariant::RingBack,
-                    if current_variant == CircleGraphColorVariant::RingBack {
-                        Some(CircleGraphColorVariant::RingBack)
-                    } else {
-                        None
-                    },
-                    |m| { Message::CircleColorPickerSelectVariant(m) }
-                ),
-                widget::radio(
-                    CircleGraphColorVariant::Background.as_str(),
-                    CircleGraphColorVariant::Background,
-                    if current_variant == CircleGraphColorVariant::Background {
-                        Some(CircleGraphColorVariant::Background)
-                    } else {
-                        None
-                    },
-                    |m| { Message::CircleColorPickerSelectVariant(m) }
-                ),
-                widget::radio(
-                    CircleGraphColorVariant::Text.as_str(),
-                    CircleGraphColorVariant::Text,
-                    if current_variant == CircleGraphColorVariant::Text {
-                        Some(CircleGraphColorVariant::Text)
-                    } else {
-                        None
-                    },
-                    |m| { Message::CircleColorPickerSelectVariant(m) }
-                )
-            ))
+            .add(fields)
             .spacing(10)
             .add(
                 row!(
-                    widget::button::standard("Defaults")
-                        .on_press(Message::CircleColorPickerDefaults),
+                    widget::button::standard("Defaults").on_press(Message::ColorPickerDefaults),
                     row!(
                         widget::horizontal_space(Length::Fill),
                         widget::button::destructive("Cancel")
-                            .on_press(Message::CircleColorPickerClose(false)),
-                        widget::button::suggested("Save")
-                            .on_press(Message::CircleColorPickerClose(true))
-                    )
-                    .width(Length::Fill)
-                    .spacing(5)
-                    .align_items(Alignment::End)
-                )
-                .padding(5)
-                .spacing(5)
-                .width(Length::Fill),
-            );
-        c.into()
-    }
-
-    fn view_line_colorpicker(&self) -> Element<<Minimon as cosmic::Application>::Message> {
-        let color = self.linecolorpicker.sliders();
-
-        let current_variant = self.linecolorpicker.color_variant;
-
-        let c = widget::list_column()
-            .padding(5)
-            .spacing(0)
-            .add(
-                widget::text::title2(fl!("network-colors"))
-                    .width(Length::Fill)
-                    .horizontal_alignment(Horizontal::Center),
-            )
-            .add(
-                widget::svg(widget::svg::Handle::from_memory(
-                    self.netmon
-                        .svg_demo(&self.linecolorpicker.colors())
-                        .as_bytes()
-                        .to_owned(),
-                ))
-                .width(Length::Fill)
-                .height(100),
-            )
-            .add(column!(
-                Element::from(
-                    row!(
-                        widget::horizontal_space(Length::Fill),
-                        widget::svg(widget::svg::Handle::from_memory(RED_RECT.as_bytes()))
-                            .height(20),
-                        widget::horizontal_space(Length::Fill),
-                        LineColorPicker::color_slider(
-                            0..=255,
-                            color.red,
-                            Message::LineColorPickerSliderRedChanged,
-                            &COLOR_STOPS_RED
-                        ),
-                        widget::horizontal_space(Length::Fill),
-                        widget::text_input("", color.red.to_string())
-                            .width(50)
-                            .on_input(Message::LineColorTextInputRedChanged),
-                        widget::horizontal_space(Length::Fill),
-                    )
-                    .align_items(Alignment::Center)
-                ),
-                Element::from(
-                    row!(
-                        widget::horizontal_space(Length::Fill),
-                        widget::svg(widget::svg::Handle::from_memory(GREEN_RECT.as_bytes()))
-                            .height(20),
-                        widget::horizontal_space(Length::Fill),
-                        LineColorPicker::color_slider(
-                            0..=255,
-                            color.green,
-                            Message::LineColorPickerSliderGreenChanged,
-                            &COLOR_STOPS_GREEN
-                        ),
-                        widget::horizontal_space(Length::Fill),
-                        widget::text_input("", color.green.to_string())
-                            .width(50)
-                            .on_input(Message::LineColorTextInputGreenChanged),
-                        widget::horizontal_space(Length::Fill),
-                    )
-                    .align_items(Alignment::Center)
-                ),
-                Element::from(
-                    row!(
-                        widget::horizontal_space(Length::Fill),
-                        widget::svg(widget::svg::Handle::from_memory(BLUE_RECT.as_bytes()))
-                            .height(20),
-                        widget::horizontal_space(Length::Fill),
-                        LineColorPicker::color_slider(
-                            0..=255,
-                            color.blue,
-                            Message::LineColorPickerSliderBlueChanged,
-                            &COLOR_STOPS_BLUE
-                        ),
-                        widget::horizontal_space(Length::Fill),
-                        widget::text_input("", color.blue.to_string())
-                            .width(50)
-                            .on_input(Message::LineColorTextInputBlueChanged),
-                        widget::horizontal_space(Length::Fill),
-                    )
-                    .align_items(Alignment::Center)
-                ),
-            ))
-            .add(row!(
-                widget::radio(
-                    LineGraphColorVariant::Download.as_str(),
-                    LineGraphColorVariant::Download,
-                    if current_variant == LineGraphColorVariant::Download {
-                        Some(LineGraphColorVariant::Download)
-                    } else {
-                        None
-                    },
-                    |m| { Message::LineColorPickerSelectVariant(m) }
-                ),
-                widget::radio(
-                    LineGraphColorVariant::Upload.as_str(),
-                    LineGraphColorVariant::Upload,
-                    if current_variant == LineGraphColorVariant::Upload {
-                        Some(LineGraphColorVariant::Upload)
-                    } else {
-                        None
-                    },
-                    |m| { Message::LineColorPickerSelectVariant(m) }
-                ),
-                widget::radio(
-                    LineGraphColorVariant::Background.as_str(),
-                    LineGraphColorVariant::Background,
-                    if current_variant == LineGraphColorVariant::Background {
-                        Some(LineGraphColorVariant::Background)
-                    } else {
-                        None
-                    },
-                    |m| { Message::LineColorPickerSelectVariant(m) }
-                ),
-            ))
-            .spacing(10)
-            .add(
-                row!(
-                    widget::button::standard("Defaults").on_press(Message::LineColorPickerDefaults),
-                    row!(
-                        widget::horizontal_space(Length::Fill),
-                        widget::button::destructive("Cancel")
-                            .on_press(Message::LineColorPickerClose(false)),
-                        widget::button::suggested("Save")
-                            .on_press(Message::LineColorPickerClose(true))
+                            .on_press(Message::ColorPickerClose(false)),
+                        widget::button::suggested("Save").on_press(Message::ColorPickerClose(true))
                     )
                     .width(Length::Fill)
                     .spacing(5)

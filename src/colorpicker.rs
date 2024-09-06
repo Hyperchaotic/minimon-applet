@@ -14,16 +14,43 @@ use cosmic::{
     },
 };
 
-use crate::config::{LineGraphColorVariant, LineGraphColors};
+use crate::config::{SvgColorVariant, SvgColors, SvgKind};
+use crate::netmon::NetMon;
 use crate::svgstat::SvgStat;
-use crate::{
-    config::{CircleGraphColorVariant, CircleGraphColors, CircleGraphKind},
-    netmon::NetMon
-};
 
-pub trait ColorPicker {
-    // Thanks to PixelDoted/cosmic-color-picker for his cool slider
-    fn color_slider<'a, Message>(
+/// Data for managing the CircleColorPicker dialog
+#[derive(Debug)]
+pub struct ColorPicker {
+    pub is_active: bool,
+    /// Type of current displaying device CPU or Memory
+    pub graph_kind: SvgKind,
+    // Current field being adjusted background/text/etc.
+    pub color_variant: SvgColorVariant,
+    /// An example SVG to show the changes
+    pub svg_ring: SvgStat,
+    pub svg_line: NetMon,
+
+    ///Current slider values
+    pub slider_red_val: u8,
+    pub slider_green_val: u8,
+    pub slider_blue_val: u8,
+}
+
+impl ColorPicker {
+    pub fn new(kind: SvgKind) -> Self {
+        ColorPicker {
+            is_active: false,
+            graph_kind: kind,
+            color_variant: SvgColorVariant::Color1,
+            svg_ring: SvgStat::new(100),
+            svg_line: NetMon::new(),
+            slider_red_val: 0,
+            slider_green_val: 0,
+            slider_blue_val: 0,
+        }
+    }
+
+    pub fn color_slider<'a, Message>(
         range: RangeInclusive<u8>,
         value: u8,
         on_change: impl Fn(u8) -> Message + 'a,
@@ -82,36 +109,6 @@ pub trait ColorPicker {
             .into()
     }
 
-}
-
-/// Data for managing the CircleColorPicker dialog
-#[derive(Debug)]
-pub struct CircleColorPicker {
-    /// If dialog is active this is not None
-    active: bool,
-    /// Type of current displaying device CPU or Memory
-    pub graph_kind: CircleGraphKind,
-    // Current field being adjusted background/text/etc.
-    pub color_variant: CircleGraphColorVariant,
-    /// An example SVG to show the changes
-    pub example_svg: SvgStat,
-    ///Current slider values
-    pub slider_red_val: u8,
-    pub slider_green_val: u8,
-    pub slider_blue_val: u8,
-}
-
-impl ColorPicker for CircleColorPicker { }
-
-impl CircleColorPicker {
-    pub fn is_active(&self) -> bool {
-        self.active
-    }
-
-    pub fn set_active(&mut self, activation: bool) {
-        self.active = activation;
-    }
-
     pub fn sliders(&self) -> Srgb<u8> {
         Srgb::from_components((
             self.slider_red_val,
@@ -120,126 +117,61 @@ impl CircleColorPicker {
         ))
     }
 
-    pub fn set_sliders(&mut self, color: Srgb<u8>) {
-        self.slider_red_val = color.red;
-        self.slider_green_val = color.green;
-        self.slider_blue_val = color.blue;
-
-        let mut col = self.example_svg.colors();
-        col.set_color(self.sliders(), self.color_variant);
-        self.example_svg.set_colors(col);
-    }
-
-    pub fn set_colors(&mut self, colors: CircleGraphColors) {
-        self.example_svg.set_colors(colors);
-    }
-
-    pub fn set_variant(&mut self, variant: CircleGraphColorVariant) {
-        self.color_variant = variant;
-
-        let col = self.example_svg.colors().to_srgb(variant);
-
-        self.slider_red_val = col.red;
-        self.slider_green_val = col.green;
-        self.slider_blue_val = col.blue;
-    }
-
-    pub fn colors(&self) -> CircleGraphColors {
-        self.example_svg.colors()
-    }
-
-}
-
-impl Default for CircleColorPicker {
-    fn default() -> Self {
-        let mut dev = SvgStat::new(100);
-        dev.set_variable(50.0);
-        Self {
-            active: false,
-            graph_kind: CircleGraphKind::Cpu,
-            color_variant: CircleGraphColorVariant::RingFront,
-            example_svg: dev,
-            slider_red_val: 0,
-            slider_green_val: 0,
-            slider_blue_val: 0,
+    pub fn demo_svg(&self) -> String {
+        if self.graph_kind==SvgKind::Network {
+            self.svg_line.svg_demo()
+        } else {
+            self.svg_ring.svg_demo()
         }
     }
-}
-
-/// Data for managing the CircleColorPicker dialog
-#[derive(Debug)]
-pub struct LineColorPicker {
-    /// If dialog is active this is not None
-    active: bool,
-    // Current field being adjusted background/text/etc.
-    pub color_variant: LineGraphColorVariant,
-    /// An example SVG to show the changes
-    pub example_svg: NetMon,
-    ///Current slider values
-    pub slider_red_val: u8,
-    pub slider_green_val: u8,
-    pub slider_blue_val: u8,
-}
-
-impl ColorPicker for LineColorPicker { }
-
-impl LineColorPicker {
-
-    pub fn is_active(&self) -> bool {
-        self.active
-    }
-
-    pub fn set_active(&mut self, activation: bool) {
-        self.active = activation;
-    }
-
-    pub fn sliders(&self) -> Srgb<u8> {
-        Srgb::from_components((
-            self.slider_red_val,
-            self.slider_green_val,
-            self.slider_blue_val,
-        ))
-    }
 
     pub fn set_sliders(&mut self, color: Srgb<u8>) {
         self.slider_red_val = color.red;
         self.slider_green_val = color.green;
         self.slider_blue_val = color.blue;
 
-        let mut col = self.example_svg.colors();
-        col.set_color(self.sliders(), self.color_variant);
-        self.example_svg.set_colors(col);
+        if self.graph_kind == SvgKind::Network {
+            let mut col = self.svg_line.colors();
+            col.set_color(self.sliders(), self.color_variant);
+            self.svg_line.set_colors(col);
+        } else {
+            let mut col = self.svg_ring.colors();
+            col.set_color(self.sliders(), self.color_variant);
+            self.svg_ring.set_colors(col);
+        }
     }
 
-    pub fn set_colors(&mut self, colors: LineGraphColors) {
-        self.example_svg.set_colors(colors);
+    pub fn set_colors(&mut self, colors: SvgColors) {
+        if self.graph_kind==SvgKind::Network {
+            self.svg_line.set_colors(colors);
+            self.set_sliders(self.svg_line.colors().get_color(self.color_variant));
+        } else {
+            self.svg_ring.set_colors(colors);
+            self.set_sliders(self.svg_ring.colors().get_color(self.color_variant));
+        }
     }
 
-    pub fn set_variant(&mut self, variant: LineGraphColorVariant) {
+    pub fn set_variant(&mut self, variant: SvgColorVariant) {
         self.color_variant = variant;
 
-        let col = self.example_svg.colors().to_srgb(variant);
+        let cols = if self.graph_kind == SvgKind::Network {
+            self.svg_line.colors()
+        } else {
+            self.svg_ring.colors()
+        };
+
+        let col = cols.get_color(variant);
 
         self.slider_red_val = col.red;
         self.slider_green_val = col.green;
         self.slider_blue_val = col.blue;
     }
 
-    pub fn colors(&self) -> LineGraphColors {
-        self.example_svg.colors()
-    }
-}
-
-impl Default for LineColorPicker {
-    fn default() -> Self {
-        let dev = NetMon::new();
-        Self {
-            active: false,
-            color_variant: LineGraphColorVariant::Background,
-            example_svg: dev,
-            slider_red_val: 0,
-            slider_green_val: 0,
-            slider_blue_val: 0,
+    pub fn colors(&self) -> SvgColors {
+        if self.graph_kind == SvgKind::Network {
+            self.svg_line.colors()
+        } else {
+            self.svg_ring.colors()
         }
     }
 }

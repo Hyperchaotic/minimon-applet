@@ -1,4 +1,4 @@
-use crate::config::CircleGraphColors;
+use crate::config::SvgColors;
 
 const SVGSTATSTART: &str = "
 <svg viewBox=\"0 0 34 34\" xmlns=\"http://www.w3.org/2000/svg\">
@@ -49,7 +49,7 @@ const SVG_LEN: usize = SVGSTATSTART.len()
 pub struct SvgStat {
     current_val: f64,
     max_val: u64,
-    colors: CircleGraphColors,
+    colors: SvgColors,
 
     /// current value cpu/ram load shown. 
     value: String,
@@ -76,14 +76,14 @@ impl SvgStat {
         let mut svg = SvgStat {
             current_val: 0.0,
             max_val,
-            colors: CircleGraphColors::default(),
+            colors: SvgColors::default(),
             value,
             percentage,
             ringfront_color: String::new(),
             text_color: String::new(),
             circle_colors: String::new(),
         };
-        svg.set_colors(CircleGraphColors::default());
+        svg.set_colors(SvgColors::default());
         svg
     }
 
@@ -108,24 +108,29 @@ impl SvgStat {
             }
     }
 
-    pub fn set_colors(&mut self, colors: CircleGraphColors) {
+    pub fn set_colors(&mut self, colors: SvgColors) {
         self.colors = colors;
-        self.ringfront_color = self.colors.ringfront_to_string();
-        self.text_color = format!(" fill:{};", &self.colors.text_to_string());
+        self.ringfront_color = self.colors.color4_to_string();
+        self.text_color = format!(" fill:{};", &self.colors.color2_to_string());
         self.circle_colors = format!(
             "fill=\"{}\" stroke=\"{}\"",
-            self.colors.background_to_string(),
-            self.colors.ringback_to_string()
+            self.colors.color1_to_string(),
+            self.colors.color3_to_string()
         );
     }
 
-    pub fn colors(&self) -> CircleGraphColors {
+    pub fn colors(&self) -> SvgColors {
         self.colors
+    }
+
+    pub fn svg_demo(&self) -> String {
+        self.svg()
     }
 
     pub fn svg(&self) -> String {
 
         let mut svg = String::with_capacity(SVG_LEN);
+
         svg.push_str(SVGSTATSTART);
         svg.push_str(&self.circle_colors);
         svg.push_str(SVGSTATPART2);

@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 
 use sysinfo::Networks;
 
-use crate::config::{LineGraphColorVariant, LineGraphColors};
+use crate::config::{SvgColorVariant, SvgColors};
 
 const MAX_SAMPLES: usize = 30;
 const GRAPH_SAMPLES: usize = 21;
@@ -16,7 +16,7 @@ pub struct NetMon {
     download: VecDeque<u64>,
     upload: VecDeque<u64>,
     max_y: Option<u64>,
-    colors: LineGraphColors,
+    colors: SvgColors,
 }
 
 impl NetMon {
@@ -29,11 +29,11 @@ impl NetMon {
             download: VecDeque::new(),
             upload: VecDeque::new(),
             max_y: None,
-            colors: LineGraphColors::default(),
+            colors: SvgColors::new(crate::config::SvgKind::Network),
         }
     }
 
-    pub fn set_colors(&mut self, colors: LineGraphColors) {
+    pub fn set_colors(&mut self, colors: SvgColors) {
         self.colors = colors;
     }
 
@@ -41,7 +41,7 @@ impl NetMon {
         self.max_y = max;
     }
 
-    pub fn colors(&self) -> LineGraphColors {
+    pub fn colors(&self) -> SvgColors {
         self.colors
     }
 
@@ -149,12 +149,11 @@ impl NetMon {
         &self,
         download: &VecDeque<u64>,
         upload: &VecDeque<u64>,
-        colors: &LineGraphColors,
         max_y: Option<u64>
     ) -> String {
         let mut sname: String = String::new();
         {
-            let bg = colors.to_srgb(LineGraphColorVariant::Background);
+            let bg = self.colors.get_color(SvgColorVariant::Color1);
             let root = SVGBackend::with_string(&mut sname, (40, 40)).into_drawing_area();
             root.fill(&RGBColor(bg.red, bg.green, bg.blue)).unwrap();
             let root = root.margin(0, 0, 0, 0);
@@ -214,8 +213,8 @@ impl NetMon {
                     .map(|(index, &value)| ((index * 2) as f32, scaling * value as f32))
                     .collect();
 
-                let dl = colors.to_srgb(LineGraphColorVariant::Download);
-                let ul = colors.to_srgb(LineGraphColorVariant::Upload);
+                let dl = self.colors.get_color(SvgColorVariant::Color2);
+                let ul = self.colors.get_color(SvgColorVariant::Color3);
 
                 let dl_color = RGBColor(dl.red, dl.green, dl.blue);
                 let ul_color = RGBColor(ul.red, ul.green, ul.blue);
@@ -241,14 +240,14 @@ impl NetMon {
         sname
     }
 
-    pub fn svg_demo(&self, colors: &LineGraphColors) -> String {
+    pub fn svg_demo(&self) -> String {
         let download = VecDeque::from(DL_DEMO);
         let upload = VecDeque::from(UL_DEMO);
-        self.svg_draw(&download, &upload, colors, None)
+        self.svg_draw(&download, &upload, None)
     }
 
     pub fn svg(&self) -> String {
-        self.svg_draw(&self.download, &self.upload, &self.colors, self.max_y)
+        self.svg_draw(&self.download, &self.upload, self.max_y)
     }
 }
 
