@@ -23,7 +23,7 @@ impl DemoSvg for NetMon {
     fn svg_demo(&self) -> String {
         let download = VecDeque::from(DL_DEMO);
         let upload = VecDeque::from(UL_DEMO);
-        self.svg_draw(&download, &upload, None)
+        self.svg_compose(&download, &upload, None)
     }
 
     fn svg_colors(&self) -> SvgColors {
@@ -74,7 +74,7 @@ impl NetMon {
     }
 
     /// Retrieve the amount of data transmitted since last update.
-    pub fn update_samples(&mut self) {
+    pub fn update(&mut self) {
         self.networks.refresh();
         let mut dl = 0;
         let mut ul = 0;
@@ -153,7 +153,7 @@ impl NetMon {
         NetMon::makestr(ul)
     }
 
-    fn svg_draw(
+    fn svg_compose(
         &self,
         download: &VecDeque<u64>,
         upload: &VecDeque<u64>,
@@ -249,7 +249,7 @@ impl NetMon {
     }
 
     pub fn svg(&self) -> String {
-        self.svg_draw(&self.download, &self.upload, self.max_y)
+        self.svg_compose(&self.download, &self.upload, self.max_y)
     }
 }
 

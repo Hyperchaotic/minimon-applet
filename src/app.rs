@@ -1,7 +1,6 @@
 use cosmic::applet::PanelType;
 use cosmic::cosmic_config::CosmicConfigEntry;
 use std::time;
-use sysinfo::System;
 
 use cosmic::app::{Command, Core};
 use cosmic::iced::wayland::popup::{destroy_popup, get_popup};
@@ -41,12 +40,6 @@ const APP_ICON: &[u8] =
 pub struct Minimon {
     /// Application state which is managed by the COSMIC runtime.
     core: Core,
-    /// Lib for retrieving system stats
-    system: System,
-    /// Current Total Load Avg in %
-    cpu_load: f64,
-    /// Current Mem usage in bytes
-    mem_usage: f64,
     /// The svg image to draw for the CPU load
     svgstat_cpu: super::svgstat::SvgStat,
     /// The svg image to draw for the Memory load
@@ -115,18 +108,10 @@ impl cosmic::Application for Minimon {
     const APP_ID: &'static str = "com.github.hyperchaotic.cosmic-applet-minimon";
 
     fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
-        let mut system = System::new();
-        system.refresh_memory();
-        system.refresh_cpu_all();
-        let mem_physical = system.total_memory();
-
         let app = Minimon {
             core,
-            system,
-            cpu_load: 0.0,
-            mem_usage: 0.0,
-            svgstat_cpu: super::svgstat::SvgStat::new(100),
-            svgstat_mem: super::svgstat::SvgStat::new(mem_physical / 1_073_741_824),
+            svgstat_cpu: super::svgstat::SvgStat::new(SvgKind::Cpu),
+            svgstat_mem: super::svgstat::SvgStat::new(SvgKind::Memory),
             popup: None,
             colorpicker: ColorPicker::new(),
             dropdown_options: ["b", "Kb", "Mb", "Gb", "Tb"].into(),
@@ -256,14 +241,14 @@ impl cosmic::Application for Minimon {
         let button = cosmic::widget::button(if horizontal {
             let mut formated = String::new();
             if self.config.enable_cpu {
-                formated = format!("{:.2}%", self.cpu_load);
+                formated = format!("{:.2}%", self.svgstat_cpu.value());
             }
 
             if self.config.enable_mem {
                 if !formated.is_empty() {
                     formated.push(' ');
                 }
-                formated.push_str(&format!("{:.1}GB", self.mem_usage));
+                formated.push_str(&format!("{:.1}GB", self.svgstat_mem.value()));
             }
 
             if self.config.enable_net {
@@ -286,13 +271,13 @@ impl cosmic::Application for Minimon {
                 .align_items(Alignment::Center),
             )
         } else {
-            let formated_cpu = if self.cpu_load < 10.0 {
-                format!("{:.2}%", self.cpu_load)
+            let formated_cpu = if self.svgstat_cpu.value() < 10.0 {
+                format!("{:.2}%", self.svgstat_cpu.value())
             } else {
-                format!("{:.1}%", self.cpu_load)
+                format!("{:.1}%", self.svgstat_cpu.value())
             };
 
-            let formated_mem = format!("{:.1}GB", self.mem_usage);
+            let formated_mem = format!("{:.1}GB", self.svgstat_mem.value());
 
             // vertical layout
             let mut elements = Vec::new();
@@ -547,11 +532,11 @@ impl cosmic::Application for Minimon {
                 self.colorpicker.set_variant(SvgColorVariant::Color1);
                 match kind {
                     SvgKind::Cpu => {
-                        self.colorpicker.activate(SvgKind::Cpu, Box::new(SvgStat::new(100)));
+                        self.colorpicker.activate(SvgKind::Cpu, Box::new(SvgStat::new(SvgKind::Cpu)));
                         self.colorpicker.set_colors(self.config.cpu_colors);
                     }
                     SvgKind::Memory => {
-                        self.colorpicker.activate(SvgKind::Memory, Box::new(SvgStat::new(100)));
+                        self.colorpicker.activate(SvgKind::Memory, Box::new(SvgStat::new(SvgKind::Memory)));
                         self.colorpicker.set_colors(self.config.mem_colors);
                     }
                     SvgKind::Network => {
@@ -794,27 +779,17 @@ impl Minimon {
     }
 
     fn refresh_stats(&mut self) {
-        if self.config.enable_cpu {
-            self.system.refresh_cpu_usage();
-            self.cpu_load = self
-                .system
-                .cpus()
-                .iter()
-                .map(|p| f64::from(p.cpu_usage()))
-                .sum::<f64>()
-                / self.system.cpus().len() as f64;
 
-            self.svgstat_cpu.set_variable(self.cpu_load);
+        if self.config.enable_cpu {
+            self.svgstat_cpu.update();
         }
 
         if self.config.enable_mem {
-            self.system.refresh_memory();
-            self.mem_usage = self.system.used_memory() as f64 / 1_073_741_824.0;
-            self.svgstat_mem.set_variable(self.mem_usage);
+            self.svgstat_mem.update();
         }
 
         if self.config.enable_net {
-            self.netmon.update_samples();
+            self.netmon.update();
         }
     }
 }

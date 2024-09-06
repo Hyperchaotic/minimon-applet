@@ -1,12 +1,19 @@
-use crate::{colorpicker::DemoSvg, config::SvgColors};
+use sysinfo::System;
+
+use crate::{
+    colorpicker::DemoSvg,
+    config::{SvgColors, SvgKind},
+};
 use std::fmt::Write;
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug)]
 
 pub struct SvgStat {
     current_val: f64,
     max_val: u64,
     colors: SvgColors,
+    system: System,
+    kind: SvgKind,
 
     /// current value cpu/ram load shown.
     value: String,
@@ -20,8 +27,10 @@ pub struct SvgStat {
 
 impl DemoSvg for SvgStat {
     fn svg_demo(&self) -> String {
-        let percentage: u64 = ((35.0 / self.max_val as f64) * 100.0) as u64;
-        self.svg_compose("35", &format!("{percentage}"))
+        // show a number of 40% of max 
+        let val = self.max_val as f64 * 0.4;
+        let percentage: u64 = ((val / self.max_val as f64) * 100.0) as u64;
+        self.svg_compose(&format!("{val}"), &format!("{percentage}"))
     }
 
     fn svg_colors(&self) -> SvgColors {
@@ -41,7 +50,17 @@ impl DemoSvg for SvgStat {
 }
 
 impl SvgStat {
-    pub fn new(max_val: u64) -> Self {
+    pub fn new(kind: SvgKind) -> Self {
+        let mut system = System::new();
+        system.refresh_memory();
+        system.refresh_cpu_all();
+
+        let max_val = if kind == SvgKind::Cpu {
+            100
+        } else {
+            system.total_memory() / 1_073_741_824
+        };
+
         // value and percentage are pre-allocated and reused as they're changed often.
         let mut percentage = String::with_capacity(6);
         write!(percentage, "0").unwrap();
@@ -51,8 +70,10 @@ impl SvgStat {
 
         let mut svg = SvgStat {
             current_val: 0.0,
-            max_val,
+            max_val: max_val,
             colors: SvgColors::default(),
+            system: system,
+            kind: kind,
             value,
             percentage,
             ringfront_color: String::new(),
@@ -63,23 +84,48 @@ impl SvgStat {
         svg
     }
 
-    pub fn set_variable(&mut self, val: f64) {
-        if self.current_val != val {
-            self.current_val = val;
-
-            self.value.clear();
-            if self.current_val < 10.0 {
-                write!(self.value, "{:.2}", self.current_val).unwrap();
-            } else if self.current_val < 100.0 {
-                write!(self.value, "{:.1}", self.current_val).unwrap();
-            } else {
-                write!(self.value, "{}", self.current_val).unwrap();
-            }
-
-            let percentage: u64 = ((self.current_val / self.max_val as f64) * 100.0) as u64;
-            self.percentage.clear();
-            write!(self.percentage, "{percentage}").unwrap();
+    fn format_variable(&mut self) {
+        self.value.clear();
+        if self.current_val < 10.0 {
+            write!(self.value, "{:.2}", self.current_val).unwrap();
+        } else if self.current_val < 100.0 {
+            write!(self.value, "{:.1}", self.current_val).unwrap();
+        } else {
+            write!(self.value, "{}", self.current_val).unwrap();
         }
+
+        let percentage: u64 = ((self.current_val / self.max_val as f64) * 100.0) as u64;
+        self.percentage.clear();
+        write!(self.percentage, "{percentage}").unwrap();
+    }
+
+    pub fn update(&mut self) {
+
+        let mut new_val = 0.0;
+        if self.kind == SvgKind::Cpu {
+            self.system.refresh_cpu_usage();
+            new_val = self
+                .system
+                .cpus()
+                .iter()
+                .map(|p| f64::from(p.cpu_usage()))
+                .sum::<f64>()
+                / self.system.cpus().len() as f64;
+        }
+
+        if self.kind == SvgKind::Memory {
+            self.system.refresh_memory();
+            new_val = self.system.used_memory() as f64 / 1_073_741_824.0;
+        }
+
+        if new_val != self.current_val {
+            self.current_val = new_val;
+            self.format_variable();
+        }
+    }
+
+    pub fn value(&self) -> f64 {
+        self.current_val
     }
 
     fn svg_compose(&self, value: &str, percentage: &str) -> String {
