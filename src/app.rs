@@ -35,6 +35,19 @@ const TICK: i64 = 250;
 const APP_ICON: &[u8] =
     include_bytes!("../res/icons/apps/com.github.hyperchaotic.cosmic-applet-minimon.svg");
 
+const RING_CHOICES: [(&str, SvgColorVariant); 4] = [
+    ("Ring1.  ", SvgColorVariant::Color4),
+    ("Ring2.  ", SvgColorVariant::Color3),
+    ("Back.  ", SvgColorVariant::Color1),
+    ("Text.", SvgColorVariant::Color2),
+];
+
+const LINE_CHOICES: [(&str, SvgColorVariant); 3] = [
+    ("Download.  ", SvgColorVariant::Color2),
+    ("Upload.  ", SvgColorVariant::Color3),
+    ("Back.  ", SvgColorVariant::Color1),
+];
+
 /// This is the struct that represents your application.
 /// It is used to define the data that will be used by your application.
 pub struct Minimon {
@@ -323,7 +336,14 @@ impl cosmic::Application for Minimon {
 
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
         if self.colorpicker.active() {
-            self.colorpicker.view_colorpicker()
+            let fields: Vec<(&str, SvgColorVariant)> =
+            if self.colorpicker.kind() == SvgKind::Network {
+                    LINE_CHOICES.into()
+                } else {
+                    RING_CHOICES.into()
+                };
+
+            self.colorpicker.view_colorpicker(fields)
         } else {
             let mut cpu_elements = Vec::new();
 
@@ -532,15 +552,18 @@ impl cosmic::Application for Minimon {
                 self.colorpicker.set_variant(SvgColorVariant::Color1);
                 match kind {
                     SvgKind::Cpu => {
-                        self.colorpicker.activate(SvgKind::Cpu, Box::new(SvgStat::new(SvgKind::Cpu)));
+                        self.colorpicker
+                            .activate(SvgKind::Cpu, Box::new(SvgStat::new(SvgKind::Cpu)));
                         self.colorpicker.set_colors(self.config.cpu_colors);
                     }
                     SvgKind::Memory => {
-                        self.colorpicker.activate(SvgKind::Memory, Box::new(SvgStat::new(SvgKind::Memory)));
+                        self.colorpicker
+                            .activate(SvgKind::Memory, Box::new(SvgStat::new(SvgKind::Memory)));
                         self.colorpicker.set_colors(self.config.mem_colors);
                     }
                     SvgKind::Network => {
-                        self.colorpicker.activate(SvgKind::Network, Box::new(NetMon::new()));
+                        self.colorpicker
+                            .activate(SvgKind::Network, Box::new(NetMon::new()));
                         self.colorpicker.set_colors(self.config.net_colors);
                     }
                 }
@@ -779,7 +802,6 @@ impl Minimon {
     }
 
     fn refresh_stats(&mut self) {
-
         if self.config.enable_cpu {
             self.svgstat_cpu.update();
         }

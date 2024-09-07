@@ -1,8 +1,8 @@
-use cosmic::iced::{
-        widget::{column, row},
-        Alignment,
-    };
 use cosmic::iced::alignment::Horizontal;
+use cosmic::iced::{
+    widget::{column, row},
+    Alignment,
+};
 use cosmic::{cosmic_theme::palette::Srgb, Element};
 use std::ops::RangeInclusive;
 use std::rc::Rc;
@@ -19,8 +19,8 @@ use cosmic::{
     },
 };
 
-use crate::config::{SvgColorVariant, SvgColors, SvgKind};
 use crate::app::Message;
+use crate::config::{SvgColorVariant, SvgColors, SvgKind};
 
 const RED_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"red\" /></svg>";
 const GREEN_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"green\" /></svg>";
@@ -101,6 +101,7 @@ impl ColorPicker {
 
     pub fn activate(&mut self, kind: SvgKind, demo_svg: Box<dyn DemoSvg>) {
         self.kind = kind;
+        self.color_variant = SvgColorVariant::Color1;
         self.demo_svg = Some(demo_svg);
     }
 
@@ -222,91 +223,26 @@ impl ColorPicker {
         }
         SvgColors::default()
     }
-    
-    pub fn view_colorpicker(&self) -> Element<crate::app::Message> {
-        let color = self.sliders();
 
+    pub fn view_colorpicker(
+        &self,
+        choices: Vec<(&str, SvgColorVariant)>,
+    ) -> Element<crate::app::Message> {
+        let color = self.sliders();
         let title = format!("{} colors", self.kind);
 
-        let current_variant = self.variant();
+        let mut children = Vec::new();
 
-        let fields = if self.kind == SvgKind::Network {
-            row!(
-                widget::radio(
-                    "Download.  ",
-                    SvgColorVariant::Color2,
-                    if current_variant == SvgColorVariant::Color2 {
-                        Some(SvgColorVariant::Color2)
-                    } else {
-                        None
-                    },
-                    |m| { Message::ColorPickerSelectVariant(m) }
-                ),
-                widget::radio(
-                    "Upload.  ",
-                    SvgColorVariant::Color3,
-                    if current_variant == SvgColorVariant::Color3 {
-                        Some(SvgColorVariant::Color3)
-                    } else {
-                        None
-                    },
-                    |m| { Message::ColorPickerSelectVariant(m) }
-                ),
-                widget::radio(
-                    "Back.",
-                    SvgColorVariant::Color1,
-                    if current_variant == SvgColorVariant::Color1 {
-                        Some(SvgColorVariant::Color1)
-                    } else {
-                        None
-                    },
-                    |m| { Message::ColorPickerSelectVariant(m) }
-                ),
-            )
-        } else {
-            row!(
-                widget::radio(
-                    "Ring1.  ",
-                    SvgColorVariant::Color4,
-                    if current_variant == SvgColorVariant::Color4 {
-                        Some(SvgColorVariant::Color4)
-                    } else {
-                        None
-                    },
-                    |m| { Message::ColorPickerSelectVariant(m) }
-                ),
-                widget::radio(
-                    "Ring2.  ",
-                    SvgColorVariant::Color3,
-                    if current_variant == SvgColorVariant::Color3 {
-                        Some(SvgColorVariant::Color3)
-                    } else {
-                        None
-                    },
-                    |m| { Message::ColorPickerSelectVariant(m) }
-                ),
-                widget::radio(
-                    "Back.  ",
-                    SvgColorVariant::Color1,
-                    if current_variant == SvgColorVariant::Color1 {
-                        Some(SvgColorVariant::Color1)
-                    } else {
-                        None
-                    },
-                    |m| { Message::ColorPickerSelectVariant(m) }
-                ),
-                widget::radio(
-                    "Text.",
-                    SvgColorVariant::Color2,
-                    if current_variant == SvgColorVariant::Color2 {
-                        Some(SvgColorVariant::Color2)
-                    } else {
-                        None
-                    },
-                    |m| { Message::ColorPickerSelectVariant(m) }
-                )
-            )
-        };
+        for (s, c) in choices {
+            children.push(Element::from(widget::radio(
+                s,
+                c,
+                if self.variant() == c { Some(c) } else { None },
+                |m| Message::ColorPickerSelectVariant(m),
+            )));
+        }
+
+        let fields = cosmic::widget::row::with_children(children);
 
         let c = widget::list_column()
             .padding(0)
@@ -317,9 +253,11 @@ impl ColorPicker {
                     .horizontal_alignment(Horizontal::Center),
             )
             .add(
-                widget::svg(widget::svg::Handle::from_memory(self.svg_demo().into_bytes()))
-                    .width(Length::Fill)
-                    .height(100),
+                widget::svg(widget::svg::Handle::from_memory(
+                    self.svg_demo().into_bytes(),
+                ))
+                .width(Length::Fill)
+                .height(100),
             )
             .add(column!(
                 Element::from(
