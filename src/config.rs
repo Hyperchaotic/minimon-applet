@@ -13,18 +13,42 @@ pub enum SvgColorVariant {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SvgKind {
-    Cpu,
-    Memory,
-    Network,
+pub enum SvgGraphKind {
+    Ring,
+    Line,
 }
 
-impl std::fmt::Display for SvgKind {
+impl From<usize> for SvgGraphKind {
+    fn from(index: usize) -> Self {
+        match index {
+            0 => SvgGraphKind::Ring,
+            1 => SvgGraphKind::Line,
+            _ => panic!("Invalid index for SvgKind"),
+        }
+    }
+}
+
+impl Into<usize> for SvgGraphKind {
+    fn into(self) -> usize {
+        match self {
+            SvgGraphKind::Ring => 0,
+            SvgGraphKind::Line => 1,
+        }
+    }
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SvgDevKind {
+    Cpu(SvgGraphKind),
+    Memory(SvgGraphKind),
+    Network(SvgGraphKind),
+}
+
+impl std::fmt::Display for SvgDevKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            SvgKind::Cpu => write!(f, "CPU"),
-            SvgKind::Memory => write!(f, "Memory"),
-            SvgKind::Network => write!(f, "Network"),
+            SvgDevKind::Cpu(_) => write!(f, "CPU"),
+            SvgDevKind::Memory(_) => write!(f, "Memory"),
+            SvgDevKind::Network(_) => write!(f, "Network"),
         }
     }
 }
@@ -41,27 +65,27 @@ pub struct SvgColors {
 impl Default for SvgColors {
     fn default() -> Self {
         Self {
-            color1: Srgb::from_components((0x1b, 0x1b, 0x1b)),
+            color1: Srgb::from_components((0x2b, 0x2b, 0x2b)),
             color2: palette::named::WHITE,
             color3: palette::named::WHITE,
-            color4: palette::named::RED,
+            color4: Srgb::from_components((255, 6, 0)),
         }
     }
 }
 
 impl SvgColors {
-    pub fn new(kind: SvgKind) -> Self {
+    pub fn new(kind: SvgDevKind) -> Self {
         match kind {
-            SvgKind::Cpu => SvgColors::default(),
-            SvgKind::Memory => SvgColors {
-                color4: palette::named::PURPLE.into(),
+            SvgDevKind::Cpu(_) => SvgColors::default(),
+            SvgDevKind::Memory(_) => SvgColors {
+                color4: Srgb::from_components((187, 41, 187)),
                 ..Default::default()
             },
-            SvgKind::Network => SvgColors {
-                color1: Srgb::from_components((0x1b, 0x1b, 0x1b)),
+            SvgDevKind::Network(_) => SvgColors {
+                color1: Srgb::from_components((0x2b, 0x2b, 0x2b)),
                 color2: Srgb::from_components((47, 141, 255)),
                 color3: Srgb::from_components((255, 0, 0)),
-                ..Default::default()
+                color4: Srgb::from_components((0x2b, 0x2b, 0x2b)),
             },
         }
     }
@@ -110,7 +134,9 @@ impl SvgColors {
 pub struct MinimonConfig {
     pub text_only: bool,
     pub enable_cpu: bool,
+    cpu_type: usize,
     pub enable_mem: bool,
+    mem_type: usize,
     pub enable_net: bool,
     pub refresh_rate: u64,
     pub enable_adaptive_net: bool,
@@ -126,15 +152,32 @@ impl Default for MinimonConfig {
         Self {
             text_only: false,
             enable_cpu: true,
+            cpu_type: 0,
             enable_mem: true,
+            mem_type: 0,
             enable_net: true,
             refresh_rate: 1000,
             enable_adaptive_net: true,
             net_bandwidth: 62_500_000, // 500Mbit/s
             net_unit: Some(0),
-            cpu_colors: SvgColors::new(SvgKind::Cpu),
-            mem_colors: SvgColors::new(SvgKind::Memory),
-            net_colors: SvgColors::new(SvgKind::Network),
+            cpu_colors: SvgColors::new(SvgDevKind::Cpu(SvgGraphKind::Ring)),
+            mem_colors: SvgColors::new(SvgDevKind::Memory(SvgGraphKind::Ring)),
+            net_colors: SvgColors::new(SvgDevKind::Network(SvgGraphKind::Line)),
         }
+    }
+}
+
+impl MinimonConfig {
+    pub fn cpu_kind(&self) -> SvgDevKind {
+        SvgDevKind::Cpu(self.cpu_type.into())
+    }
+    pub fn set_cpu_kind(&mut self, kind: SvgGraphKind) {
+        self.cpu_type = kind.into();
+    }
+    pub fn memory_kind(&self) -> SvgDevKind {
+        SvgDevKind::Memory(self.mem_type.into())
+    }
+    pub fn set_memory_kind(&mut self, kind: SvgGraphKind) {
+        self.mem_type = kind.into();
     }
 }

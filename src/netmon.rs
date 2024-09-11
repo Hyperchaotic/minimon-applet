@@ -3,12 +3,22 @@ use std::collections::VecDeque;
 
 use sysinfo::Networks;
 
-use crate::{colorpicker::DemoSvg, config::{SvgColorVariant, SvgColors}};
+use crate::{
+    colorpicker::DemoSvg,
+    config::{SvgColorVariant, SvgColors, SvgDevKind, SvgGraphKind},
+};
 
 const MAX_SAMPLES: usize = 30;
 const GRAPH_SAMPLES: usize = 21;
 const UNITS: [&str; 5] = ["b", "K", "M", "G", "T"];
 const UNITS_LONG: [&str; 5] = ["bps", "Kbps", "Mbps", "Gbps", "Tbps"];
+
+const COLOR_CHOICES: [(&str, SvgColorVariant); 4] = [
+    ("Down.  ", SvgColorVariant::Color2),
+    ("Up.  ", SvgColorVariant::Color3),
+    ("Back.  ", SvgColorVariant::Color1),
+    ("Frame.", SvgColorVariant::Color4),
+];
 
 #[derive(Debug)]
 pub struct NetMon {
@@ -17,6 +27,7 @@ pub struct NetMon {
     upload: VecDeque<u64>,
     max_y: Option<u64>,
     colors: SvgColors,
+    kind: SvgDevKind,
 }
 
 impl DemoSvg for NetMon {
@@ -33,6 +44,10 @@ impl DemoSvg for NetMon {
     fn svg_set_colors(&mut self, colors: SvgColors) {
         self.colors = colors;
     }
+
+    fn svg_color_choices(&self) -> Vec<(&'static str, SvgColorVariant)> {
+        COLOR_CHOICES.into()
+    }
 }
 
 impl NetMon {
@@ -42,15 +57,27 @@ impl NetMon {
 
         NetMon {
             networks,
-            download: VecDeque::new(),
-            upload: VecDeque::new(),
+            download: VecDeque::from(vec![0; MAX_SAMPLES]),
+            upload: VecDeque::from(vec![0; MAX_SAMPLES]),
             max_y: None,
-            colors: SvgColors::new(crate::config::SvgKind::Network),
+            colors: SvgColors::new(SvgDevKind::Network(SvgGraphKind::Line)),
+            kind: SvgDevKind::Network(SvgGraphKind::Line),
         }
     }
 
     pub fn set_max_y(&mut self, max: Option<u64>) {
         self.max_y = max;
+    }
+
+    pub fn kind(&self) -> SvgDevKind {
+        self.kind
+    }
+
+    pub fn set_kind(&mut self, kind: SvgDevKind) {
+        match kind {
+            SvgDevKind::Network(SvgGraphKind::Line) => (),
+            _ => panic!("ERROR: Wrong kind {:?}", kind),
+        }
     }
 
     // Get bits per second
@@ -157,7 +184,7 @@ impl NetMon {
         &self,
         download: &VecDeque<u64>,
         upload: &VecDeque<u64>,
-        max_y: Option<u64>
+        max_y: Option<u64>,
     ) -> String {
         let mut sname: String = String::new();
         {
@@ -180,6 +207,17 @@ impl NetMon {
                 .draw()
                 .unwrap();
 
+            let col = self.colors.get_color(SvgColorVariant::Color4);
+            let rect = Rectangle::new(
+                [(0, 0), (40, 40)],
+                ShapeStyle {
+                    color: RGBAColor(col.red, col.green, col.blue, 1.0),
+                    filled: false,
+                    stroke_width: 1,
+                },
+            );
+            root.draw(&rect).unwrap();
+
             if !download.is_empty() {
                 // Configured max or adaptive
                 let max: u64 = if let Some(m) = max_y {
@@ -191,7 +229,7 @@ impl NetMon {
                     )
                 };
 
-                let scaling: f32 = 40.0 / max as f32;
+                let scaling: f32 = 39.0 / max as f32;
 
                 let dl_len = download.len();
                 let dl_start = if dl_len > GRAPH_SAMPLES {
@@ -254,12 +292,12 @@ impl NetMon {
 }
 
 const DL_DEMO: [u64; 21] = [
-    208, 2071, 0, 1056588, 912575, 912875, 912975, 912600, 1397, 1173024, 1228, 6910, 2493, 1102101,
-    380, 2287, 1109656, 1541, 3798, 1132822, 68479,
+    208, 2071, 0, 1056588, 912575, 912875, 912975, 912600, 1397, 1173024, 1228, 6910, 2493,
+    1102101, 380, 2287, 1109656, 1541, 3798, 1132822, 68479,
 ];
 const UL_DEMO: [u64; 21] = [
-    0, 1687, 0, 9417, 9161, 838, 6739, 1561, 212372, 312372, 412372, 512372, 512372, 512372, 412372, 312372, 112372,
-    864, 0, 8587, 760,
+    0, 1687, 0, 9417, 9161, 838, 6739, 1561, 212372, 312372, 412372, 512372, 512372, 512372,
+    412372, 312372, 112372, 864, 0, 8587, 760,
 ];
 
 /*

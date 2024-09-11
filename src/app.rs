@@ -25,7 +25,7 @@ use cosmic::{
 };
 
 use crate::colorpicker::{ColorPicker, DemoSvg};
-use crate::config::{SvgColorVariant, SvgColors, SvgKind};
+use crate::config::{SvgColorVariant, SvgColors, SvgDevKind, SvgGraphKind};
 use crate::netmon::NetMon;
 use crate::svgstat::SvgStat;
 use crate::{config::MinimonConfig, fl};
@@ -34,19 +34,6 @@ const TICK: i64 = 250;
 
 const APP_ICON: &[u8] =
     include_bytes!("../res/icons/apps/com.github.hyperchaotic.cosmic-applet-minimon.svg");
-
-const RING_CHOICES: [(&str, SvgColorVariant); 4] = [
-    ("Ring1.  ", SvgColorVariant::Color4),
-    ("Ring2.  ", SvgColorVariant::Color3),
-    ("Back.  ", SvgColorVariant::Color1),
-    ("Text.", SvgColorVariant::Color2),
-];
-
-const LINE_CHOICES: [(&str, SvgColorVariant); 3] = [
-    ("Download.  ", SvgColorVariant::Color2),
-    ("Upload.  ", SvgColorVariant::Color3),
-    ("Back.  ", SvgColorVariant::Color1),
-];
 
 /// This is the struct that represents your application.
 /// It is used to define the data that will be used by your application.
@@ -62,6 +49,7 @@ pub struct Minimon {
     /// The color picker dialog
     colorpicker: ColorPicker,
     dropdown_options: Vec<&'static str>,
+    graph_options: Vec<&'static str>,
 
     /// The network monitor
     netmon: NetMon,
@@ -79,7 +67,7 @@ pub struct Minimon {
 pub enum Message {
     TogglePopup,
 
-    ColorPickerOpen(SvgKind),
+    ColorPickerOpen(SvgDevKind),
     ColorPickerClose(bool),
     ColorPickerDefaults,
 
@@ -96,6 +84,7 @@ pub enum Message {
     NetworkSelectUnit(usize),
     TextInputBandwidthChanged(String),
 
+    SelectGraphType(SvgDevKind, usize),
     Tick,
     PopupClosed(Id),
     ToggleTextOnly(bool),
@@ -123,11 +112,12 @@ impl cosmic::Application for Minimon {
     fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
         let app = Minimon {
             core,
-            svgstat_cpu: super::svgstat::SvgStat::new(SvgKind::Cpu),
-            svgstat_mem: super::svgstat::SvgStat::new(SvgKind::Memory),
+            svgstat_cpu: super::svgstat::SvgStat::new(SvgDevKind::Cpu(SvgGraphKind::Ring)),
+            svgstat_mem: super::svgstat::SvgStat::new(SvgDevKind::Memory(SvgGraphKind::Ring)),
             popup: None,
             colorpicker: ColorPicker::new(),
             dropdown_options: ["b", "Kb", "Mb", "Gb", "Tb"].into(),
+            graph_options: ["Ring", "Line"].into(),
             netmon: NetMon::new(),
             config: MinimonConfig::default(),
             tick_timer: TICK,
@@ -254,14 +244,14 @@ impl cosmic::Application for Minimon {
         let button = cosmic::widget::button(if horizontal {
             let mut formated = String::new();
             if self.config.enable_cpu {
-                formated = format!("{:.2}%", self.svgstat_cpu.value());
+                formated = format!("{:.2}%", self.svgstat_cpu.latest_sample());
             }
 
             if self.config.enable_mem {
                 if !formated.is_empty() {
                     formated.push(' ');
                 }
-                formated.push_str(&format!("{:.1}GB", self.svgstat_mem.value()));
+                formated.push_str(&format!("{:.1}GB", self.svgstat_mem.latest_sample()));
             }
 
             if self.config.enable_net {
@@ -284,13 +274,13 @@ impl cosmic::Application for Minimon {
                 .align_items(Alignment::Center),
             )
         } else {
-            let formated_cpu = if self.svgstat_cpu.value() < 10.0 {
-                format!("{:.2}%", self.svgstat_cpu.value())
+            let formated_cpu = if self.svgstat_cpu.latest_sample() < 10.0 {
+                format!("{:.2}%", self.svgstat_cpu.latest_sample())
             } else {
-                format!("{:.1}%", self.svgstat_cpu.value())
+                format!("{:.1}%", self.svgstat_cpu.latest_sample())
             };
 
-            let formated_mem = format!("{:.1}GB", self.svgstat_mem.value());
+            let formated_mem = format!("{:.1}GB", self.svgstat_mem.latest_sample());
 
             // vertical layout
             let mut elements = Vec::new();
@@ -336,25 +326,26 @@ impl cosmic::Application for Minimon {
 
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
         if self.colorpicker.active() {
-            let fields: Vec<(&str, SvgColorVariant)> =
-            if self.colorpicker.kind() == SvgKind::Network {
-                    LINE_CHOICES.into()
-                } else {
-                    RING_CHOICES.into()
-                };
-
-            self.colorpicker.view_colorpicker(fields)
+            self.colorpicker.view_colorpicker()
         } else {
             let mut cpu_elements = Vec::new();
 
+            let cpu = self.svgstat_cpu.to_string();
             cpu_elements.push(Element::from(
                 column!(widget::svg(widget::svg::Handle::from_memory(
                     self.svgstat_cpu.svg().as_bytes().to_owned(),
                 ))
-                .width(60)
-                .height(60))
-                .padding(5),
+                    .width(60)
+                    .height(60),
+                    cosmic::widget::text::body(cpu),
+                )
+                .padding(5).align_items(Alignment::Center),
             ));
+
+            let selected: Option<usize> = match self.svgstat_cpu.kind() {
+                SvgDevKind::Cpu(m) => Some(m.into()),
+                _ => None,
+            };
 
             cpu_elements.push(Element::from(column!(
                 Element::from(
@@ -368,10 +359,15 @@ impl cosmic::Application for Minimon {
                 ),
                 row!(
                     widget::horizontal_space(Length::Fill),
+                    widget::dropdown(&self.graph_options, selected, |m| {
+                        Message::SelectGraphType(self.svgstat_cpu.kind(), m)
+                    },)
+                    .width(70),
+                    widget::horizontal_space(Length::Fill),
                     cosmic::widget::button(Element::from(
                         self.core.applet.text(fl!("change-colors"))
                     ))
-                    .on_press(Message::ColorPickerOpen(SvgKind::Cpu)),
+                    .on_press(Message::ColorPickerOpen(self.svgstat_cpu.kind())),
                     widget::horizontal_space(Length::Fill)
                 )
             )));
@@ -381,15 +377,22 @@ impl cosmic::Application for Minimon {
                 .spacing(0);
 
             let mut mem_elements = Vec::new();
-
+            let mem = self.svgstat_mem.to_string();
             mem_elements.push(Element::from(
                 column!(widget::svg(widget::svg::Handle::from_memory(
                     self.svgstat_mem.svg().as_bytes().to_owned(),
                 ))
-                .width(60)
-                .height(60))
-                .padding(5),
+                    .width(60)
+                    .height(60),
+                    cosmic::widget::text::body(mem),
+                )
+                .padding(5).align_items(Alignment::Center),
             ));
+
+            let selected: Option<usize> = match self.svgstat_mem.kind() {
+                SvgDevKind::Memory(m) => Some(m.into()),
+                _ => None,
+            };
 
             mem_elements.push(Element::from(column!(
                 Element::from(
@@ -403,10 +406,15 @@ impl cosmic::Application for Minimon {
                 ),
                 row!(
                     widget::horizontal_space(Length::Fill),
+                    widget::dropdown(&self.graph_options, selected, |m| {
+                        Message::SelectGraphType(self.svgstat_mem.kind(), m)
+                    },)
+                    .width(70),
+                    widget::horizontal_space(Length::Fill),
                     cosmic::widget::button(Element::from(
                         self.core.applet.text(fl!("change-colors"))
                     ))
-                    .on_press(Message::ColorPickerOpen(SvgKind::Memory)),
+                    .on_press(Message::ColorPickerOpen(self.svgstat_mem.kind())),
                     widget::horizontal_space(Length::Fill)
                 )
             )));
@@ -447,7 +455,7 @@ impl cosmic::Application for Minimon {
                     cosmic::widget::text::body(dlrate),
                     cosmic::widget::text::body(ulrate),
                 )
-                .padding(5),
+                .padding(5).align_items(Alignment::Center),
             ));
 
             net_elements.push(Element::from(column!(
@@ -494,7 +502,7 @@ impl cosmic::Application for Minimon {
                     cosmic::widget::button(Element::from(
                         self.core.applet.text(fl!("change-colors"))
                     ))
-                    .on_press(Message::ColorPickerOpen(SvgKind::Network)),
+                    .on_press(Message::ColorPickerOpen(self.netmon.kind())),
                     widget::horizontal_space(Length::Fill)
                 ),
             )));
@@ -549,25 +557,23 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ColorPickerOpen(kind) => {
-                self.colorpicker.set_variant(SvgColorVariant::Color1);
                 match kind {
-                    SvgKind::Cpu => {
+                    SvgDevKind::Cpu(_) => {
                         self.colorpicker
-                            .activate(SvgKind::Cpu, Box::new(SvgStat::new(SvgKind::Cpu)));
+                            .activate(kind, Box::new(SvgStat::new(kind)));
                         self.colorpicker.set_colors(self.config.cpu_colors);
                     }
-                    SvgKind::Memory => {
+                    SvgDevKind::Memory(_) => {
                         self.colorpicker
-                            .activate(SvgKind::Memory, Box::new(SvgStat::new(SvgKind::Memory)));
+                            .activate(kind, Box::new(SvgStat::new(kind)));
                         self.colorpicker.set_colors(self.config.mem_colors);
                     }
-                    SvgKind::Network => {
-                        self.colorpicker
-                            .activate(SvgKind::Network, Box::new(NetMon::new()));
+                    SvgDevKind::Network(_) => {
+                        self.colorpicker.activate(kind, Box::new(NetMon::new()));
                         self.colorpicker.set_colors(self.config.net_colors);
                     }
                 }
-
+                self.colorpicker.set_variant(SvgColorVariant::Color1);
                 let col = self
                     .colorpicker
                     .colors()
@@ -612,7 +618,6 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ToggleAdaptiveNet(toggle) => {
-                println!("Message::ToggleAdaptiveNet({toggle})");
                 self.config.enable_adaptive_net = toggle;
                 if toggle {
                     self.netmon.set_max_y(None);
@@ -621,7 +626,6 @@ impl cosmic::Application for Minimon {
             }
 
             Message::NetworkSelectUnit(unit) => {
-                println!("Message::NetworkSelectUnit({unit})");
                 if !self.config.enable_adaptive_net {
                     self.config.net_unit = Some(unit);
                     self.set_max_y();
@@ -629,8 +633,25 @@ impl cosmic::Application for Minimon {
                 }
             }
 
+            Message::SelectGraphType(dev, selection) => {
+                match dev {
+                    SvgDevKind::Cpu(_) => {
+                        self.svgstat_cpu.set_kind(SvgDevKind::Cpu(selection.into()));
+                        self.config.set_cpu_kind(selection.into());
+                    }
+                    SvgDevKind::Memory(_) => {
+                        self.svgstat_mem
+                            .set_kind(SvgDevKind::Memory(selection.into()));
+                        self.config.set_memory_kind(selection.into());
+                    }
+                    SvgDevKind::Network(_) => {
+                        self.netmon.set_kind(SvgDevKind::Network(selection.into()));
+                    }
+                }
+                self.save_config();
+            }
+
             Message::TextInputBandwidthChanged(string) => {
-                println!("Message::TextInputBandwidthChanged({string})");
                 if string.is_empty() {
                     self.config.net_bandwidth = 0;
                     self.set_max_y();
@@ -699,7 +720,9 @@ impl cosmic::Application for Minimon {
                 self.config = config;
                 self.tick_timer = self.config.refresh_rate as i64;
                 self.svgstat_cpu.svg_set_colors(self.config.cpu_colors);
+                self.svgstat_cpu.set_kind(self.config.cpu_kind());
                 self.svgstat_mem.svg_set_colors(self.config.mem_colors);
+                self.svgstat_mem.set_kind(self.config.memory_kind());
                 self.netmon.svg_set_colors(self.config.net_colors);
                 self.set_max_y();
                 self.set_tick();
@@ -756,17 +779,17 @@ impl Minimon {
         }
     }
 
-    fn set_colors(&mut self, colors: SvgColors, kind: SvgKind) {
+    fn set_colors(&mut self, colors: SvgColors, kind: SvgDevKind) {
         match kind {
-            SvgKind::Cpu => {
+            SvgDevKind::Cpu(_) => {
                 self.config.cpu_colors = colors;
                 self.svgstat_cpu.svg_set_colors(colors);
             }
-            SvgKind::Memory => {
+            SvgDevKind::Memory(_) => {
                 self.config.mem_colors = colors;
                 self.svgstat_mem.svg_set_colors(colors);
             }
-            SvgKind::Network => {
+            SvgDevKind::Network(_) => {
                 self.config.net_colors = colors;
                 self.netmon.svg_set_colors(colors);
             }

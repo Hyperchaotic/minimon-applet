@@ -20,7 +20,7 @@ use cosmic::{
 };
 
 use crate::app::Message;
-use crate::config::{SvgColorVariant, SvgColors, SvgKind};
+use crate::config::{SvgColorVariant, SvgColors, SvgDevKind, SvgGraphKind};
 
 const RED_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"red\" /></svg>";
 const GREEN_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"green\" /></svg>";
@@ -65,12 +65,13 @@ pub trait DemoSvg {
     fn svg_demo(&self) -> String;
     fn svg_colors(&self) -> SvgColors;
     fn svg_set_colors(&mut self, colors: SvgColors);
+    fn svg_color_choices(&self) -> Vec<(&'static str, SvgColorVariant)>;
 }
 
 /// Data for managing the `ColorPicker` dialog
 pub struct ColorPicker {
     demo_svg: Option<Box<dyn DemoSvg>>,
-    kind: SvgKind,
+    kind: SvgDevKind,
     // Current field being adjusted background/text/etc.
     color_variant: SvgColorVariant,
     ///Current slider values
@@ -83,7 +84,7 @@ impl ColorPicker {
     pub fn new() -> Self {
         ColorPicker {
             demo_svg: None,
-            kind: SvgKind::Cpu,
+            kind: SvgDevKind::Cpu(SvgGraphKind::Ring),
             color_variant: SvgColorVariant::Color1,
             slider_red_val: 0,
             slider_green_val: 0,
@@ -91,7 +92,7 @@ impl ColorPicker {
         }
     }
 
-    pub fn kind(&self) -> SvgKind {
+    pub fn kind(&self) -> SvgDevKind {
         self.kind
     }
 
@@ -99,7 +100,7 @@ impl ColorPicker {
         self.demo_svg.is_some()
     }
 
-    pub fn activate(&mut self, kind: SvgKind, demo_svg: Box<dyn DemoSvg>) {
+    pub fn activate(&mut self, kind: SvgDevKind, demo_svg: Box<dyn DemoSvg>) {
         self.kind = kind;
         self.color_variant = SvgColorVariant::Color1;
         self.demo_svg = Some(demo_svg);
@@ -187,19 +188,16 @@ impl ColorPicker {
         self.slider_red_val = color.red;
         self.slider_green_val = color.green;
         self.slider_blue_val = color.blue;
-
-        if let Some(d) = self.demo_svg.as_mut() {
-            let mut col = d.svg_colors();
-            col.set_color(color, self.color_variant);
-            d.svg_set_colors(col);
-        }
+        let dmo = self.demo_svg.as_mut().expect("ERROR: No demo svg!");
+        let mut col = dmo.svg_colors();
+        col.set_color(color, self.color_variant);
+        dmo.svg_set_colors(col);
     }
 
     pub fn set_colors(&mut self, colors: SvgColors) {
-        if let Some(d) = self.demo_svg.as_mut() {
-            d.svg_set_colors(colors);
-            self.set_sliders(colors.get_color(self.color_variant));
-        }
+        let dmo = self.demo_svg.as_mut().expect("ERROR: No demo svg!");
+        dmo.svg_set_colors(colors);
+        self.set_sliders(colors.get_color(self.color_variant));
     }
 
     pub fn variant(&self) -> SvgColorVariant {
@@ -207,33 +205,27 @@ impl ColorPicker {
     }
 
     pub fn set_variant(&mut self, variant: SvgColorVariant) {
-        if let Some(d) = self.demo_svg.as_mut() {
-            self.color_variant = variant;
-            let color = d.svg_colors().get_color(variant);
-
-            self.slider_red_val = color.red;
-            self.slider_green_val = color.green;
-            self.slider_blue_val = color.blue;
-        }
+        let dmo = self.demo_svg.as_mut().expect("ERROR: No demo svg!");
+        self.color_variant = variant;
+        let color = dmo.svg_colors().get_color(variant);
+        self.slider_red_val = color.red;
+        self.slider_green_val = color.green;
+        self.slider_blue_val = color.blue;
     }
 
     pub fn colors(&self) -> SvgColors {
-        if let Some(d) = self.demo_svg.as_ref() {
-            return d.svg_colors();
-        }
-        SvgColors::default()
+        let dmo = self.demo_svg.as_ref().expect("ERROR: No demo svg!");
+        dmo.svg_colors()
     }
 
-    pub fn view_colorpicker(
-        &self,
-        choices: Vec<(&str, SvgColorVariant)>,
-    ) -> Element<crate::app::Message> {
+    pub fn view_colorpicker(&self) -> Element<crate::app::Message> {
         let color = self.sliders();
         let title = format!("{} colors", self.kind);
 
         let mut children = Vec::new();
 
-        for (s, c) in choices {
+        let dmo = self.demo_svg.as_ref().expect("ERROR: No demo svg!");
+        for (s, c) in dmo.svg_color_choices() {
             children.push(Element::from(widget::radio(
                 s,
                 c,
