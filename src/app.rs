@@ -332,14 +332,16 @@ impl cosmic::Application for Minimon {
 
             let cpu = self.svgstat_cpu.to_string();
             cpu_elements.push(Element::from(
-                column!(widget::svg(widget::svg::Handle::from_memory(
-                    self.svgstat_cpu.svg().as_bytes().to_owned(),
-                ))
+                column!(
+                    widget::svg(widget::svg::Handle::from_memory(
+                        self.svgstat_cpu.svg().as_bytes().to_owned(),
+                    ))
                     .width(60)
                     .height(60),
                     cosmic::widget::text::body(cpu),
                 )
-                .padding(5).align_items(Alignment::Center),
+                .padding(5)
+                .align_items(Alignment::Center),
             ));
 
             let selected: Option<usize> = match self.svgstat_cpu.kind() {
@@ -379,14 +381,16 @@ impl cosmic::Application for Minimon {
             let mut mem_elements = Vec::new();
             let mem = self.svgstat_mem.to_string();
             mem_elements.push(Element::from(
-                column!(widget::svg(widget::svg::Handle::from_memory(
-                    self.svgstat_mem.svg().as_bytes().to_owned(),
-                ))
+                column!(
+                    widget::svg(widget::svg::Handle::from_memory(
+                        self.svgstat_mem.svg().as_bytes().to_owned(),
+                    ))
                     .width(60)
                     .height(60),
                     cosmic::widget::text::body(mem),
                 )
-                .padding(5).align_items(Alignment::Center),
+                .padding(5)
+                .align_items(Alignment::Center),
             ));
 
             let selected: Option<usize> = match self.svgstat_mem.kind() {
@@ -455,7 +459,8 @@ impl cosmic::Application for Minimon {
                     cosmic::widget::text::body(dlrate),
                     cosmic::widget::text::body(ulrate),
                 )
-                .padding(5).align_items(Alignment::Center),
+                .padding(5)
+                .align_items(Alignment::Center),
             ));
 
             net_elements.push(Element::from(column!(
@@ -825,16 +830,8 @@ impl Minimon {
     }
 
     fn refresh_stats(&mut self) {
-        if self.config.enable_cpu {
-            self.svgstat_cpu.update();
-        }
-
-        if self.config.enable_mem {
-            self.svgstat_mem.update();
-        }
-
-        if self.config.enable_net {
-            self.netmon.update();
-        }
+        self.svgstat_cpu.update();
+        self.svgstat_mem.update();
+        self.netmon.update();
     }
 }
