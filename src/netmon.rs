@@ -10,7 +10,7 @@ use crate::{
 
 const MAX_SAMPLES: usize = 30;
 const GRAPH_SAMPLES: usize = 21;
-const UNITS: [&str; 5] = ["b", "K", "M", "G", "T"];
+const UNITS_SHORT: [&str; 5] = ["b", "K", "M", "G", "T"];
 const UNITS_LONG: [&str; 5] = ["bps", "Kbps", "Mbps", "Gbps", "Tbps"];
 
 const COLOR_CHOICES: [(&str, SvgColorVariant); 4] = [
@@ -19,6 +19,12 @@ const COLOR_CHOICES: [(&str, SvgColorVariant); 4] = [
     ("Back.  ", SvgColorVariant::Color1),
     ("Frame.", SvgColorVariant::Color4),
 ];
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum UnitVariant {
+    Short,
+    Long,
+}
 
 #[derive(Debug)]
 pub struct NetMon {
@@ -80,26 +86,6 @@ impl NetMon {
         }
     }
 
-    // Get bits per second
-    pub fn get_bitrate_dl(&self, ticks_per_sec: u64) -> String {
-        let len = self.download.len();
-        let ticks = ticks_per_sec as usize;
-        let start = if ticks > len { 0 } else { len - ticks };
-        // Sum the last `ticks` elements
-        let bps = self.download.iter().skip(start).sum();
-        NetMon::makestr_bps(bps)
-    }
-
-    // Get bits per second
-    pub fn get_bitrate_ul(&self, ticks_per_sec: u64) -> String {
-        let len = self.upload.len();
-        let ticks = ticks_per_sec as usize;
-        let start = if ticks > len { 0 } else { len - ticks };
-        // Sum the last `ticks` elements
-        let bps = self.upload.iter().skip(start).sum();
-        NetMon::makestr_bps(bps)
-    }
-
     /// Retrieve the amount of data transmitted since last update.
     pub fn update(&mut self) {
         self.networks.refresh();
@@ -122,62 +108,62 @@ impl NetMon {
         self.upload.push_back(ul);
     }
 
-    fn makestr_bps(val: u64) -> String {
+    fn makestr(val: u64, format: UnitVariant) -> String {
         let mut value = val as f64;
         let mut unit_index = 0;
+        let units = if format==UnitVariant::Short { UNITS_SHORT } else { UNITS_LONG };
 
         // Find the appropriate unit
-        while value >= 999.0 && unit_index < UNITS_LONG.len() - 1 {
+        while value >= 999.0 && unit_index < units.len() - 1 {
             value /= 1024.0;
             unit_index += 1;
         }
 
         if value < 10.0 {
-            format!("{:.2}{}", value, UNITS_LONG[unit_index])
+            format!("{:.2}{}", value, units[unit_index])
         } else if value < 99.0 {
-            format!("{:.1}{}", value, UNITS_LONG[unit_index])
+            format!("{:.1}{}", value, units[unit_index])
         } else {
-            format!("{:.0}{}", value, UNITS_LONG[unit_index])
+            format!("{:.0}{}", value, units[unit_index])
         }
     }
 
-    fn makestr(val: u64) -> String {
-        let mut value = val as f64;
-        let mut unit_index = 0;
-
-        // Find the appropriate unit
-        while value >= 999.0 && unit_index < UNITS.len() - 1 {
-            value /= 1024.0;
-            unit_index += 1;
-        }
-
-        if value < 10.0 {
-            format!("{:.2}{}", value, UNITS[unit_index])
-        } else if value < 99.0 {
-            format!("{:.1}{}", value, UNITS[unit_index])
-        } else {
-            format!("{:.0}{}", value, UNITS[unit_index])
-        }
+    // Get bits per second
+    pub fn get_bitrate_dl(&self, ticks_per_sec: usize) -> String {
+        let len = self.download.len();
+        let start = if ticks_per_sec > len { 0 } else { len - ticks_per_sec };
+        // Sum the last `ticks` elements
+        let bps = self.download.iter().skip(start).sum();
+        NetMon::makestr(bps, UnitVariant::Long)
     }
 
+    // Get bits per second
+    pub fn get_bitrate_ul(&self, ticks_per_sec: usize) -> String {
+        let len = self.upload.len();
+        let start = if ticks_per_sec > len { 0 } else { len - ticks_per_sec };
+        // Sum the last `ticks` elements
+        let bps = self.upload.iter().skip(start).sum();
+        NetMon::makestr(bps, UnitVariant::Long)
+    }
+
+    // Bits per tick
     pub fn dl_to_string(&self) -> String {
         let dl = if !self.download.is_empty() {
             *self.download.back().unwrap_or(&0u64)
         } else {
             0
         };
-
-        NetMon::makestr(dl)
+        NetMon::makestr(dl, UnitVariant::Short)
     }
 
+    // Bits per tick
     pub fn ul_to_string(&self) -> String {
         let ul = if !self.upload.is_empty() {
             *self.upload.back().unwrap_or(&0u64)
         } else {
             0
         };
-
-        NetMon::makestr(ul)
+        NetMon::makestr(ul, UnitVariant::Short)
     }
 
     fn svg_compose(

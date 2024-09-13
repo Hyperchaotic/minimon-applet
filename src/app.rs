@@ -113,7 +113,7 @@ impl cosmic::Application for Minimon {
         let app = Minimon {
             core,
             svgstat_cpu: super::svgstat::SvgStat::new(SvgDevKind::Cpu(SvgGraphKind::Ring)),
-            svgstat_mem: super::svgstat::SvgStat::new(SvgDevKind::Memory(SvgGraphKind::Ring)),
+            svgstat_mem: super::svgstat::SvgStat::new(SvgDevKind::Memory(SvgGraphKind::Line)),
             popup: None,
             colorpicker: ColorPicker::new(),
             dropdown_options: ["b", "Kb", "Mb", "Gb", "Tb"].into(),
@@ -444,7 +444,7 @@ impl cosmic::Application for Minimon {
 
             let mut net_elements = Vec::new();
 
-            let ticks_per_sec = (1000 / self.tick.clone().load(atomic::Ordering::Relaxed)) as u64;
+            let ticks_per_sec = (1000 / self.tick.clone().load(atomic::Ordering::Relaxed)) as usize;
             let dlrate = self.netmon.get_bitrate_dl(ticks_per_sec);
             let ulrate = self.netmon.get_bitrate_ul(ticks_per_sec);
 
