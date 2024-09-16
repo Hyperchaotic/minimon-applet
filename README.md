@@ -4,7 +4,7 @@ A little applet for displaying total CPU load and/or memory usage. Can sit in th
 
 ![screenshot-2024-09-12-16-52-36](https://github.com/user-attachments/assets/12a1592f-e814-430f-9ccf-e35486911481)
 
-![screenshot-2024-08-29-22-02-21](https://github.com/user-attachments/assets/679a2026-a0ee-455a-8d1d-b0eda7ab9719)
+![screenshot-2024-09-16-22-03-01](https://github.com/user-attachments/assets/1f2d9a1d-d1a6-4319-859b-5c9300633579)
 
 
 ![screenshot-2024-08-15-01-02-19](https://github.com/user-attachments/assets/c1e8bc40-d678-44d0-ae6e-e3036102f4a1)
