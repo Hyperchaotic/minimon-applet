@@ -7,7 +7,7 @@ use cosmic::iced::wayland::popup::{destroy_popup, get_popup};
 use cosmic::iced::window::Id;
 use cosmic::iced::{subscription, Limits};
 use cosmic::iced_style::application;
-use cosmic::widget::settings;
+use cosmic::widget::{settings, text};
 use cosmic::{iced::Length, widget};
 use cosmic::{Element, Theme};
 
@@ -422,12 +422,12 @@ impl cosmic::Application for Minimon {
 
             let mut refresh_elements = Vec::new();
 
-            let button_plus = cosmic::widget::button(" - ").on_press(Message::RefreshRateDown);
+            let button_plus = widget::button::standard("-").on_press(Message::RefreshRateDown);
+            let button_minus = widget::button::standard("+").on_press(Message::RefreshRateUp);
 
-            let button_minus = cosmic::widget::button(" + ").on_press(Message::RefreshRateUp);
             let rate_str = format!(" {:.2} ", self.config.refresh_rate as f64 / 1000.0);
             refresh_elements.push(button_plus.into());
-            refresh_elements.push(Element::from(self.core.applet.text(rate_str)));
+            refresh_elements.push(text::body(rate_str).into());
             refresh_elements.push(button_minus.into());
 
             let refresh_row = Row::with_children(refresh_elements)
