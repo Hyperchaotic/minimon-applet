@@ -161,7 +161,7 @@ impl Default for MinimonConfig {
             net_bandwidth: 62_500_000, // 500Mbit/s
             net_unit: Some(0),
             cpu_colors: SvgColors::new(SvgDevKind::Cpu(SvgGraphKind::Ring)),
-            mem_colors: SvgColors::new(SvgDevKind::Memory(SvgGraphKind::Ring)),
+            mem_colors: SvgColors::new(SvgDevKind::Memory(SvgGraphKind::Line)),
             net_colors: SvgColors::new(SvgDevKind::Network(SvgGraphKind::Line)),
         }
     }
