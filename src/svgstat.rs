@@ -341,7 +341,7 @@ const SVGSTATPART4: &str = ", 100\"
 .percentage {
  ";
 const SVGSTATPART5: &str = "
-  font-family: sans-serif;
+  font-family: \"Noto Sans\", sans-serif;
   font-size: 1.2em;
   text-anchor: middle;
 }
