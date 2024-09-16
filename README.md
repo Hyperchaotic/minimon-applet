@@ -2,7 +2,8 @@
 
 A little applet for displaying total CPU load and/or memory usage. Can sit in the panel or Dock. Can display as icons or text.  
 
-![screenshot-2024-09-12-16-52-36](https://github.com/user-attachments/assets/12a1592f-e814-430f-9ccf-e35486911481)
+
+![screenshot-2024-09-12-16-52-36](https://raw.githubusercontent.com/Hyperchaotic/minimon-applet/main/cosmic-applet-minimon.png)
 
 ![screenshot-2024-09-16-22-03-01](https://github.com/user-attachments/assets/1f2d9a1d-d1a6-4319-859b-5c9300633579)
 
