@@ -32,9 +32,7 @@ use crate::{config::MinimonConfig, fl};
 
 const TICK: i64 = 250;
 
-const APP_ICON: &[u8] =
-    include_bytes!("../res/icons/apps/com.github.hyperchaotic.cosmic-applet-minimon.svg");
-
+const ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon";
 /// This is the struct that represents your application.
 /// It is used to define the data that will be used by your application.
 pub struct Minimon {
@@ -175,13 +173,12 @@ impl cosmic::Application for Minimon {
         );
 
         if !self.config.enable_cpu && !self.config.enable_mem && !self.config.enable_net {
-            return Element::from(
-                self.core
-                    .applet
-                    .icon_button_from_handle(cosmic::widget::icon::from_svg_bytes(APP_ICON))
-                    .on_press(Message::TogglePopup)
-                    .style(cosmic::theme::Button::AppletIcon),
-            );
+            return self
+                .core
+                .applet
+                .icon_button(ICON)
+                .on_press(Message::TogglePopup)
+                .into();
         }
 
         // If using SVG we go here and return from within this block
