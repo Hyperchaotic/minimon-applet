@@ -366,10 +366,8 @@ impl cosmic::Application for Minimon {
                     },)
                     .width(70),
                     widget::horizontal_space(Length::Fill),
-                    cosmic::widget::button(Element::from(
-                        self.core.applet.text(fl!("change-colors"))
-                    ))
-                    .on_press(Message::ColorPickerOpen(self.svgstat_cpu.kind())),
+                    widget::button::standard(fl!("change-colors"))
+                        .on_press(Message::ColorPickerOpen(self.svgstat_cpu.kind())),
                     widget::horizontal_space(Length::Fill)
                 )
             )));
@@ -415,10 +413,8 @@ impl cosmic::Application for Minimon {
                     },)
                     .width(70),
                     widget::horizontal_space(Length::Fill),
-                    cosmic::widget::button(Element::from(
-                        self.core.applet.text(fl!("change-colors"))
-                    ))
-                    .on_press(Message::ColorPickerOpen(self.svgstat_mem.kind())),
+                    widget::button::standard(fl!("change-colors"))
+                        .on_press(Message::ColorPickerOpen(self.svgstat_mem.kind())),
                     widget::horizontal_space(Length::Fill)
                 )
             )));
@@ -429,10 +425,9 @@ impl cosmic::Application for Minimon {
 
             let mut refresh_elements = Vec::new();
 
-            let button_plus = cosmic::widget::button(Element::from(self.core.applet.text(" - ")))
-                .on_press(Message::RefreshRateDown);
-            let button_minus = cosmic::widget::button(Element::from(self.core.applet.text(" + ")))
-                .on_press(Message::RefreshRateUp);
+            let button_plus = cosmic::widget::button(" - ").on_press(Message::RefreshRateDown);
+
+            let button_minus = cosmic::widget::button(" + ").on_press(Message::RefreshRateUp);
             let rate_str = format!(" {:.2} ", self.config.refresh_rate as f64 / 1000.0);
             refresh_elements.push(button_plus.into());
             refresh_elements.push(Element::from(self.core.applet.text(rate_str)));
@@ -504,10 +499,8 @@ impl cosmic::Application for Minimon {
                 ),
                 row!(
                     widget::horizontal_space(Length::Fill),
-                    cosmic::widget::button(Element::from(
-                        self.core.applet.text(fl!("change-colors"))
-                    ))
-                    .on_press(Message::ColorPickerOpen(self.netmon.kind())),
+                    widget::button::standard(fl!("change-colors"))
+                        .on_press(Message::ColorPickerOpen(self.netmon.kind())),
                     widget::horizontal_space(Length::Fill)
                 ),
             )));
