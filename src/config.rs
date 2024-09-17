@@ -67,7 +67,7 @@ impl Default for SvgColors {
         Self {
             color1: Srgb::from_components((0x2b, 0x2b, 0x2b)),
             color2: palette::named::WHITE,
-            color3: palette::named::WHITE,
+            color3: Srgb::from_components((85, 85, 85)),
             color4: Srgb::from_components((255, 6, 0)),
         }
     }
