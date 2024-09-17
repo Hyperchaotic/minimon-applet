@@ -1,6 +1,6 @@
 # Minimon COSMIC Applet
 
-A little applet for displaying total CPU load and/or memory usage. Can sit in the panel or Dock. Can display as icons or text.  
+A little applet for displaying total CPU load and/or memory usage. Can sit in the panel or Dock. Configurable refresh rate and display options. Can sit both in dock and the panel and can be configured differently for each instance. 
 
 
 ![screenshot-2024-09-12-16-52-36](https://raw.githubusercontent.com/Hyperchaotic/minimon-applet/main/cosmic-applet-minimon.png)
