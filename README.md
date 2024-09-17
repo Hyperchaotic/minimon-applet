@@ -5,7 +5,7 @@ A little applet for displaying total CPU load and/or memory usage. Can sit in th
 
 ![screenshot-2024-09-12-16-52-36](https://raw.githubusercontent.com/Hyperchaotic/minimon-applet/main/cosmic-applet-minimon.png)
 
-![screenshot-2024-09-16-22-03-01](https://github.com/user-attachments/assets/1f2d9a1d-d1a6-4319-859b-5c9300633579)
+![panel](https://github.com/user-attachments/assets/c2fcf71a-2a80-40bc-9067-3c12c4e506d6)
 
 
 ![screenshot-2024-08-15-01-02-19](https://github.com/user-attachments/assets/c1e8bc40-d678-44d0-ae6e-e3036102f4a1)
