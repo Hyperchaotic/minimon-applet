@@ -59,6 +59,8 @@ pub struct Minimon {
     tick_timer: i64,
     /// tick can be 250, 500 or 1000, depending on refresh rate modolu tick
     tick: Arc<AtomicI64>,
+    /// System Monitor Application
+    sysmon: Option<(String, String)>,
 }
 
 #[derive(Debug, Clone)]
@@ -92,6 +94,7 @@ pub enum Message {
     ConfigChanged(MinimonConfig),
     RefreshRateUp,
     RefreshRateDown,
+    LaunchSystemMonitor(),
 }
 
 const APP_ID_DOCK: &str = "com.github.hyperchaotic.cosmic-applet-minimon-dock";
@@ -120,6 +123,7 @@ impl cosmic::Application for Minimon {
             config: MinimonConfig::default(),
             tick_timer: TICK,
             tick: Arc::new(AtomicI64::new(TICK)),
+            sysmon: Minimon::get_sysmon(),
         };
 
         (app, Command::none())
@@ -506,7 +510,11 @@ impl cosmic::Application for Minimon {
                 .align_items(Alignment::Center)
                 .spacing(0);
 
-            let content_list = widget::list_column()
+            let mut content_list = widget::list_column();
+                if let Some((_exec, application)) = self.sysmon.as_ref() {
+                    content_list = content_list.add(row!(widget::horizontal_space(Length::Fill), widget::button::standard(application).on_press(Message::LaunchSystemMonitor()).trailing_icon(widget::button::link::icon()), widget::horizontal_space(Length::Fill)));
+                }
+            let content_list = content_list// = widget::list_column()
                 .spacing(5)
                 .add(Element::from(cpu_row))
                 .add(Element::from(mem_row))
@@ -521,7 +529,6 @@ impl cosmic::Application for Minimon {
                         Message::ToggleTextOnly(value)
                     }),
                 ));
-
             return self.core.applet.popup_container(content_list).into();
         }
     }
@@ -740,6 +747,10 @@ impl cosmic::Application for Minimon {
                 Minimon::set_color(&value, &mut col.blue);
                 self.colorpicker.set_sliders(col);
             }
+
+            Message::LaunchSystemMonitor() => {
+                self.spawn_sysmon();
+            }
         }
         Command::none()
     }
@@ -823,5 +834,24 @@ impl Minimon {
         self.svgstat_cpu.update();
         self.svgstat_mem.update();
         self.netmon.update();
+    }
+
+    fn spawn_sysmon(&self) {
+        if let Some((exec, _application)) = self.sysmon.as_ref() {
+            let _child = std::process::Command::new(exec).spawn();
+        }
+    }
+
+    /// Check if a system monitor application exist
+    fn get_sysmon() -> Option<(String, String)> {
+        if let Ok(o) = std::process::Command::new("which")
+            .arg("gnome-system-monitor")
+            .output()
+        {
+            if !o.stdout.is_empty() {
+                return Some((String::from("gnome-system-monitor"), String::from("System Monitor")));
+            }
+        }
+        None
     }
 }
