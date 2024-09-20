@@ -7,7 +7,7 @@ use cosmic::iced::wayland::popup::{destroy_popup, get_popup};
 use cosmic::iced::window::Id;
 use cosmic::iced::{subscription, Limits};
 use cosmic::iced_style::application;
-use cosmic::widget::{settings, text};
+use cosmic::widget::{settings, spin_button};
 use cosmic::{iced::Length, widget};
 use cosmic::{Element, Theme};
 
@@ -61,6 +61,7 @@ pub struct Minimon {
     tick: Arc<AtomicI64>,
     /// System Monitor Application
     sysmon: Option<(String, String)>,
+    refresh_rate_str: String,
 }
 
 #[derive(Debug, Clone)]
@@ -92,9 +93,8 @@ pub enum Message {
     ToggleCpu(bool),
     ToggleMemory(bool),
     ConfigChanged(MinimonConfig),
-    RefreshRateUp,
-    RefreshRateDown,
     LaunchSystemMonitor(),
+    RefreshRateChanged(spin_button::Message),
 }
 
 const APP_ID_DOCK: &str = "com.github.hyperchaotic.cosmic-applet-minimon-dock";
@@ -124,6 +124,7 @@ impl cosmic::Application for Minimon {
             tick_timer: TICK,
             tick: Arc::new(AtomicI64::new(TICK)),
             sysmon: Minimon::get_sysmon(),
+            refresh_rate_str: String::from("1.0"),
         };
 
         (app, Command::none())
@@ -426,14 +427,10 @@ impl cosmic::Application for Minimon {
 
             let mut refresh_elements = Vec::new();
 
-            let button_plus = widget::button::standard("-").on_press(Message::RefreshRateDown);
-            let button_minus = widget::button::standard("+").on_press(Message::RefreshRateUp);
-
-            let rate_str = format!(" {:.2} ", self.config.refresh_rate as f64 / 1000.0);
-            refresh_elements.push(button_plus.into());
-            refresh_elements.push(text::body(rate_str).into());
-            refresh_elements.push(button_minus.into());
-
+            refresh_elements.push(Element::from(spin_button(
+                &self.refresh_rate_str,
+                Message::RefreshRateChanged,
+            )));
             let refresh_row = Row::with_children(refresh_elements)
                 .align_items(Alignment::Center)
                 .spacing(0);
@@ -709,20 +706,6 @@ impl cosmic::Application for Minimon {
                 self.config.enable_net = toggled;
                 self.save_config();
             }
-            Message::RefreshRateUp => {
-                if self.config.refresh_rate < 10000 {
-                    self.config.refresh_rate += 250;
-                }
-                self.set_tick();
-                self.save_config();
-            }
-            Message::RefreshRateDown => {
-                if self.config.refresh_rate >= 500 {
-                    self.config.refresh_rate -= 250;
-                }
-                self.set_tick();
-                self.save_config();
-            }
 
             Message::ConfigChanged(config) => {
                 self.config = config;
@@ -734,6 +717,7 @@ impl cosmic::Application for Minimon {
                 self.netmon.svg_set_colors(self.config.net_colors);
                 self.set_max_y();
                 self.set_tick();
+                self.update_refresh_rate_str();
             }
 
             Message::ColorTextInputRedChanged(value) => {
@@ -756,6 +740,26 @@ impl cosmic::Application for Minimon {
 
             Message::LaunchSystemMonitor() => {
                 self.spawn_sysmon();
+            }
+
+            Message::RefreshRateChanged(message) => {
+                match message {
+                    spin_button::Message::Increment => {
+                        if self.config.refresh_rate < 5000 {
+                            self.config.refresh_rate += 250;
+                        }
+                        self.set_tick();
+                        self.save_config();
+                    }
+                    spin_button::Message::Decrement => {
+                        if self.config.refresh_rate >= 500 {
+                            self.config.refresh_rate -= 250;
+                        }
+                        self.set_tick();
+                        self.save_config();
+                    }
+                }
+                self.update_refresh_rate_str();
             }
         }
         Command::none()
@@ -789,6 +793,11 @@ impl Minimon {
                 println!("Error writing config {err}");
             }
         }
+    }
+
+    fn update_refresh_rate_str(&mut self) {
+        let num: f64 = self.config.refresh_rate as f64 / 1000.0;
+        self.refresh_rate_str = format!("{:.2}", num);
     }
 
     fn set_colors(&mut self, colors: SvgColors, kind: SvgDevKind) {
