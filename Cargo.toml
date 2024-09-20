@@ -1,6 +1,6 @@
 [package]
 name = "cosmic-applet-minimon"
-version = "0.3.4"
+version = "0.3.5"
 edition = "2021"
 license = "GPL-3.0"
 

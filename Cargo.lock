@@ -877,7 +877,7 @@ dependencies = [
 
 [[package]]
 name = "cosmic-applet-minimon"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "chrono",
  "i18n-embed",
