@@ -511,10 +511,16 @@ impl cosmic::Application for Minimon {
                 .spacing(0);
 
             let mut content_list = widget::list_column();
-                if let Some((_exec, application)) = self.sysmon.as_ref() {
-                    content_list = content_list.add(row!(widget::horizontal_space(Length::Fill), widget::button::standard(application).on_press(Message::LaunchSystemMonitor()).trailing_icon(widget::button::link::icon()), widget::horizontal_space(Length::Fill)));
-                }
-            let content_list = content_list// = widget::list_column()
+            if let Some((_exec, application)) = self.sysmon.as_ref() {
+                content_list = content_list.add(row!(
+                    widget::horizontal_space(Length::Fill),
+                    widget::button::standard(application)
+                        .on_press(Message::LaunchSystemMonitor())
+                        .trailing_icon(widget::button::link::icon()),
+                    widget::horizontal_space(Length::Fill)
+                ));
+            }
+            let content_list = content_list // = widget::list_column()
                 .spacing(5)
                 .add(Element::from(cpu_row))
                 .add(Element::from(mem_row))
@@ -844,12 +850,19 @@ impl Minimon {
 
     /// Check if a system monitor application exist
     fn get_sysmon() -> Option<(String, String)> {
-        if let Ok(o) = std::process::Command::new("which")
-            .arg("gnome-system-monitor")
-            .output()
-        {
-            if !o.stdout.is_empty() {
-                return Some((String::from("gnome-system-monitor"), String::from("System Monitor")));
+        let system_monitors = vec![
+            ("gnome-system-monitor", "System Monitor"),
+            ("xfce4-taskmanager", "Task Manager"),
+            ("plasma-systemmonitor", "System Monitor"),
+            ("mate-system-monitor", "System Monitor"),
+            ("lxqt-taskmanager", "Task Manager"),
+        ];
+
+        for (command, name) in system_monitors {
+            if let Ok(o) = std::process::Command::new("which").arg(command).output() {
+                if !o.stdout.is_empty() {
+                    return Some((command.to_string(), name.to_string()));
+                }
             }
         }
         None
