@@ -243,7 +243,7 @@ impl cosmic::Application for Minimon {
         }
 
         // If using text only mode instead we go here and just make a button
-        let button = cosmic::widget::button(if horizontal {
+        let button = widget::button::custom(if horizontal {
             let mut formated = String::new();
             if self.config.enable_cpu {
                 formated = format!("{:.2}%", self.svgstat_cpu.latest_sample());
