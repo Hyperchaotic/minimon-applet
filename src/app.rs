@@ -2,15 +2,16 @@ use cosmic::applet::PanelType;
 use cosmic::cosmic_config::CosmicConfigEntry;
 use std::time;
 
-use cosmic::app::{Command, Core};
-use cosmic::iced::wayland::popup::{destroy_popup, get_popup};
+use cosmic::app::{Core, Task};
+use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
 use cosmic::iced::window::Id;
-use cosmic::iced::{subscription, Limits};
-use cosmic::iced_style::application;
-use cosmic::widget::{settings, spin_button};
-use cosmic::{iced::Length, widget};
-use cosmic::{Element, Theme};
+use cosmic::iced::Limits;
+use cosmic::iced::{self, Subscription};
+use cosmic::widget::{settings, spin_button, toggler};
+use cosmic::Element;
+use cosmic::{iced::Length, widget, widget::autosize};
 
+use once_cell::sync::Lazy;
 use std::sync::atomic::{self, AtomicI64};
 use std::sync::Arc;
 
@@ -18,7 +19,7 @@ use cosmic::{
     applet::cosmic_panel_config::PanelAnchor,
     iced::{
         widget::{column, row, vertical_space},
-        Alignment, Subscription,
+        Alignment,
     },
     iced_widget::{Column, Row},
     widget::{container, horizontal_space},
@@ -29,6 +30,9 @@ use crate::config::{SvgColorVariant, SvgColors, SvgDevKind, SvgGraphKind};
 use crate::netmon::NetMon;
 use crate::svgstat::SvgStat;
 use crate::{config::MinimonConfig, fl};
+use cosmic::widget::Id as WId;
+
+static AUTOSIZE_MAIN_ID: Lazy<WId> = Lazy::new(|| WId::new("autosize-main"));
 
 const TICK: i64 = 250;
 
@@ -61,7 +65,6 @@ pub struct Minimon {
     tick: Arc<AtomicI64>,
     /// System Monitor Application
     sysmon: Option<(String, String)>,
-    refresh_rate_str: String,
 }
 
 #[derive(Debug, Clone)]
@@ -94,7 +97,7 @@ pub enum Message {
     ToggleMemory(bool),
     ConfigChanged(MinimonConfig),
     LaunchSystemMonitor(),
-    RefreshRateChanged(spin_button::Message),
+    RefreshRateChanged(f64),
 }
 
 const APP_ID_DOCK: &str = "com.github.hyperchaotic.cosmic-applet-minimon-dock";
@@ -110,7 +113,7 @@ impl cosmic::Application for Minimon {
 
     const APP_ID: &'static str = "com.github.hyperchaotic.cosmic-applet-minimon";
 
-    fn init(core: Core, _flags: Self::Flags) -> (Self, Command<Self::Message>) {
+    fn init(core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
         let app = Minimon {
             core,
             svgstat_cpu: super::svgstat::SvgStat::new(SvgDevKind::Cpu(SvgGraphKind::Ring)),
@@ -124,10 +127,9 @@ impl cosmic::Application for Minimon {
             tick_timer: TICK,
             tick: Arc::new(AtomicI64::new(TICK)),
             sysmon: Minimon::get_sysmon(),
-            refresh_rate_str: String::from("1.0"),
         };
 
-        (app, Command::none())
+        (app, Task::none())
     }
 
     fn core(&self) -> &Core {
@@ -138,25 +140,19 @@ impl cosmic::Application for Minimon {
         &mut self.core
     }
 
-    fn style(&self) -> Option<<Theme as application::StyleSheet>::Style> {
+    fn style(&self) -> Option<cosmic::iced_runtime::Appearance> {
         Some(cosmic::applet::style())
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        fn time_subscription(tick: std::sync::Arc<AtomicI64>) -> Subscription<()> {
-            subscription::unfold("time-sub", (), move |()| {
-                let atomic = tick.clone();
-                async move {
-                    let val = atomic.load(atomic::Ordering::Relaxed);
-                    let duration = time::Duration::from_millis(val as u64);
-                    tokio::time::sleep(duration).await;
-                    ((), ())
-                }
-            })
+        fn time_subscription(tick: std::sync::Arc<AtomicI64>) -> Subscription<time::Instant> {
+            let atomic = tick.clone();
+            let val = atomic.load(atomic::Ordering::Relaxed);
+            iced::time::every(time::Duration::from_millis(val as u64))
         }
 
         Subscription::batch(vec![
-            time_subscription(self.tick.clone()).map(|()| Message::Tick),
+            time_subscription(self.tick.clone()).map(|_| Message::Tick),
             self.core
                 .watch_config(match self.core.applet.panel_type {
                     PanelType::Panel => APP_ID_PANEL,
@@ -170,12 +166,21 @@ impl cosmic::Application for Minimon {
     fn on_close_requested(&self, id: Id) -> Option<Message> {
         Some(Message::PopupClosed(id))
     }
-
     fn view(&self) -> Element<Message> {
         let horizontal = matches!(
             self.core.applet.anchor,
             PanelAnchor::Top | PanelAnchor::Bottom
         );
+
+        let suggested_total =
+            self.core.applet.suggested_size(true).0 + self.core.applet.suggested_padding(true) * 2;
+        let suggested_window_size = self.core.applet.suggested_window_size();
+        let (width, height) = if self.core.applet.is_horizontal() {
+            (suggested_total as f32, suggested_window_size.1.get() as f32)
+        } else {
+            (suggested_window_size.0.get() as f32, suggested_total as f32)
+        };
+        let mut limits = Limits::NONE.min_width(1.).min_height(1.);
 
         if !self.config.enable_cpu && !self.config.enable_mem && !self.config.enable_net {
             return self
@@ -191,55 +196,83 @@ impl cosmic::Application for Minimon {
             let mut elements = Vec::new();
 
             if self.config.enable_cpu {
-                let cpu_widget = Element::from(
-                    self.core
-                        .applet
-                        .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_cpu))
-                        .on_press(Message::TogglePopup)
-                        .style(cosmic::theme::Button::AppletIcon),
-                );
-                elements.push(cpu_widget);
+                let content = self
+                    .core
+                    .applet
+                    .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_cpu))
+                    .on_press(Message::TogglePopup)
+                    .padding(0);
+                let content = row!(content, vertical_space().height(Length::Fixed(height)))
+                    .align_y(Alignment::Center)
+                    .padding(0);
+                let content = column!(content, horizontal_space().width(Length::Fixed(width)))
+                    .align_x(Alignment::Center)
+                    .padding(0);
+                elements.push(Element::from(content));
             }
 
             if self.config.enable_mem {
-                let mem_widget = Element::from(
-                    self.core
-                        .applet
-                        .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_mem))
-                        .on_press(Message::TogglePopup)
-                        .style(cosmic::theme::Button::AppletIcon),
-                );
-
-                elements.push(mem_widget);
+                let content = self
+                    .core
+                    .applet
+                    .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_mem))
+                    .on_press(Message::TogglePopup)
+                    .padding(0);
+                let content = row!(content, vertical_space().height(Length::Fixed(height)))
+                    .align_y(Alignment::Center)
+                    .padding(0);
+                let content = column!(content, horizontal_space().width(Length::Fixed(width)))
+                    .align_x(Alignment::Center)
+                    .padding(0);
+                elements.push(Element::from(content));
             }
 
             if self.config.enable_net {
                 let svg = self.netmon.svg();
                 let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+                let content = self
+                    .core
+                    .applet
+                    .icon_button_from_handle(handle)
+                    .on_press(Message::TogglePopup)
+                    .padding(0);
+                let content = row!(content, vertical_space().height(Length::Fixed(height)))
+                    .align_y(Alignment::Center)
+                    .padding(0);
+                let content = column!(content, horizontal_space().width(Length::Fixed(width)))
+                    .align_x(Alignment::Center)
+                    .padding(0);
+                elements.push(Element::from(content));
+            }
 
-                let net_widget = Element::from(
-                    self.core
-                        .applet
-                        .icon_button_from_handle(handle)
-                        .on_press(Message::TogglePopup)
-                        .style(cosmic::theme::Button::AppletIcon),
-                );
-                elements.push(net_widget);
+            if let Some(b) = self.core.applet.suggested_bounds {
+                if b.width as i32 > 0 {
+                    limits = limits.max_width(b.width);
+                }
+                if b.height as i32 > 0 {
+                    limits = limits.max_height(b.height);
+                }
             }
 
             if horizontal {
                 let row = Row::with_children(elements)
-                    .align_items(Alignment::Center)
-                    .spacing(0);
+                    .align_y(Alignment::Center)
+                    .spacing(0)
+                    .padding(0);
 
-                return Element::from(row!(row));
+                return autosize::autosize(container(row).padding(0), AUTOSIZE_MAIN_ID.clone())
+                    .limits(limits)
+                    .into();
             }
 
             let col = Column::with_children(elements)
-                .align_items(Alignment::Center)
-                .spacing(0);
+                .align_x(Alignment::Center)
+                .spacing(0)
+                .padding(0);
 
-            return Element::from(row!(col)); // returning SVG elements here
+            return autosize::autosize(container(col).padding(0), AUTOSIZE_MAIN_ID.clone())
+                .limits(limits)
+                .into();
         }
 
         // If using text only mode instead we go here and just make a button
@@ -265,16 +298,7 @@ impl cosmic::Application for Minimon {
                 formated.push_str(&self.netmon.ul_to_string());
             }
 
-            Element::from(
-                row!(
-                    self.core.applet.text(formated),
-                    container(vertical_space(Length::Fixed(f32::from(
-                        self.core.applet.suggested_size(true).1
-                            + 2 * self.core.applet.suggested_padding(true)
-                    ))))
-                )
-                .align_items(Alignment::Center),
-            )
+            Element::from(row!(self.core.applet.text(formated)).align_y(Alignment::Center))
         } else {
             let formated_cpu = if self.svgstat_cpu.latest_sample() < 10.0 {
                 format!("{:.2}%", self.svgstat_cpu.latest_sample())
@@ -301,34 +325,30 @@ impl cosmic::Application for Minimon {
             }
 
             let col = Column::with_children(elements)
-                .align_items(Alignment::Center)
+                .align_x(Alignment::Center)
                 .spacing(0);
 
-            Element::from(
-                column!(
-                    col,
-                    horizontal_space(Length::Fixed(f32::from(
-                        self.core.applet.suggested_size(true).0
-                            + 2 * self.core.applet.suggested_padding(true)
-                    )))
-                )
-                .align_items(Alignment::Center),
-            )
+            Element::from(column!(col,).align_x(Alignment::Center))
         })
         .padding(if horizontal {
             [0, self.core.applet.suggested_padding(true)]
         } else {
             [self.core.applet.suggested_padding(true), 0]
         })
-        .on_press(Message::TogglePopup)
-        .style(cosmic::theme::Button::AppletIcon);
+        .on_press(Message::TogglePopup);
 
-        button.into()
+        autosize::autosize(container(button).padding(0), AUTOSIZE_MAIN_ID.clone())
+            .limits(limits)
+            .into()
     }
 
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
         if self.colorpicker.active() {
-            self.colorpicker.view_colorpicker()
+            return self
+                .core
+                .applet
+                .popup_container(self.colorpicker.view_colorpicker())
+                .into();
         } else {
             let mut cpu_elements = Vec::new();
 
@@ -338,12 +358,12 @@ impl cosmic::Application for Minimon {
                     widget::svg(widget::svg::Handle::from_memory(
                         self.svgstat_cpu.svg().as_bytes().to_owned(),
                     ))
-                    .width(60)
+                    .width(80)
                     .height(60),
                     cosmic::widget::text::body(cpu),
                 )
                 .padding(5)
-                .align_items(Alignment::Center),
+                .align_x(Alignment::Center),
             ));
 
             let selected: Option<usize> = match self.svgstat_cpu.kind() {
@@ -355,27 +375,26 @@ impl cosmic::Application for Minimon {
                 Element::from(
                     settings::item(
                         fl!("enable-cpu"),
-                        widget::toggler(None, self.config.enable_cpu, |value| {
-                            Message::ToggleCpu(value)
-                        }),
+                        toggler(self.config.enable_cpu)
+                            .on_toggle(|value| { Message::ToggleCpu(value) }),
                     )
                     .padding(5)
                 ),
                 row!(
-                    widget::horizontal_space(Length::Fill),
+                    widget::horizontal_space(),
                     widget::dropdown(&self.graph_options, selected, |m| {
                         Message::SelectGraphType(self.svgstat_cpu.kind(), m)
                     },)
                     .width(70),
-                    widget::horizontal_space(Length::Fill),
+                    widget::horizontal_space(),
                     widget::button::standard(fl!("change-colors"))
                         .on_press(Message::ColorPickerOpen(self.svgstat_cpu.kind())),
-                    widget::horizontal_space(Length::Fill)
+                    widget::horizontal_space()
                 )
             )));
 
             let cpu_row = Row::with_children(cpu_elements)
-                .align_items(Alignment::Center)
+                .align_y(Alignment::Center)
                 .spacing(0);
 
             let mut mem_elements = Vec::new();
@@ -385,12 +404,12 @@ impl cosmic::Application for Minimon {
                     widget::svg(widget::svg::Handle::from_memory(
                         self.svgstat_mem.svg().as_bytes().to_owned(),
                     ))
-                    .width(60)
+                    .width(80)
                     .height(60),
                     cosmic::widget::text::body(mem),
                 )
                 .padding(5)
-                .align_items(Alignment::Center),
+                .align_x(Alignment::Center),
             ));
 
             let selected: Option<usize> = match self.svgstat_mem.kind() {
@@ -402,37 +421,40 @@ impl cosmic::Application for Minimon {
                 Element::from(
                     settings::item(
                         fl!("enable-memory"),
-                        widget::toggler(None, self.config.enable_mem, |value| {
-                            Message::ToggleMemory(value)
-                        }),
+                        toggler(self.config.enable_mem)
+                            .on_toggle(|value| { Message::ToggleMemory(value) }),
                     )
                     .padding(5)
                 ),
                 row!(
-                    widget::horizontal_space(Length::Fill),
+                    widget::horizontal_space(),
                     widget::dropdown(&self.graph_options, selected, |m| {
                         Message::SelectGraphType(self.svgstat_mem.kind(), m)
                     },)
                     .width(70),
-                    widget::horizontal_space(Length::Fill),
+                    widget::horizontal_space(),
                     widget::button::standard(fl!("change-colors"))
                         .on_press(Message::ColorPickerOpen(self.svgstat_mem.kind())),
-                    widget::horizontal_space(Length::Fill)
+                    widget::horizontal_space()
                 )
             )));
 
             let mem_row = Row::with_children(mem_elements)
-                .align_items(Alignment::Center)
+                .align_y(Alignment::Center)
                 .spacing(0);
 
             let mut refresh_elements = Vec::new();
-
+            let refresh_rate = self.config.refresh_rate as f64 / 1000.0;
             refresh_elements.push(Element::from(spin_button(
-                &self.refresh_rate_str,
+                format!("{:.2}", refresh_rate),
+                refresh_rate,
+                0.250,
+                0.250,
+                5.00,
                 Message::RefreshRateChanged,
             )));
             let refresh_row = Row::with_children(refresh_elements)
-                .align_items(Alignment::Center)
+                .align_y(Alignment::Center)
                 .spacing(0);
 
             let mut net_elements = Vec::new();
@@ -446,23 +468,22 @@ impl cosmic::Application for Minimon {
                     widget::svg(widget::svg::Handle::from_memory(
                         self.netmon.svg().as_bytes().to_owned(),
                     ))
-                    .width(60)
+                    .width(80)
                     .height(60),
                     cosmic::widget::text::body(""),
                     cosmic::widget::text::body(dlrate),
                     cosmic::widget::text::body(ulrate),
                 )
                 .padding(5)
-                .align_items(Alignment::Center),
+                .align_x(Alignment::Center),
             ));
 
             net_elements.push(Element::from(column!(
                 Element::from(
                     settings::item(
                         fl!("enable-net"),
-                        widget::toggler(None, self.config.enable_net, |value| {
-                            Message::ToggleNet(value)
-                        }),
+                        widget::toggler(self.config.enable_net)
+                            .on_toggle(|value| { Message::ToggleNet(value) }),
                     )
                     .padding(5)
                 ),
@@ -470,10 +491,9 @@ impl cosmic::Application for Minimon {
                     settings::item(
                         fl!("use-adaptive"),
                         row!(
-                            widget::checkbox("", self.config.enable_adaptive_net, |v| {
-                                Message::ToggleAdaptiveNet(v)
-                            }),
-                            widget::horizontal_space(15)
+                            widget::checkbox("", self.config.enable_adaptive_net)
+                                .on_toggle(|v| { Message::ToggleAdaptiveNet(v) }),
+                            widget::horizontal_space()
                         ),
                     )
                     .padding(5)
@@ -496,25 +516,25 @@ impl cosmic::Application for Minimon {
                     .padding(5)
                 ),
                 row!(
-                    widget::horizontal_space(Length::Fill),
+                    widget::horizontal_space(),
                     widget::button::standard(fl!("change-colors"))
                         .on_press(Message::ColorPickerOpen(self.netmon.kind())),
-                    widget::horizontal_space(Length::Fill)
+                    widget::horizontal_space()
                 ),
             )));
 
             let net_row = Row::with_children(net_elements)
-                .align_items(Alignment::Center)
+                .align_y(Alignment::Center)
                 .spacing(0);
 
             let mut content_list = widget::list_column();
             if let Some((_exec, application)) = self.sysmon.as_ref() {
                 content_list = content_list.add(row!(
-                    widget::horizontal_space(Length::Fill),
+                    widget::horizontal_space(),
                     widget::button::standard(application)
                         .on_press(Message::LaunchSystemMonitor())
                         .trailing_icon(widget::button::link::icon()),
-                    widget::horizontal_space(Length::Fill)
+                    widget::horizontal_space()
                 ));
             }
             let content_list = content_list // = widget::list_column()
@@ -528,9 +548,7 @@ impl cosmic::Application for Minimon {
                 ))
                 .add(settings::item(
                     fl!("text-only"),
-                    widget::toggler(None, self.config.text_only, |value| {
-                        Message::ToggleTextOnly(value)
-                    }),
+                    widget::toggler(self.config.text_only).on_toggle(Message::ToggleTextOnly),
                 ));
             return self.core.applet.popup_container(content_list).into();
         }
@@ -539,28 +557,36 @@ impl cosmic::Application for Minimon {
     /// Application messages are handled here. The application state can be modified based on
     /// what message was received. Commands may be returned for asynchronous execution on a
     /// background thread managed by the application's executor.
-    fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
+    fn update(&mut self, message: Self::Message) -> Task<Self::Message> {
         match message {
             Message::TogglePopup => {
                 return if let Some(p) = self.popup.take() {
-                    self.colorpicker.active();
+                    self.colorpicker.deactivate();
                     destroy_popup(p)
                 } else {
                     let new_id = Id::unique();
                     self.popup.replace(new_id);
-                    let mut popup_settings =
-                        self.core
-                            .applet
-                            .get_popup_settings(Id::MAIN, new_id, None, None, None);
+                    let mut popup_settings = self.core.applet.get_popup_settings(
+                        self.core.main_window_id().unwrap(),
+                        new_id,
+                        None,
+                        None,
+                        None,
+                    );
                     popup_settings.positioner.size_limits = Limits::NONE
                         .max_width(372.0)
-                        .min_width(300.0)
+                        .min_width(200.0)
                         .min_height(200.0)
-                        .max_height(1080.0);
+                        .max_height(720.0);
                     get_popup(popup_settings)
+                };
+            }
+            Message::PopupClosed(id) => {
+                if self.popup.as_ref() == Some(&id) {
+                    self.colorpicker.deactivate();
+                    self.popup = None;
                 }
             }
-
             Message::ColorPickerOpen(kind) => {
                 match kind {
                     SvgDevKind::Cpu(_) => {
@@ -584,7 +610,6 @@ impl cosmic::Application for Minimon {
                     .colors()
                     .get_color(self.colorpicker.variant());
                 self.colorpicker.set_sliders(col);
-                self.colorpicker.active();
             }
 
             Message::ColorPickerClose(save) => {
@@ -684,12 +709,6 @@ impl cosmic::Application for Minimon {
                     self.tick_timer = 0;
                 };
             }
-
-            Message::PopupClosed(id) => {
-                if self.popup.as_ref() == Some(&id) {
-                    self.popup = None;
-                }
-            }
             Message::ToggleTextOnly(toggled) => {
                 self.config.text_only = toggled;
                 self.save_config();
@@ -717,7 +736,6 @@ impl cosmic::Application for Minimon {
                 self.netmon.svg_set_colors(self.config.net_colors);
                 self.set_max_y();
                 self.set_tick();
-                self.update_refresh_rate_str();
             }
 
             Message::ColorTextInputRedChanged(value) => {
@@ -742,27 +760,13 @@ impl cosmic::Application for Minimon {
                 self.spawn_sysmon();
             }
 
-            Message::RefreshRateChanged(message) => {
-                match message {
-                    spin_button::Message::Increment => {
-                        if self.config.refresh_rate < 5000 {
-                            self.config.refresh_rate += 250;
-                        }
-                        self.set_tick();
-                        self.save_config();
-                    }
-                    spin_button::Message::Decrement => {
-                        if self.config.refresh_rate >= 500 {
-                            self.config.refresh_rate -= 250;
-                        }
-                        self.set_tick();
-                        self.save_config();
-                    }
-                }
-                self.update_refresh_rate_str();
+            Message::RefreshRateChanged(rate) => {
+                self.config.refresh_rate = (rate * 1000.0) as u64;
+                self.set_tick();
+                self.save_config();
             }
         }
-        Command::none()
+        Task::none()
     }
 }
 
@@ -793,11 +797,6 @@ impl Minimon {
                 println!("Error writing config {err}");
             }
         }
-    }
-
-    fn update_refresh_rate_str(&mut self) {
-        let num: f64 = self.config.refresh_rate as f64 / 1000.0;
-        self.refresh_rate_str = format!("{:.2}", num);
     }
 
     fn set_colors(&mut self, colors: SvgColors, kind: SvgDevKind) {
@@ -834,11 +833,7 @@ impl Minimon {
         if self.config.enable_adaptive_net {
             self.netmon.set_max_y(None);
         } else {
-            let unit = if let Some(u) = self.config.net_unit {
-                u
-            } else {
-                1
-            };
+            let unit = self.config.net_unit.unwrap_or(1);
             let multiplier: [u64; 5] = [1, 1000, 1_000_000, 1_000_000_000, 1_000_000_000_000];
             self.netmon
                 .set_max_y(Some(self.config.net_bandwidth * multiplier[unit]));

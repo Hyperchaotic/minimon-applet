@@ -52,7 +52,7 @@ impl DemoSvg for SvgStat {
             }
             SvgDevKind::Cpu(SvgGraphKind::Line) | SvgDevKind::Memory(SvgGraphKind::Line) => {
                 self.svg_compose_line(&VecDeque::from(DEMO_SAMPLES), self.max_val)
-            },
+            }
             _ => panic!("ERROR: Wrong kind {:?}", self.kind),
         }
     }
@@ -104,10 +104,10 @@ impl SvgStat {
         let mut svg = SvgStat {
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
 
-            max_val: max_val,
+            max_val,
             colors: SvgColors::default(),
-            system: system,
-            kind: kind,
+            system,
+            kind,
             value,
             percentage,
             ringfront_color: String::new(),
@@ -137,7 +137,7 @@ impl SvgStat {
         }
     }
 
-    pub fn to_string(&self, ) -> String {
+    pub fn to_string(&self) -> String {
         let current_val = self.latest_sample();
         let unit = match self.kind {
             SvgDevKind::Cpu(_) => "%",
@@ -171,25 +171,22 @@ impl SvgStat {
     }
 
     pub fn update(&mut self) {
-        let new_val: f64;
-
-        match self.kind {
+        let new_val: f64 = match self.kind {
             SvgDevKind::Cpu(_) => {
                 self.system.refresh_cpu_usage();
-                new_val = self
-                    .system
+                self.system
                     .cpus()
                     .iter()
                     .map(|p| f64::from(p.cpu_usage()))
                     .sum::<f64>()
-                    / self.system.cpus().len() as f64;
+                    / self.system.cpus().len() as f64
             }
             SvgDevKind::Memory(_) => {
                 self.system.refresh_memory();
-                new_val = self.system.used_memory() as f64 / 1_073_741_824.0;
+                self.system.used_memory() as f64 / 1_073_741_824.0
             }
             SvgDevKind::Network(_) => panic!("ERROR: Wrong kind {:?}", self.kind),
-        }
+        };
 
         if self.samples.len() >= MAX_SAMPLES {
             self.samples.pop_front();
@@ -318,17 +315,17 @@ const SVGSTATSTART: &str = "
  <path
     d=\"M17 1.0845
       a 15.9155 15.9155 0 0 1 0 31.831
-      a 15.9155 15.9155 0 0 1 0 -31.831\" 
+      a 15.9155 15.9155 0 0 1 0 -31.831\"
       ";
 
-const SVGSTATPART2: &str = " 
+const SVGSTATPART2: &str = "
         stroke-width=\"2\"
   />
   <path
     d=\"M17 32.831
       a 15.9155 15.9155 0 0 1 0 -31.831
       a 15.9155 15.9155 0 0 1 0 31.831\"
-    fill=\"none\" 
+    fill=\"none\"
     stroke=\"";
 
 const SVGSTATPART3: &str = "\"

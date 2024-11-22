@@ -4,11 +4,11 @@ use app::Minimon;
 
 /// The `app` module is used by convention to indicate the main component of our application.
 mod app;
-mod core;
-mod svgstat;
-mod config;
 mod colorpicker;
+mod config;
+mod core;
 mod netmon;
+mod svgstat;
 
 /// The `cosmic::app::run()` function is the starting point of your application.
 /// It takes two arguments:
@@ -16,5 +16,5 @@ mod netmon;
 /// - `()` is the flags that your app needs to use before it starts.
 ///  If your app does not need any flags, you can pass in `()`.
 fn main() -> cosmic::iced::Result {
-    cosmic::applet::run::<Minimon>(true, ())
+    cosmic::applet::run::<Minimon>(())
 }
