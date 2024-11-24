@@ -574,7 +574,7 @@ impl cosmic::Application for Minimon {
                         None,
                     );
                     popup_settings.positioner.size_limits = Limits::NONE
-                        .max_width(372.0)
+                        .max_width(400.0)
                         .min_width(200.0)
                         .min_height(200.0)
                         .max_height(720.0);

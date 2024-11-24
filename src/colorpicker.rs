@@ -5,7 +5,6 @@ use cosmic::iced::{
     Alignment,
 };
 use cosmic::{cosmic_theme::palette::Srgb, Element};
-use std::ops::RangeInclusive;
 use std::rc::Rc;
 
 use cosmic::{
@@ -148,7 +147,6 @@ impl ColorPicker {
     }
 
     fn color_slider<'b, Message>(
-        range: RangeInclusive<u8>,
         value: u8,
         on_change: impl Fn(u8) -> Message + 'b,
         color_stops_low: &'static Mutex<[ColorStop; 2]>,
@@ -157,7 +155,7 @@ impl ColorPicker {
     where
         Message: Clone + 'b,
     {
-        widget::slider(range, value, on_change)
+        widget::slider(0..=255, value, on_change)
             .width(Length::Fixed(220.0))
             .step(1)
             .class(Slider::Custom {
@@ -335,7 +333,6 @@ impl ColorPicker {
                             .height(20),
                         widget::horizontal_space(),
                         ColorPicker::color_slider(
-                            0..=255,
                             color.red,
                             Message::ColorPickerSliderRedChanged,
                             &COLOR_STOPS_RED_LOW,
@@ -356,7 +353,6 @@ impl ColorPicker {
                             .height(20),
                         widget::horizontal_space(),
                         ColorPicker::color_slider(
-                            0..=255,
                             color.green,
                             Message::ColorPickerSliderGreenChanged,
                             &COLOR_STOPS_GREEN_LOW,
@@ -377,7 +373,6 @@ impl ColorPicker {
                             .height(20),
                         widget::horizontal_space(),
                         ColorPicker::color_slider(
-                            0..=255,
                             color.blue,
                             Message::ColorPickerSliderBlueChanged,
                             &COLOR_STOPS_BLUE_LOW,
