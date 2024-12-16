@@ -640,8 +640,10 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ColorPickerAccent => {
-                let accent = self.core.applet.theme().unwrap().cosmic().accent_color();
-                self.colorpicker.set_sliders(accent.color.into());
+                if let Some(theme) = self.core.applet.theme() {
+                    self.colorpicker
+                        .set_sliders(theme.cosmic().accent_color().color.into());
+                }
             }
 
             Message::ColorPickerSliderRedChanged(val) => {
