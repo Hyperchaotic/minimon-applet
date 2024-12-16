@@ -291,12 +291,24 @@ impl cosmic::Application for Minimon {
             }
 
             if self.config.enable_net {
+                let ticks_per_sec =
+                    (1000 / self.tick.clone().load(atomic::Ordering::Relaxed)) as usize;
                 if !formated.is_empty() {
                     formated.push(' ');
                 }
-                formated.push_str(&self.netmon.dl_to_string());
+                formated.push('↓');
+                if horizontal {
+                    formated.push_str(&self.netmon.get_bitrate_dl(ticks_per_sec));
+                } else {
+                    formated.push_str(&self.netmon.dl_to_string());
+                }
                 formated.push(' ');
-                formated.push_str(&self.netmon.ul_to_string());
+                formated.push('↑');
+                if horizontal {
+                    formated.push_str(&self.netmon.get_bitrate_ul(ticks_per_sec));
+                } else {
+                    formated.push_str(&self.netmon.ul_to_string());
+                }
             }
 
             Element::from(row!(self.core.applet.text(formated)).align_y(Alignment::Center))
