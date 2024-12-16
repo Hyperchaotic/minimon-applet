@@ -348,6 +348,7 @@ impl cosmic::Application for Minimon {
         } else {
             [self.core.applet.suggested_padding(true), 0]
         })
+        .class(cosmic::theme::Button::AppletIcon)
         .on_press(Message::TogglePopup);
 
         autosize::autosize(container(button).padding(0), AUTOSIZE_MAIN_ID.clone())
