@@ -74,6 +74,7 @@ pub enum Message {
     ColorPickerOpen(SvgDevKind),
     ColorPickerClose(bool),
     ColorPickerDefaults,
+    ColorPickerAccent,
 
     ColorPickerSliderRedChanged(u8),
     ColorPickerSliderGreenChanged(u8),
@@ -623,6 +624,11 @@ impl cosmic::Application for Minimon {
             Message::ColorPickerDefaults => {
                 self.colorpicker
                     .set_colors(SvgColors::new(self.colorpicker.kind()));
+            }
+
+            Message::ColorPickerAccent => {
+                let accent = self.core.applet.theme().unwrap().cosmic().accent_color();
+                self.colorpicker.set_sliders(accent.color.into());
             }
 
             Message::ColorPickerSliderRedChanged(val) => {

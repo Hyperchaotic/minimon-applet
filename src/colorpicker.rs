@@ -392,6 +392,7 @@ impl ColorPicker {
             .add(
                 row!(
                     widget::button::standard("Defaults").on_press(Message::ColorPickerDefaults),
+                    widget::button::standard("Accent").on_press(Message::ColorPickerAccent),
                     row!(
                         widget::horizontal_space(),
                         widget::button::destructive("Cancel")
