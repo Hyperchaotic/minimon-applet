@@ -876,6 +876,7 @@ impl Minimon {
     /// Check if a system monitor application exist
     fn get_sysmon() -> Option<(String, String)> {
         let system_monitors = vec![
+            ("observatory", "COSMIC Observatory"),
             ("gnome-system-monitor", "System Monitor"),
             ("xfce4-taskmanager", "Task Manager"),
             ("plasma-systemmonitor", "System Monitor"),

@@ -1029,7 +1029,7 @@ dependencies = [
 
 [[package]]
 name = "cosmic-applet-minimon"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "i18n-embed",
  "i18n-embed-fl",
