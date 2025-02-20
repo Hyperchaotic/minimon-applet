@@ -67,8 +67,7 @@ impl DemoSvg for NetMon {
 
 impl NetMon {
     pub fn new() -> Self {
-        let mut networks = Networks::new_with_refreshed_list();
-        networks.refresh();
+        let networks = Networks::new_with_refreshed_list();
 
         NetMon {
             networks,
@@ -101,7 +100,7 @@ impl NetMon {
 
     /// Retrieve the amount of data transmitted since last update.
     pub fn update(&mut self) {
-        self.networks.refresh();
+        self.networks.refresh(true);
         let mut dl = 0;
         let mut ul = 0;
 
