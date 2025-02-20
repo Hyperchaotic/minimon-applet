@@ -358,11 +358,11 @@ impl cosmic::Application for Minimon {
 
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
         if self.colorpicker.active() {
-            return self
+            self
                 .core
                 .applet
                 .popup_container(self.colorpicker.view_colorpicker())
-                .into();
+                .into()
         } else {
             let mut cpu_elements = Vec::new();
 
@@ -564,7 +564,7 @@ impl cosmic::Application for Minimon {
                     fl!("text-only"),
                     widget::toggler(self.config.text_only).on_toggle(Message::ToggleTextOnly),
                 ));
-            return self.core.applet.popup_container(content_list).into();
+            self.core.applet.popup_container(content_list).into()
         }
     }
 
@@ -856,8 +856,12 @@ impl Minimon {
         } else {
             let unit = self.config.net_unit.unwrap_or(1);
             let multiplier: [u64; 5] = [1, 1000, 1_000_000, 1_000_000_000, 1_000_000_000_000];
+
+            let sec_per_tic: f64 = self.config.refresh_rate as f64 / 1000.0;
+            let new_y = (self.config.net_bandwidth * multiplier[unit]) as f64 *sec_per_tic;
+
             self.netmon
-                .set_max_y(Some(self.config.net_bandwidth * multiplier[unit]));
+                .set_max_y(Some(new_y.round() as u64));
         }
     }
 

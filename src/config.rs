@@ -28,14 +28,15 @@ impl From<usize> for SvgGraphKind {
     }
 }
 
-impl Into<usize> for SvgGraphKind {
-    fn into(self) -> usize {
-        match self {
+impl From<SvgGraphKind> for usize {
+    fn from(kind: SvgGraphKind) -> Self {
+        match kind {
             SvgGraphKind::Ring => 0,
             SvgGraphKind::Line => 1,
         }
     }
 }
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SvgDevKind {
     Cpu(SvgGraphKind),
@@ -90,24 +91,25 @@ impl SvgColors {
         }
     }
 
-    pub fn color1_to_string(&self) -> String {
+    pub fn color1_as_string(&self) -> String {
         SvgColors::to_string(self.color1)
     }
 
-    pub fn color2_to_string(&self) -> String {
+    pub fn color2_as_string(&self) -> String {
         SvgColors::to_string(self.color2)
     }
 
-    pub fn color3_to_string(&self) -> String {
+    pub fn color3_as_string(&self) -> String {
         SvgColors::to_string(self.color3)
     }
 
-    pub fn color4_to_string(&self) -> String {
+    pub fn color4_as_string(&self) -> String {
         SvgColors::to_string(self.color4)
     }
 
     fn to_string(col: Srgb<u8>) -> String {
-        format!("rgba({},{},{})", col.red, col.green, col.blue)
+        //        format!("rgba({},{},{})", col.red, col.green, col.blue)
+        format!("#{:02x}{:02x}{:02x}", col.red, col.green, col.blue)
     }
 
     pub fn set_color(&mut self, srgb: Srgb<u8>, variant: SvgColorVariant) {

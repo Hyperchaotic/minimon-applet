@@ -1,4 +1,3 @@
-use plotters::prelude::*;
 use std::collections::VecDeque;
 
 use sysinfo::Networks;
@@ -34,13 +33,19 @@ pub struct NetMon {
     max_y: Option<u64>,
     colors: SvgColors,
     kind: SvgDevKind,
+
+    /// colors cached so we don't need to convert to string every time
+    color1_hex: String,
+    color2_hex: String,
+    color3_hex: String,
+    color4_hex: String,
 }
 
 impl DemoSvg for NetMon {
     fn svg_demo(&self) -> String {
         let download = VecDeque::from(DL_DEMO);
         let upload = VecDeque::from(UL_DEMO);
-        self.svg_compose(&download, &upload, None)
+        self.svg_compose_double_line(&download, &upload, None)
     }
 
     fn svg_colors(&self) -> SvgColors {
@@ -49,6 +54,10 @@ impl DemoSvg for NetMon {
 
     fn svg_set_colors(&mut self, colors: SvgColors) {
         self.colors = colors;
+        self.color1_hex = colors.color1_as_string();
+        self.color2_hex = colors.color2_as_string();
+        self.color3_hex = colors.color3_as_string();
+        self.color4_hex = colors.color4_as_string();
     }
 
     fn svg_color_choices(&self) -> Vec<(&'static str, SvgColorVariant)> {
@@ -68,6 +77,10 @@ impl NetMon {
             max_y: None,
             colors: SvgColors::new(SvgDevKind::Network(SvgGraphKind::Line)),
             kind: SvgDevKind::Network(SvgGraphKind::Line),
+            color1_hex: String::new(),
+            color2_hex: String::new(),
+            color3_hex: String::new(),
+            color4_hex: String::new(),
         }
     }
 
@@ -111,7 +124,11 @@ impl NetMon {
     fn makestr(val: u64, format: UnitVariant) -> String {
         let mut value = val as f64;
         let mut unit_index = 0;
-        let units = if format==UnitVariant::Short { UNITS_SHORT } else { UNITS_LONG };
+        let units = if format == UnitVariant::Short {
+            UNITS_SHORT
+        } else {
+            UNITS_LONG
+        };
 
         // Find the appropriate unit
         while value >= 999.0 && unit_index < units.len() - 1 {
@@ -131,7 +148,7 @@ impl NetMon {
     // Get bits per second
     pub fn get_bitrate_dl(&self, ticks_per_sec: usize) -> String {
         let len = self.download.len();
-        let start = if ticks_per_sec > len { 0 } else { len - ticks_per_sec };
+        let start = len.saturating_sub(ticks_per_sec);
         // Sum the last `ticks` elements
         let bps = self.download.iter().skip(start).sum();
         NetMon::makestr(bps, UnitVariant::Long)
@@ -140,7 +157,7 @@ impl NetMon {
     // Get bits per second
     pub fn get_bitrate_ul(&self, ticks_per_sec: usize) -> String {
         let len = self.upload.len();
-        let start = if ticks_per_sec > len { 0 } else { len - ticks_per_sec };
+        let start = len.saturating_sub(ticks_per_sec);
         // Sum the last `ticks` elements
         let bps = self.upload.iter().skip(start).sum();
         NetMon::makestr(bps, UnitVariant::Long)
@@ -166,116 +183,109 @@ impl NetMon {
         NetMon::makestr(ul, UnitVariant::Short)
     }
 
-    fn svg_compose(
+    fn svg_compose_double_line(
         &self,
-        download: &VecDeque<u64>,
-        upload: &VecDeque<u64>,
+        samples: &VecDeque<u64>,
+        samples2: &VecDeque<u64>,
         max_y: Option<u64>,
     ) -> String {
-        let mut sname: String = String::new();
-        {
-            let bg = self.colors.get_color(SvgColorVariant::Color1);
-            let root = SVGBackend::with_string(&mut sname, (40, 40)).into_drawing_area();
-            root.fill(&RGBColor(bg.red, bg.green, bg.blue)).unwrap();
-            let root = root.margin(0, 0, 0, 0);
-            // After this point, we should be able to construct a chart context
-            let mut chart = ChartBuilder::on(&root)
-                // Finally attach a coordinate on the drawing area and make a chart context
-                .build_cartesian_2d(0f32..40f32, 0f32..40f32)
-                .unwrap();
+        assert!(samples.len() == samples2.len());
 
-            // Then we can draw a mesh
-            chart
-                .configure_mesh()
-                .disable_x_axis()
-                .disable_y_axis()
-                .disable_mesh()
-                .draw()
-                .unwrap();
+        let len = samples.len();
+        let start = if len > GRAPH_SAMPLES {
+            len - GRAPH_SAMPLES
+        } else {
+            0
+        };
 
-            let col = self.colors.get_color(SvgColorVariant::Color4);
-            let rect = Rectangle::new(
-                [(0, 0), (40, 40)],
-                ShapeStyle {
-                    color: RGBAColor(col.red, col.green, col.blue, 1.0),
-                    filled: false,
-                    stroke_width: 1,
-                },
-            );
-            root.draw(&rect).unwrap();
+        let max = max_y.unwrap_or_else(|| {
+            let calculated_max = samples
+                .iter()
+                .chain(samples2.iter())
+                .copied()
+                .max()
+                .unwrap_or(40);
+            std::cmp::max(40, calculated_max) // Ensure min value is 40
+        });
 
-            if !download.is_empty() {
-                // Configured max or adaptive
-                let max: u64 = if let Some(m) = max_y {
-                    m
-                } else {
-                    *std::cmp::max(
-                        download.iter().max().unwrap_or(&0),
-                        upload.iter().max().unwrap_or(&0),
-                    )
-                };
+        // Generate list of coordinates for line
+        let scaling: f64 = 40.0 / max as f64;
 
-                let scaling: f32 = 39.0 / max as f32;
+        let (indexed_string, indexed_string2): (String, String) = samples
+            .iter()
+            .skip(start)
+            .zip(samples2.iter()) // Iterate over both iterators together
+            .enumerate()
+            .map(|(index, (&value1, &value2))| {
+                let x = ((index * 2) + 1) as u32;
+                let y1 = (41.0 - (scaling * value1 as f64)).round() as u32;
+                let y2 = (41.0 - (scaling * value2 as f64)).round() as u32;
+                (format!("{},{} ", x, y1), format!("{},{} ", x, y2)) // Return tuple of formatted strings
+            })
+            .unzip(); // Collect results into two separate collections
 
-                let dl_len = download.len();
-                let dl_start = if dl_len > GRAPH_SAMPLES {
-                    dl_len - GRAPH_SAMPLES
-                } else {
-                    0
-                };
+        let mut svg = String::with_capacity(LINESVG_LEN);
+        svg.push_str(LINESVG_1);
+        svg.push_str(&self.color1_hex);
+        svg.push_str(LINESVG_2);
+        svg.push_str(&self.color4_hex);
+        svg.push_str(LINESVG_3);
 
-                let ul_len = upload.len();
-                let ul_start = if ul_len > GRAPH_SAMPLES {
-                    ul_len - GRAPH_SAMPLES
-                } else {
-                    0
-                };
+        //First graph and polygon
+        svg.push_str(LINESVG_4);
+        svg.push_str(&self.color2_hex);
+        svg.push_str(LINESVG_5);
+        svg.push_str(&indexed_string);
+        svg.push_str(LINESVG_6);
+        svg.push_str(&self.color2_hex);
+        svg.push_str(LINESVG_7);
+        svg.push_str(&indexed_string);
+        svg.push_str(LINESVG_8);
 
-                let indexed_vec_dl: Vec<(f32, f32)> = download
-                    .iter()
-                    .skip(dl_start)
-                    .enumerate()
-                    .map(|(index, &value)| ((index * 2) as f32, scaling * value as f32))
-                    .collect();
+        //Second graph and polygon
+        svg.push_str(LINESVG_4);
+        svg.push_str(&self.color3_hex);
+        svg.push_str(LINESVG_5);
+        svg.push_str(&indexed_string2);
+        svg.push_str(LINESVG_6);
+        svg.push_str(&self.color3_hex);
+        svg.push_str(LINESVG_7);
+        svg.push_str(&indexed_string2);
+        svg.push_str(LINESVG_8);
 
-                let indexed_vec_ul: Vec<(f32, f32)> = upload
-                    .iter()
-                    .skip(ul_start)
-                    .enumerate()
-                    .map(|(index, &value)| ((index * 2) as f32, scaling * value as f32))
-                    .collect();
+        svg.push_str(LINESVG_9);
 
-                let dl = self.colors.get_color(SvgColorVariant::Color2);
-                let ul = self.colors.get_color(SvgColorVariant::Color3);
-
-                let dl_color = RGBColor(dl.red, dl.green, dl.blue);
-                let ul_color = RGBColor(ul.red, ul.green, ul.blue);
-                let _ = chart.draw_series(AreaSeries::new(
-                    indexed_vec_dl.clone(),
-                    0.0,
-                    dl_color.mix(0.3), // Rust color with some transparency
-                ));
-
-                let _ = chart.draw_series(AreaSeries::new(
-                    indexed_vec_ul.clone(),
-                    0.0,
-                    ul_color.mix(0.5), // Rust color with some transparency
-                ));
-
-                let _ = chart.draw_series(LineSeries::new(indexed_vec_dl, &dl_color));
-
-                let _ = chart.draw_series(LineSeries::new(indexed_vec_ul, &ul_color));
-            }
-
-            let _ = root.present();
-        }
-        sname
+        svg
     }
 
     pub fn svg(&self) -> String {
-        self.svg_compose(&self.download, &self.upload, self.max_y)
+        self.svg_compose_double_line(&self.download, &self.upload, self.max_y)
     }
 }
+
+const LINESVG_1: &str = "
+<svg width=\"42\" height=\"42\" viewBox=\"0 0 42 42\" xmlns=\"http://www.w3.org/2000/svg\">\n\
+<rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" opacity=\"1\" fill=\""; // background color
+
+const LINESVG_2: &str = "\" stroke=\""; // frame color
+const LINESVG_3: &str = "\"/>\n";
+
+// line
+const LINESVG_4: &str = "<polyline fill=\"none\" opacity=\"1\" stroke=\""; // line color
+
+const LINESVG_5: &str = "\" stroke-width=\"1\" points=\"";
+
+// Polygon
+const LINESVG_6: &str = "\"/>\
+<polygon opacity=\"0.3\" fill=\""; // polygon color
+
+const LINESVG_7: &str = "\" points=\""; // polygonpoints
+
+const LINESVG_8: &str = "  41,41 1,41\"/>";
+
+const LINESVG_9: &str = "</svg>";
+
+const LINESVG_LEN: usize = 1000; // For preallocation
 
 const DL_DEMO: [u64; 21] = [
     208, 2071, 0, 1056588, 912575, 912875, 912975, 912600, 1397, 1173024, 1228, 6910, 2493,

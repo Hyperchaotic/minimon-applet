@@ -1,5 +1,3 @@
-use plotters::prelude::*;
-use plotters::{chart::ChartBuilder, prelude::SVGBackend, style::RGBColor};
 use sysinfo::System;
 
 use crate::{
@@ -35,10 +33,12 @@ pub struct SvgStat {
     value: String,
     /// the percentage of the ring to be filled
     percentage: String,
-    /// colors
-    ringfront_color: String,
-    text_color: String,
-    circle_colors: String,
+
+    /// colors cached so we don't need to convert to string every time
+    color1_hex: String,
+    color2_hex: String,
+    color3_hex: String,
+    color4_hex: String,
 }
 
 impl DemoSvg for SvgStat {
@@ -63,13 +63,10 @@ impl DemoSvg for SvgStat {
 
     fn svg_set_colors(&mut self, colors: SvgColors) {
         self.colors = colors;
-        self.ringfront_color = colors.color4_to_string();
-        self.text_color = format!(" fill:{};", &colors.color2_to_string());
-        self.circle_colors = format!(
-            "fill=\"{}\" stroke=\"{}\"",
-            colors.color1_to_string(),
-            colors.color3_to_string()
-        );
+        self.color1_hex = colors.color1_as_string();
+        self.color2_hex = colors.color2_as_string();
+        self.color3_hex = colors.color3_as_string();
+        self.color4_hex = colors.color4_as_string();
     }
 
     fn svg_color_choices(&self) -> Vec<(&'static str, SvgColorVariant)> {
@@ -110,9 +107,10 @@ impl SvgStat {
             kind,
             value,
             percentage,
-            ringfront_color: String::new(),
-            text_color: String::new(),
-            circle_colors: String::new(),
+            color1_hex: String::new(),
+            color2_hex: String::new(),
+            color3_hex: String::new(),
+            color4_hex: String::new(),
         };
         svg.svg_set_colors(SvgColors::default());
         svg
@@ -202,77 +200,57 @@ impl SvgStat {
 
     fn svg_compose_ring(&self, value: &str, percentage: &str) -> String {
         let mut svg = String::with_capacity(SVG_LEN);
-        svg.push_str(SVGSTATSTART);
-        svg.push_str(&self.circle_colors);
-        svg.push_str(SVGSTATPART2);
-        svg.push_str(&self.ringfront_color);
-        svg.push_str(SVGSTATPART3);
+        svg.push_str(RINGSVG_1);
+        svg.push_str(&self.color1_hex);
+        svg.push_str(RINGSVG_1_1);
+        svg.push_str(&self.color3_hex);
+        svg.push_str(RINGSVG_2);
+        svg.push_str(&self.color4_hex);
+        svg.push_str(RINGSVG_3);
         svg.push_str(percentage);
-        svg.push_str(SVGSTATPART4);
-        svg.push_str(&self.text_color);
-        svg.push_str(SVGSTATPART5);
+        svg.push_str(RINGSVG_4);
+        svg.push_str(&self.color2_hex);
+        svg.push_str(RINGSVG_5);
         svg.push_str(value);
-        svg.push_str(SVGSTATPART6);
+        svg.push_str(RINGSVG_6);
 
         svg
     }
-
+    
     fn svg_compose_line(&self, samples: &VecDeque<f64>, max_y: u64) -> String {
-        let mut sname: String = String::new();
-        {
-            let bg = self.colors.get_color(SvgColorVariant::Color1);
-            let root = SVGBackend::with_string(&mut sname, (40, 40)).into_drawing_area();
-            root.fill(&RGBColor(bg.red, bg.green, bg.blue)).unwrap();
-            let root = root.margin(0, 0, 0, 0);
-            // After this point, we should be able to construct a chart context
-            let mut chart = ChartBuilder::on(&root)
-                // Finally attach a coordinate on the drawing area and make a chart context
-                .build_cartesian_2d(0f32..40f32, 0f32..40f32)
-                .unwrap();
 
-            // Then we can draw a mesh
-            chart
-                .configure_mesh()
-                .disable_x_axis()
-                .disable_y_axis()
-                .disable_mesh()
-                .draw()
-                .unwrap();
+        // Generate list of coordinates for line
+        let scaling: f32 = 40.0 / max_y as f32;
+        let indexed_string: String = samples
+        .iter()
+        .enumerate()
+        .map(|(index, &value)| {
+            let x = ((index * 2) + 1) as u32;
+            let y = (41.0 - (scaling * value as f32)).round() as u32;
+            format!("{},{}", x, y)  
+        })
+        .collect::<Vec<String>>()
+        .join(" ");
+    
+        let mut svg = String::with_capacity(LINE_LEN);
+        svg.push_str(LINESVG_1);
+        svg.push_str(&self.color1_hex);
+        svg.push_str(LINESVG_2);
+        svg.push_str(&self.color2_hex);
+        svg.push_str(LINESVG_3);
+        svg.push_str(LINESVG_4);
+        svg.push_str(&self.color4_hex);
+        svg.push_str(LINESVG_5);
+        svg.push_str(&indexed_string);
+        svg.push_str(LINESVG_6);
+        svg.push_str(&self.color4_hex);
+        svg.push_str(LINESVG_7);
+        svg.push_str(&indexed_string);
+        svg.push_str(LINESVG_8);
+        svg.push_str(LINESVG_9);
 
-            let col = self.colors.get_color(SvgColorVariant::Color2);
-            let rect = Rectangle::new(
-                [(0, 0), (40, 40)],
-                ShapeStyle {
-                    color: RGBAColor(col.red, col.green, col.blue, 1.0),
-                    filled: false,
-                    stroke_width: 1,
-                },
-            );
-            root.draw(&rect).unwrap();
+        svg
 
-            if !samples.is_empty() {
-                let scaling: f32 = 39.0 / max_y as f32;
-
-                let indexed_vec: Vec<(f32, f32)> = samples
-                    .iter()
-                    .enumerate()
-                    .map(|(index, &value)| ((index * 2) as f32, scaling * value as f32))
-                    .collect();
-
-                let col = self.colors.get_color(SvgColorVariant::Color4);
-                let line_color = RGBColor(col.red, col.green, col.blue);
-                let _ = chart.draw_series(AreaSeries::new(
-                    indexed_vec.clone(),
-                    0.0,
-                    line_color.mix(0.3), // Rust color with some transparency
-                ));
-
-                let _ = chart.draw_series(LineSeries::new(indexed_vec, &line_color));
-            }
-
-            let _ = root.present();
-        }
-        sname
     }
 
     pub fn svg(&self) -> String {
@@ -310,16 +288,38 @@ const DEMO_SAMPLES: [f64; 21] = [
     13.892818450927734,
 ];
 
-const SVGSTATSTART: &str = "
+const LINESVG_1: &str = "<svg width=\"42\" height=\"42\" viewBox=\"0 0 42 42\" xmlns=\"http://www.w3.org/2000/svg\">\n\
+<rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" opacity=\"1\" fill=\"";// background color
+
+const LINESVG_2: &str = "\" stroke=\""; // frame color
+const LINESVG_3: &str = "\"/>\n";
+
+// polyline part
+const LINESVG_4: &str = "<polyline fill=\"none\" opacity=\"1\" stroke=\""; // line color 
+const LINESVG_5: &str = "\" stroke-width=\"1\" points=\"";
+
+// Polygon part
+const LINESVG_6: &str = "\"/>\n<polygon opacity=\"0.3\" fill=\""; // polygon color
+const LINESVG_7: &str = "\" points=\""; // polygonpoints
+const LINESVG_8: &str = "  41,41 1,41\"/>";
+
+// End
+const LINESVG_9: &str = "</svg>";
+
+const LINE_LEN: usize = 640; // Just for preallocation
+
+
+const RINGSVG_1: &str = "
 <svg viewBox=\"0 0 34 34\" xmlns=\"http://www.w3.org/2000/svg\">
  <path
     d=\"M17 1.0845
       a 15.9155 15.9155 0 0 1 0 31.831
       a 15.9155 15.9155 0 0 1 0 -31.831\"
-      ";
+      fill=\"";
 
-const SVGSTATPART2: &str = "
-        stroke-width=\"2\"
+const RINGSVG_1_1: &str = "\" stroke=\"";
+
+const RINGSVG_2: &str = "\"\nstroke-width=\"2\"
   />
   <path
     d=\"M17 32.831
@@ -328,16 +328,17 @@ const SVGSTATPART2: &str = "
     fill=\"none\"
     stroke=\"";
 
-const SVGSTATPART3: &str = "\"
+const RINGSVG_3: &str = "\"
     stroke-width=\"2\"
     stroke-dasharray=\"";
 
-const SVGSTATPART4: &str = ", 100\"
+const RINGSVG_4: &str = ", 100\"
   />
   <style>
 .percentage {
- ";
-const SVGSTATPART5: &str = "
+ fill: ";
+
+const RINGSVG_5: &str = ";
   font-family: \"Noto Sans\", sans-serif;
   font-size: 1.2em;
   text-anchor: middle;
@@ -345,11 +346,5 @@ const SVGSTATPART5: &str = "
 </style>
   <text x=\"17\" y=\"22.35\" class=\"percentage\">";
 
-const SVGSTATPART6: &str = "</text></svg>";
-const SVG_LEN: usize = SVGSTATSTART.len()
-    + SVGSTATPART2.len()
-    + SVGSTATPART3.len()
-    + SVGSTATPART4.len()
-    + SVGSTATPART5.len()
-    + SVGSTATPART6.len()
-    + 40;
+const RINGSVG_6: &str = "</text></svg>";
+const SVG_LEN: usize = 680;  // For preallocation
