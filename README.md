@@ -16,26 +16,25 @@ A little applet for displaying total CPU load and/or memory usage. Can sit in th
 Thanks to [@edfloreshz](https://github.com/edfloreshz) for the applet template :)
 
 ## Installing
-If you're on a .deb based distibution download [latest version](https://github.com/Hyperchaotic/minimon-applet/releases) and install with the following commands:
+If on a .deb based distibution download [latest version](https://github.com/Hyperchaotic/minimon-applet/releases) and install with the following commands:
 
 ```sh
-unzip ./cosmic-applet-minimon_0.1.1_amd64.deb.zip
-dpkg -i cosmic-applet-minimon_0.1.1_amd64.deb
+sudo dpkg -i cosmic-applet-minimon_0.3.10_amd64.deb
 ```
 
 ## Building
 
-To build your COSMIC applet, you will need [just](https://github.com/casey/just) and probably xkbcommon, if you're on Pop!\_OS, you can install it with the following command:
+To build the applet, you will need [just](https://github.com/casey/just) and probably xkbcommon, if you're on Pop!\_OS, you can install it with the following command:
 
 ```sh
 sudo apt install just libxkbcommon-dev
 ```
 
-After you install it, you can run the following commands to build and install your applet:
+Run the following commands to build and install the applet:
 
 ```sh
 just build-release
-sudo just install
+just install
 ```
 
 Alternatively generate a deb file for installation:
