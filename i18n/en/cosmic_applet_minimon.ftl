@@ -1,7 +1,12 @@
-text-only = Show text only
-enable-cpu = Show CPU load average
-enable-net = Show network load in bits
-enable-memory = Show memory in use
+cpu-title = CPU Load Average
+enable-cpu-chart = Show CPU chart
+enable-cpu-label = Show CPU label
+net-title = Network load in bits
+enable-net-chart = Show network chart
+enable-net-label = Show network label
+memory-title = Memory Usage
+enable-memory-chart = Show memory chart
+enable-memory-label = Show memory label
 use-adaptive = Use adaptive scale
 net-bandwidth = Network speed
 refresh-rate = Refresh rate (seconds)
