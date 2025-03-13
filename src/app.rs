@@ -9,7 +9,7 @@ use cosmic::iced::Limits;
 use cosmic::iced::{self, Subscription};
 use cosmic::widget::{settings, spin_button, toggler};
 use cosmic::Element;
-use cosmic::{iced::Length, widget, widget::autosize};
+use cosmic::{widget, widget::autosize};
 
 use once_cell::sync::Lazy;
 use std::sync::atomic::{self, AtomicI64};
@@ -18,11 +18,11 @@ use std::sync::Arc;
 use cosmic::{
     applet::cosmic_panel_config::PanelAnchor,
     iced::{
-        widget::{column, row, vertical_space},
+        widget::{column, row},
         Alignment,
     },
     iced_widget::{Column, Row},
-    widget::{container, horizontal_space},
+    widget::container,
 };
 
 use crate::colorpicker::{ColorPicker, DemoSvg};
@@ -176,15 +176,16 @@ impl cosmic::Application for Minimon {
             PanelAnchor::Top | PanelAnchor::Bottom
         );
 
-        let suggested_total =
-            self.core.applet.suggested_size(true).0 + self.core.applet.suggested_padding(true) * 2;
-        let suggested_window_size = self.core.applet.suggested_window_size();
-        let (width, height) = if self.core.applet.is_horizontal() {
-            (suggested_total as f32, suggested_window_size.1.get() as f32)
-        } else {
-            (suggested_window_size.0.get() as f32, suggested_total as f32)
-        };
         let mut limits = Limits::NONE.min_width(1.).min_height(1.);
+
+        if let Some(b) = self.core.applet.suggested_bounds {
+            if b.width as i32 > 0 {
+                limits = limits.max_width(b.width);
+            }
+            if b.height as i32 > 0 {
+                limits = limits.max_height(b.height);
+            }
+        }
 
         if !self.config.enable_cpu_chart
             && !self.config.enable_cpu_label
@@ -223,14 +224,8 @@ impl cosmic::Application for Minimon {
             let content = self
                 .core
                 .applet
-                .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_cpu))
-                .padding(0);
-            /* let content = row!(content, vertical_space().height(Length::Fixed(height)))
-                .align_y(Alignment::Center)
-                .padding(0);
-            let content = column!(content, horizontal_space().width(Length::Fixed(width)))
-                .align_x(Alignment::Center)
-                .padding(0); */
+                .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_cpu));
+
             elements.push(content.into());
         }
 
@@ -242,14 +237,8 @@ impl cosmic::Application for Minimon {
             let content = self
                 .core
                 .applet
-                .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_mem))
-                .padding(0);
-            /* let content = row!(content, vertical_space().height(Length::Fixed(height)))
-                .align_y(Alignment::Center)
-                .padding(0);
-            let content = column!(content, horizontal_space().width(Length::Fixed(width)))
-                .align_x(Alignment::Center)
-                .padding(0); */
+                .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_mem));
+
             elements.push(content.into());
         }
 
@@ -263,13 +252,8 @@ impl cosmic::Application for Minimon {
         if self.config.enable_net_chart {
             let svg = self.netmon.svg();
             let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
-            let content = self.core.applet.icon_button_from_handle(handle).padding(0);
-            /* let content = row!(content, vertical_space().height(Length::Fixed(height)))
-                .align_y(Alignment::Center)
-                .padding(0);
-            let content = column!(content, horizontal_space().width(Length::Fixed(width)))
-                .align_x(Alignment::Center)
-                .padding(0); */
+            let content = self.core.applet.icon_button_from_handle(handle);
+
             elements.push(content.into());
         }
 
@@ -285,10 +269,15 @@ impl cosmic::Application for Minimon {
         };
 
         let button = widget::button::custom(wrapper)
+            .padding(if horizontal {
+                [0, self.core.applet.suggested_padding(true)]
+            } else {
+                [self.core.applet.suggested_padding(true), 0]
+            })
             .class(cosmic::theme::Button::AppletIcon)
             .on_press(Message::TogglePopup);
 
-        autosize::autosize(container(button).padding(0), AUTOSIZE_MAIN_ID.clone())
+        autosize::autosize(container(button), AUTOSIZE_MAIN_ID.clone())
             .limits(limits)
             .into()
     }
