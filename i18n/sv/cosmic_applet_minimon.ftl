@@ -1,6 +1,12 @@
-enable-cpu = Visa genomsnittlig CPU-belastning
-enable-net = Visa nätverksbelastning i bitar
-enable-memory = Visa minne som används
+cpu-title = CPU Load Average
+enable-cpu-chart = Visa genomsnittlig CPU-belastning
+enable-cpu-label = Show CPU label
+net-title = Network load in bits
+enable-net-chart = Visa nätverksbelastning i bitar
+enable-net-label = Show network label
+memory-title = Memory Usage
+enable-memory-chart = Visa minne som används
+enable-memory-label = Show memory label
 use-adaptive = Använd adaptiv skala
 net-bandwidth = Nätverkshastighet
 refresh-rate = Uppdateringshastighet (sekunder)
