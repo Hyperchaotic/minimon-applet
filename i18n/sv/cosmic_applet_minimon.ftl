@@ -1,4 +1,3 @@
-text-only = Visa text endast
 enable-cpu = Visa genomsnittlig CPU-belastning
 enable-net = Visa nätverksbelastning i bitar
 enable-memory = Visa minne som används

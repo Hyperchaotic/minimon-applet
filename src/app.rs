@@ -92,10 +92,13 @@ pub enum Message {
     SelectGraphType(SvgDevKind, usize),
     Tick,
     PopupClosed(Id),
-    ToggleTextOnly(bool),
-    ToggleNet(bool),
-    ToggleCpu(bool),
-    ToggleMemory(bool),
+    /* ToggleTextOnly(bool), */
+    ToggleNetChart(bool),
+    ToggleNetLabel(bool),
+    ToggleCpuChart(bool),
+    ToggleCpuLabel(bool),
+    ToggleMemoryChart(bool),
+    ToggleMemoryLabel(bool),
     ConfigChanged(MinimonConfig),
     LaunchSystemMonitor(),
     RefreshRateChanged(f64),
@@ -183,7 +186,13 @@ impl cosmic::Application for Minimon {
         };
         let mut limits = Limits::NONE.min_width(1.).min_height(1.);
 
-        if !self.config.enable_cpu && !self.config.enable_mem && !self.config.enable_net {
+        if !self.config.enable_cpu_chart
+            && !self.config.enable_cpu_label
+            && !self.config.enable_mem_chart
+            && !self.config.enable_mem_label
+            && !self.config.enable_net_chart
+            && !self.config.enable_net_label
+        {
             return self
                 .core
                 .applet
@@ -192,164 +201,92 @@ impl cosmic::Application for Minimon {
                 .into();
         }
 
-        // If using SVG we go here and return from within this block
-        if !self.config.text_only {
-            let mut elements = Vec::new();
+        let formated_cpu = if self.svgstat_cpu.latest_sample() < 10.0 {
+            format!("{:.2}%", self.svgstat_cpu.latest_sample())
+        } else {
+            format!("{:.1}%", self.svgstat_cpu.latest_sample())
+        };
 
-            if self.config.enable_cpu {
-                let content = self
-                    .core
-                    .applet
-                    .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_cpu))
-                    .on_press(Message::TogglePopup)
-                    .padding(0);
-                let content = row!(content, vertical_space().height(Length::Fixed(height)))
-                    .align_y(Alignment::Center)
-                    .padding(0);
-                let content = column!(content, horizontal_space().width(Length::Fixed(width)))
-                    .align_x(Alignment::Center)
-                    .padding(0);
-                elements.push(Element::from(content));
-            }
+        let formated_mem = format!("{:.1}GB", self.svgstat_mem.latest_sample());
 
-            if self.config.enable_mem {
-                let content = self
-                    .core
-                    .applet
-                    .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_mem))
-                    .on_press(Message::TogglePopup)
-                    .padding(0);
-                let content = row!(content, vertical_space().height(Length::Fixed(height)))
-                    .align_y(Alignment::Center)
-                    .padding(0);
-                let content = column!(content, horizontal_space().width(Length::Fixed(width)))
-                    .align_x(Alignment::Center)
-                    .padding(0);
-                elements.push(Element::from(content));
-            }
+        // vertical layout
+        let mut elements: Vec<Element<Message>> = Vec::new();
 
-            if self.config.enable_net {
-                let svg = self.netmon.svg();
-                let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
-                let content = self
-                    .core
-                    .applet
-                    .icon_button_from_handle(handle)
-                    .on_press(Message::TogglePopup)
-                    .padding(0);
-                let content = row!(content, vertical_space().height(Length::Fixed(height)))
-                    .align_y(Alignment::Center)
-                    .padding(0);
-                let content = column!(content, horizontal_space().width(Length::Fixed(width)))
-                    .align_x(Alignment::Center)
-                    .padding(0);
-                elements.push(Element::from(content));
-            }
+        let theme = cosmic::theme::active();
+        let cosmic = theme.cosmic();
 
-            if let Some(b) = self.core.applet.suggested_bounds {
-                if b.width as i32 > 0 {
-                    limits = limits.max_width(b.width);
-                }
-                if b.height as i32 > 0 {
-                    limits = limits.max_height(b.height);
-                }
-            }
-
-            if horizontal {
-                let row = Row::with_children(elements)
-                    .align_y(Alignment::Center)
-                    .spacing(0)
-                    .padding(0);
-
-                return autosize::autosize(container(row).padding(0), AUTOSIZE_MAIN_ID.clone())
-                    .limits(limits)
-                    .into();
-            }
-
-            let col = Column::with_children(elements)
-                .align_x(Alignment::Center)
-                .spacing(0)
-                .padding(0);
-
-            return autosize::autosize(container(col).padding(0), AUTOSIZE_MAIN_ID.clone())
-                .limits(limits)
-                .into();
+        if self.config.enable_cpu_label {
+            elements.push(self.core.applet.text(formated_cpu).into());
         }
 
-        // If using text only mode instead we go here and just make a button
-        let button = widget::button::custom(if horizontal {
-            let mut formated = String::new();
-            if self.config.enable_cpu {
-                formated = format!("{:.2}%", self.svgstat_cpu.latest_sample());
-            }
-
-            if self.config.enable_mem {
-                if !formated.is_empty() {
-                    formated.push(' ');
-                }
-                formated.push_str(&format!("{:.1}GB", self.svgstat_mem.latest_sample()));
-            }
-
-            if self.config.enable_net {
-                let ticks_per_sec =
-                    (1000 / self.tick.clone().load(atomic::Ordering::Relaxed)) as usize;
-                if !formated.is_empty() {
-                    formated.push(' ');
-                }
-                formated.push('↓');
-                if horizontal {
-                    formated.push_str(&self.netmon.get_bitrate_dl(ticks_per_sec));
-                } else {
-                    formated.push_str(&self.netmon.dl_to_string());
-                }
-                formated.push(' ');
-                formated.push('↑');
-                if horizontal {
-                    formated.push_str(&self.netmon.get_bitrate_ul(ticks_per_sec));
-                } else {
-                    formated.push_str(&self.netmon.ul_to_string());
-                }
-            }
-
-            Element::from(row!(self.core.applet.text(formated)).align_y(Alignment::Center))
-        } else {
-            let formated_cpu = if self.svgstat_cpu.latest_sample() < 10.0 {
-                format!("{:.2}%", self.svgstat_cpu.latest_sample())
-            } else {
-                format!("{:.1}%", self.svgstat_cpu.latest_sample())
-            };
-
-            let formated_mem = format!("{:.1}GB", self.svgstat_mem.latest_sample());
-
-            // vertical layout
-            let mut elements = Vec::new();
-
-            if self.config.enable_cpu {
-                elements.push(self.core.applet.text(formated_cpu).into());
-            }
-
-            if self.config.enable_mem {
-                elements.push(self.core.applet.text(formated_mem).into());
-            }
-
-            if self.config.enable_net {
-                elements.push(self.core.applet.text(self.netmon.dl_to_string()).into());
-                elements.push(self.core.applet.text(self.netmon.ul_to_string()).into());
-            }
-
-            let col = Column::with_children(elements)
+        if self.config.enable_cpu_chart {
+            let content = self
+                .core
+                .applet
+                .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_cpu))
+                .padding(0);
+            /* let content = row!(content, vertical_space().height(Length::Fixed(height)))
+                .align_y(Alignment::Center)
+                .padding(0);
+            let content = column!(content, horizontal_space().width(Length::Fixed(width)))
                 .align_x(Alignment::Center)
-                .spacing(0);
+                .padding(0); */
+            elements.push(content.into());
+        }
 
-            Element::from(column!(col,).align_x(Alignment::Center))
-        })
-        .padding(if horizontal {
-            [0, self.core.applet.suggested_padding(true)]
-        } else {
-            [self.core.applet.suggested_padding(true), 0]
-        })
-        .class(cosmic::theme::Button::AppletIcon)
-        .on_press(Message::TogglePopup);
+        if self.config.enable_mem_label {
+            elements.push(self.core.applet.text(formated_mem).into());
+        }
+
+        if self.config.enable_mem_chart {
+            let content = self
+                .core
+                .applet
+                .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_mem))
+                .padding(0);
+            /* let content = row!(content, vertical_space().height(Length::Fixed(height)))
+                .align_y(Alignment::Center)
+                .padding(0);
+            let content = column!(content, horizontal_space().width(Length::Fixed(width)))
+                .align_x(Alignment::Center)
+                .padding(0); */
+            elements.push(content.into());
+        }
+
+        // Network
+
+        if self.config.enable_net_label {
+            elements.push(self.core.applet.text(self.netmon.dl_to_string()).into());
+            elements.push(self.core.applet.text(self.netmon.ul_to_string()).into());
+        }
+
+        if self.config.enable_net_chart {
+            let svg = self.netmon.svg();
+            let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+            let content = self.core.applet.icon_button_from_handle(handle).padding(0);
+            /* let content = row!(content, vertical_space().height(Length::Fixed(height)))
+                .align_y(Alignment::Center)
+                .padding(0);
+            let content = column!(content, horizontal_space().width(Length::Fixed(width)))
+                .align_x(Alignment::Center)
+                .padding(0); */
+            elements.push(content.into());
+        }
+
+        let wrapper: Element<Message> = match horizontal {
+            true => Row::from_vec(elements)
+                .align_y(Alignment::Center)
+                .spacing(cosmic.space_xxs())
+                .into(),
+            false => Column::from_vec(elements)
+                .align_x(Alignment::Center)
+                .spacing(cosmic.space_xxs())
+                .into(),
+        };
+
+        let button = widget::button::custom(wrapper)
+            .class(cosmic::theme::Button::AppletIcon)
+            .on_press(Message::TogglePopup);
 
         autosize::autosize(container(button).padding(0), AUTOSIZE_MAIN_ID.clone())
             .limits(limits)
@@ -358,12 +295,14 @@ impl cosmic::Application for Minimon {
 
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
         if self.colorpicker.active() {
-            self
-                .core
+            self.core
                 .applet
                 .popup_container(self.colorpicker.view_colorpicker())
                 .into()
         } else {
+            let theme = cosmic::theme::active();
+            let cosmic = theme.cosmic();
+
             let mut cpu_elements = Vec::new();
 
             let cpu = self.svgstat_cpu.to_string();
@@ -385,27 +324,31 @@ impl cosmic::Application for Minimon {
                 _ => None,
             };
 
-            cpu_elements.push(Element::from(column!(
-                Element::from(
+            cpu_elements.push(Element::from(
+                column!(
+                    widget::text::title4(fl!("cpu-title")),
                     settings::item(
-                        fl!("enable-cpu"),
-                        toggler(self.config.enable_cpu)
-                            .on_toggle(|value| { Message::ToggleCpu(value) }),
+                        fl!("enable-cpu-chart"),
+                        toggler(self.config.enable_cpu_chart)
+                            .on_toggle(|value| { Message::ToggleCpuChart(value) }),
+                    ),
+                    settings::item(
+                        fl!("enable-cpu-label"),
+                        toggler(self.config.enable_cpu_label)
+                            .on_toggle(|value| { Message::ToggleCpuLabel(value) }),
+                    ),
+                    row!(
+                        widget::dropdown(&self.graph_options, selected, |m| {
+                            Message::SelectGraphType(self.svgstat_cpu.kind(), m)
+                        },)
+                        .width(70),
+                        widget::horizontal_space(),
+                        widget::button::standard(fl!("change-colors"))
+                            .on_press(Message::ColorPickerOpen(self.svgstat_cpu.kind())),
                     )
-                    .padding(5)
-                ),
-                row!(
-                    widget::horizontal_space(),
-                    widget::dropdown(&self.graph_options, selected, |m| {
-                        Message::SelectGraphType(self.svgstat_cpu.kind(), m)
-                    },)
-                    .width(70),
-                    widget::horizontal_space(),
-                    widget::button::standard(fl!("change-colors"))
-                        .on_press(Message::ColorPickerOpen(self.svgstat_cpu.kind())),
-                    widget::horizontal_space()
                 )
-            )));
+                .spacing(cosmic.space_xs()),
+            ));
 
             let cpu_row = Row::with_children(cpu_elements)
                 .align_y(Alignment::Center)
@@ -431,27 +374,31 @@ impl cosmic::Application for Minimon {
                 _ => None,
             };
 
-            mem_elements.push(Element::from(column!(
-                Element::from(
+            mem_elements.push(Element::from(
+                column!(
+                    widget::text::title4(fl!("memory-title")),
                     settings::item(
-                        fl!("enable-memory"),
-                        toggler(self.config.enable_mem)
-                            .on_toggle(|value| { Message::ToggleMemory(value) }),
+                        fl!("enable-memory-chart"),
+                        toggler(self.config.enable_mem_chart)
+                            .on_toggle(|value| { Message::ToggleMemoryChart(value) }),
+                    ),
+                    settings::item(
+                        fl!("enable-memory-label"),
+                        toggler(self.config.enable_mem_label)
+                            .on_toggle(|value| { Message::ToggleMemoryLabel(value) }),
+                    ),
+                    row!(
+                        widget::dropdown(&self.graph_options, selected, |m| {
+                            Message::SelectGraphType(self.svgstat_mem.kind(), m)
+                        },)
+                        .width(70),
+                        widget::horizontal_space(),
+                        widget::button::standard(fl!("change-colors"))
+                            .on_press(Message::ColorPickerOpen(self.svgstat_mem.kind())),
                     )
-                    .padding(5)
-                ),
-                row!(
-                    widget::horizontal_space(),
-                    widget::dropdown(&self.graph_options, selected, |m| {
-                        Message::SelectGraphType(self.svgstat_mem.kind(), m)
-                    },)
-                    .width(70),
-                    widget::horizontal_space(),
-                    widget::button::standard(fl!("change-colors"))
-                        .on_press(Message::ColorPickerOpen(self.svgstat_mem.kind())),
-                    widget::horizontal_space()
                 )
-            )));
+                .spacing(cosmic.space_xs()),
+            ));
 
             let mem_row = Row::with_children(mem_elements)
                 .align_y(Alignment::Center)
@@ -492,27 +439,24 @@ impl cosmic::Application for Minimon {
                 .align_x(Alignment::Center),
             ));
 
-            net_elements.push(Element::from(column!(
-                Element::from(
+            net_elements.push(Element::from(
+                column!(
+                    widget::text::title4(fl!("net-title")),
                     settings::item(
-                        fl!("enable-net"),
-                        widget::toggler(self.config.enable_net)
-                            .on_toggle(|value| { Message::ToggleNet(value) }),
-                    )
-                    .padding(5)
-                ),
-                Element::from(
+                        fl!("enable-net-chart"),
+                        widget::toggler(self.config.enable_net_chart)
+                            .on_toggle(|value| { Message::ToggleNetChart(value) }),
+                    ),
+                    settings::item(
+                        fl!("enable-net-label"),
+                        widget::toggler(self.config.enable_net_label)
+                            .on_toggle(|value| { Message::ToggleNetLabel(value) }),
+                    ),
                     settings::item(
                         fl!("use-adaptive"),
-                        row!(
-                            widget::checkbox("", self.config.enable_adaptive_net)
-                                .on_toggle(|v| { Message::ToggleAdaptiveNet(v) }),
-                            widget::horizontal_space()
-                        ),
-                    )
-                    .padding(5)
-                ),
-                Element::from(
+                        row!(widget::checkbox("", self.config.enable_adaptive_net)
+                            .on_toggle(|v| { Message::ToggleAdaptiveNet(v) }),),
+                    ),
                     settings::item(
                         fl!("net-bandwidth"),
                         row!(
@@ -526,16 +470,16 @@ impl cosmic::Application for Minimon {
                             )
                             .width(50)
                         )
-                    )
-                    .padding(5)
-                ),
-                row!(
-                    widget::horizontal_space(),
-                    widget::button::standard(fl!("change-colors"))
-                        .on_press(Message::ColorPickerOpen(self.netmon.kind())),
-                    widget::horizontal_space()
-                ),
-            )));
+                    ),
+                    row!(
+                        widget::horizontal_space(),
+                        widget::button::standard(fl!("change-colors"))
+                            .on_press(Message::ColorPickerOpen(self.netmon.kind())),
+                        widget::horizontal_space()
+                    ),
+                )
+                .spacing(cosmic.space_xs()),
+            ));
 
             let net_row = Row::with_children(net_elements)
                 .align_y(Alignment::Center)
@@ -559,10 +503,6 @@ impl cosmic::Application for Minimon {
                 .add(settings::item(
                     fl!("refresh-rate"),
                     Element::from(refresh_row),
-                ))
-                .add(settings::item(
-                    fl!("text-only"),
-                    widget::toggler(self.config.text_only).on_toggle(Message::ToggleTextOnly),
                 ));
             self.core.applet.popup_container(content_list).into()
         }
@@ -730,20 +670,32 @@ impl cosmic::Application for Minimon {
                     self.tick_timer = 0;
                 };
             }
-            Message::ToggleTextOnly(toggled) => {
-                self.config.text_only = toggled;
+
+            Message::ToggleCpuChart(toggled) => {
+                self.config.enable_cpu_chart = toggled;
                 self.save_config();
             }
-            Message::ToggleCpu(toggled) => {
-                self.config.enable_cpu = toggled;
+            Message::ToggleMemoryChart(toggled) => {
+                self.config.enable_mem_chart = toggled;
                 self.save_config();
             }
-            Message::ToggleMemory(toggled) => {
-                self.config.enable_mem = toggled;
+            Message::ToggleNetChart(toggled) => {
+                self.config.enable_net_chart = toggled;
                 self.save_config();
             }
-            Message::ToggleNet(toggled) => {
-                self.config.enable_net = toggled;
+
+            Message::ToggleCpuLabel(toggled) => {
+                self.config.enable_cpu_label = toggled;
+                self.save_config();
+            }
+
+            Message::ToggleMemoryLabel(toggled) => {
+                self.config.enable_mem_label = toggled;
+                self.save_config();
+            }
+
+            Message::ToggleNetLabel(toggled) => {
+                self.config.enable_net_label = toggled;
                 self.save_config();
             }
 
@@ -858,10 +810,9 @@ impl Minimon {
             let multiplier: [u64; 5] = [1, 1000, 1_000_000, 1_000_000_000, 1_000_000_000_000];
 
             let sec_per_tic: f64 = self.config.refresh_rate as f64 / 1000.0;
-            let new_y = (self.config.net_bandwidth * multiplier[unit]) as f64 *sec_per_tic;
+            let new_y = (self.config.net_bandwidth * multiplier[unit]) as f64 * sec_per_tic;
 
-            self.netmon
-                .set_max_y(Some(new_y.round() as u64));
+            self.netmon.set_max_y(Some(new_y.round() as u64));
         }
     }
 

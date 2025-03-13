@@ -134,12 +134,14 @@ impl SvgColors {
 #[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq)]
 #[version = 1]
 pub struct MinimonConfig {
-    pub text_only: bool,
-    pub enable_cpu: bool,
+    pub enable_cpu_chart: bool,
+    pub enable_cpu_label: bool,
     cpu_type: usize,
-    pub enable_mem: bool,
+    pub enable_mem_chart: bool,
+    pub enable_mem_label: bool,
     mem_type: usize,
-    pub enable_net: bool,
+    pub enable_net_chart: bool,
+    pub enable_net_label: bool,
     pub refresh_rate: u64,
     pub enable_adaptive_net: bool,
     pub net_bandwidth: u64,
@@ -152,12 +154,14 @@ pub struct MinimonConfig {
 impl Default for MinimonConfig {
     fn default() -> Self {
         Self {
-            text_only: false,
-            enable_cpu: true,
+            enable_cpu_chart: true,
+            enable_cpu_label: false,
             cpu_type: 0,
-            enable_mem: true,
+            enable_mem_chart: true,
+            enable_mem_label: false,
             mem_type: 0,
-            enable_net: true,
+            enable_net_chart: true,
+            enable_net_label: false,
             refresh_rate: 1000,
             enable_adaptive_net: true,
             net_bandwidth: 62_500_000, // 500Mbit/s
