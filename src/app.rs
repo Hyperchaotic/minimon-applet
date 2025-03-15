@@ -428,24 +428,35 @@ impl cosmic::Application for Minimon {
                 .align_x(Alignment::Center),
             ));
 
-            net_elements.push(Element::from(
-                column!(
-                    widget::text::title4(fl!("net-title")),
-                    settings::item(
-                        fl!("enable-net-chart"),
-                        widget::toggler(self.config.enable_net_chart)
-                            .on_toggle(|value| { Message::ToggleNetChart(value) }),
-                    ),
-                    settings::item(
-                        fl!("enable-net-label"),
-                        widget::toggler(self.config.enable_net_label)
-                            .on_toggle(|value| { Message::ToggleNetLabel(value) }),
-                    ),
-                    settings::item(
-                        fl!("use-adaptive"),
-                        row!(widget::checkbox("", self.config.enable_adaptive_net)
-                            .on_toggle(|v| { Message::ToggleAdaptiveNet(v) }),),
-                    ),
+            let mut net_bandwidth_items = Vec::new();
+            net_bandwidth_items.push(Element::from(widget::text::title4(fl!("net-title"))));
+            net_bandwidth_items.push(
+                settings::item(
+                    fl!("enable-net-chart"),
+                    widget::toggler(self.config.enable_net_chart)
+                        .on_toggle(|value| Message::ToggleNetChart(value)),
+                )
+                .into(),
+            );
+            net_bandwidth_items.push(
+                settings::item(
+                    fl!("enable-net-label"),
+                    widget::toggler(self.config.enable_net_label)
+                        .on_toggle(|value| Message::ToggleNetLabel(value)),
+                )
+                .into(),
+            );
+            net_bandwidth_items.push(
+                settings::item(
+                    fl!("use-adaptive"),
+                    row!(widget::checkbox("", self.config.enable_adaptive_net)
+                        .on_toggle(|v| { Message::ToggleAdaptiveNet(v) }),),
+                )
+                .into(),
+            );
+
+            if !self.config.enable_adaptive_net {
+                net_bandwidth_items.push(
                     settings::item(
                         fl!("net-bandwidth"),
                         row!(
@@ -458,17 +469,25 @@ impl cosmic::Application for Minimon {
                                 Message::NetworkSelectUnit,
                             )
                             .width(50)
-                        )
-                    ),
-                    row!(
-                        widget::horizontal_space(),
-                        widget::button::standard(fl!("change-colors"))
-                            .on_press(Message::ColorPickerOpen(self.netmon.kind())),
-                        widget::horizontal_space()
-                    ),
+                        ),
+                    )
+                    .into(),
+                );
+            }
+
+            net_bandwidth_items.push(
+                row!(
+                    widget::horizontal_space(),
+                    widget::button::standard(fl!("change-colors"))
+                        .on_press(Message::ColorPickerOpen(self.netmon.kind())),
+                    widget::horizontal_space()
                 )
-                .spacing(cosmic.space_xs()),
-            ));
+                .into(),
+            );
+
+            let net_right_column = Column::with_children(net_bandwidth_items);
+
+            net_elements.push(Element::from(net_right_column.spacing(cosmic.space_xs())));
 
             let net_row = Row::with_children(net_elements)
                 .align_y(Alignment::Center)
