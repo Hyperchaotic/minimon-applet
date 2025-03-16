@@ -145,41 +145,21 @@ impl NetMon {
     }
 
     // Get bits per second
-    pub fn get_bitrate_dl(&self, ticks_per_sec: usize) -> String {
+    pub fn get_bitrate_dl(&self, ticks_per_sec: usize, format: UnitVariant) -> String {
         let len = self.download.len();
         let start = len.saturating_sub(ticks_per_sec);
         // Sum the last `ticks` elements
         let bps = self.download.iter().skip(start).sum();
-        NetMon::makestr(bps, UnitVariant::Long)
+        NetMon::makestr(bps, format)
     }
 
     // Get bits per second
-    pub fn get_bitrate_ul(&self, ticks_per_sec: usize) -> String {
+    pub fn get_bitrate_ul(&self, ticks_per_sec: usize, format: UnitVariant) -> String {
         let len = self.upload.len();
         let start = len.saturating_sub(ticks_per_sec);
         // Sum the last `ticks` elements
         let bps = self.upload.iter().skip(start).sum();
-        NetMon::makestr(bps, UnitVariant::Long)
-    }
-
-    // Bits per tick
-    pub fn dl_to_string(&self) -> String {
-        let dl = if !self.download.is_empty() {
-            *self.download.back().unwrap_or(&0u64)
-        } else {
-            0
-        };
-        NetMon::makestr(dl, UnitVariant::Short)
-    }
-
-    // Bits per tick
-    pub fn ul_to_string(&self) -> String {
-        let ul = if !self.upload.is_empty() {
-            *self.upload.back().unwrap_or(&0u64)
-        } else {
-            0
-        };
-        NetMon::makestr(ul, UnitVariant::Short)
+        NetMon::makestr(bps, format)
     }
 
     fn svg_compose_double_line(
