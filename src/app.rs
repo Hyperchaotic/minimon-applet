@@ -251,27 +251,29 @@ impl cosmic::Application for Minimon {
             let mut network_labels: Vec<Element<Message>> = Vec::new();
 
             // DL
-            let dlstr = match horizontal {
-                true => format!(
+            let dl_label = match horizontal {
+                true => self.core.applet.text(format!(
                     "↓ {}",
                     &self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long)
+                )).size(13),
+                false => self.core.applet.text(
+                    self.netmon
+                        .get_bitrate_dl(ticks_per_sec, UnitVariant::Short),
                 ),
-                false => self
-                    .netmon
-                    .get_bitrate_dl(ticks_per_sec, UnitVariant::Short),
             };
-            network_labels.push(self.core.applet.text(dlstr).into());
+            network_labels.push(dl_label.into());
             // UL
-            let ulstr = match horizontal {
-                true => format!(
+            let ul_label = match horizontal {
+                true => self.core.applet.text(format!(
                     "↑ {}",
                     &self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long)
+                )).size(13),
+                false => self.core.applet.text(
+                    self.netmon
+                        .get_bitrate_ul(ticks_per_sec, UnitVariant::Short),
                 ),
-                false => self
-                    .netmon
-                    .get_bitrate_ul(ticks_per_sec, UnitVariant::Short),
             };
-            network_labels.push(self.core.applet.text(ulstr).into());
+            network_labels.push(ul_label.into());
 
             elements.push(Column::from_vec(network_labels).into());
         }
