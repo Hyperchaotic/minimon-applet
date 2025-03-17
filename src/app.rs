@@ -202,7 +202,8 @@ impl cosmic::Application for Minimon {
                 .into();
         }
 
-        let formated_cpu = if self.svgstat_cpu.latest_sample() < 10.0 {
+        // If we are below 10% and horizontal layout we can show another decimal
+        let formated_cpu = if self.svgstat_cpu.latest_sample() < 10.0 && horizontal {
             format!("{:.2}%", self.svgstat_cpu.latest_sample())
         } else {
             format!("{:.1}%", self.svgstat_cpu.latest_sample())
@@ -243,32 +244,36 @@ impl cosmic::Application for Minimon {
         }
 
         // Network
+
         if self.config.enable_net_label {
             let ticks_per_sec = (1000 / self.tick.clone().load(atomic::Ordering::Relaxed)) as usize;
-            if horizontal {
-                // DL
-                let mut dlstr = String::with_capacity(10);
-                dlstr.push('↓');
-                dlstr.push_str(&self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long));
-                elements.push(self.core.applet.text(dlstr).into());
-                // UL
-                let mut ulstr = String::with_capacity(10);
-                ulstr.push('↑');
-                ulstr.push_str(&self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long));
-                elements.push(self.core.applet.text(ulstr).into());
-            } else {
-                elements.push(self.core.applet.text(self.netmon
-                    .get_bitrate_dl(ticks_per_sec, UnitVariant::Short)).into());
-                elements.push(
-                    self.core
-                        .applet
-                        .text(
-                            self.netmon
-                                .get_bitrate_ul(ticks_per_sec, UnitVariant::Short),
-                        )
-                        .into(),
-                );
-            }
+
+            let mut network_labels: Vec<Element<Message>> = Vec::new();
+
+            // DL
+            let dlstr = match horizontal {
+                true => format!(
+                    "↓ {}",
+                    &self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long)
+                ),
+                false => self
+                    .netmon
+                    .get_bitrate_dl(ticks_per_sec, UnitVariant::Short),
+            };
+            network_labels.push(self.core.applet.text(dlstr).into());
+            // UL
+            let ulstr = match horizontal {
+                true => format!(
+                    "↑ {}",
+                    &self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long)
+                ),
+                false => self
+                    .netmon
+                    .get_bitrate_ul(ticks_per_sec, UnitVariant::Short),
+            };
+            network_labels.push(self.core.applet.text(ulstr).into());
+
+            elements.push(Column::from_vec(network_labels).into());
         }
 
         if self.config.enable_net_chart {
@@ -432,7 +437,6 @@ impl cosmic::Application for Minimon {
             let mut net_elements = Vec::new();
 
             let ticks_per_sec = (1000 / self.tick.clone().load(atomic::Ordering::Relaxed)) as usize;
-
 
             let mut dlrate = '↓'.to_string();
             dlrate.push_str(&self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long));
