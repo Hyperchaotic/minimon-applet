@@ -440,10 +440,8 @@ impl cosmic::Application for Minimon {
 
             let ticks_per_sec = (1000 / self.tick.clone().load(atomic::Ordering::Relaxed)) as usize;
 
-            let mut dlrate = '↓'.to_string();
-            dlrate.push_str(&self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long));
-            let mut ulrate = '↑'.to_string();
-            ulrate.push_str(&self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long));
+            let dlrate = format!("↓ {}", &self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long));
+            let ulrate = format!("↑ {}", &self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long));
 
             net_elements.push(Element::from(
                 column!(
