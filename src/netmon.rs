@@ -136,11 +136,11 @@ impl NetMon {
         }
 
         if value < 10.0 {
-            format!("{:.2}{}", value, units[unit_index])
+            format!("{:.2} {}", value, units[unit_index])
         } else if value < 99.0 {
-            format!("{:.1}{}", value, units[unit_index])
+            format!("{:.1} {}", value, units[unit_index])
         } else {
-            format!("{:.0}{}", value, units[unit_index])
+            format!("{:.0} {}", value, units[unit_index])
         }
     }
 

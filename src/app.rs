@@ -209,7 +209,7 @@ impl cosmic::Application for Minimon {
             format!("{:.1}%", self.svgstat_cpu.latest_sample())
         };
 
-        let formated_mem = format!("{:.1}GB", self.svgstat_mem.latest_sample());
+        let formated_mem = format!("{:.1} GB", self.svgstat_mem.latest_sample());
 
         // vertical layout
         let mut elements: Vec<Element<Message>> = Vec::new();
