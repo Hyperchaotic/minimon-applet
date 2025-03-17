@@ -27,7 +27,7 @@ use cosmic::{
 
 use crate::colorpicker::{ColorPicker, DemoSvg};
 use crate::config::{SvgColorVariant, SvgColors, SvgDevKind, SvgGraphKind};
-use crate::netmon::NetMon;
+use crate::netmon::{NetMon, UnitVariant};
 use crate::svgstat::SvgStat;
 use crate::{config::MinimonConfig, fl};
 use cosmic::widget::Id as WId;
@@ -243,10 +243,32 @@ impl cosmic::Application for Minimon {
         }
 
         // Network
-
         if self.config.enable_net_label {
-            elements.push(self.core.applet.text(self.netmon.dl_to_string()).into());
-            elements.push(self.core.applet.text(self.netmon.ul_to_string()).into());
+            let ticks_per_sec = (1000 / self.tick.clone().load(atomic::Ordering::Relaxed)) as usize;
+            if horizontal {
+                // DL
+                let mut dlstr = String::with_capacity(10);
+                dlstr.push('↓');
+                dlstr.push_str(&self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long));
+                elements.push(self.core.applet.text(dlstr).into());
+                // UL
+                let mut ulstr = String::with_capacity(10);
+                ulstr.push('↑');
+                ulstr.push_str(&self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long));
+                elements.push(self.core.applet.text(ulstr).into());
+            } else {
+                elements.push(self.core.applet.text(self.netmon
+                    .get_bitrate_dl(ticks_per_sec, UnitVariant::Short)).into());
+                elements.push(
+                    self.core
+                        .applet
+                        .text(
+                            self.netmon
+                                .get_bitrate_ul(ticks_per_sec, UnitVariant::Short),
+                        )
+                        .into(),
+                );
+            }
         }
 
         if self.config.enable_net_chart {
@@ -410,8 +432,12 @@ impl cosmic::Application for Minimon {
             let mut net_elements = Vec::new();
 
             let ticks_per_sec = (1000 / self.tick.clone().load(atomic::Ordering::Relaxed)) as usize;
-            let dlrate = self.netmon.get_bitrate_dl(ticks_per_sec);
-            let ulrate = self.netmon.get_bitrate_ul(ticks_per_sec);
+
+
+            let mut dlrate = '↓'.to_string();
+            dlrate.push_str(&self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long));
+            let mut ulrate = '↑'.to_string();
+            ulrate.push_str(&self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long));
 
             net_elements.push(Element::from(
                 column!(
