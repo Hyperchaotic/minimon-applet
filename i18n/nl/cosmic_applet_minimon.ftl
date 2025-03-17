@@ -10,5 +10,5 @@ enable-memory-label = Label geheugengebruik tonen
 use-adaptive = Schaal past zich aan de inhoud aan
 net-bandwidth = Netwerksnelheid
 refresh-rate = Vernieuwingsfrequentie (secondes)
-network-colors = Kleur van het netwerk
-change-colors = Netwerkkleur wijzigen
+network-colors = As kleuren netwerkgrafiek
+change-colors = As kleuren wijzigen
