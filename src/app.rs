@@ -265,6 +265,7 @@ impl cosmic::Application for Minimon {
                         .get_bitrate_dl(ticks_per_sec, UnitVariant::Short),
                 ),
             };
+            network_labels.push(widget::vertical_space().into());
             network_labels.push(dl_label.into());
             // UL
             let ul_label = match horizontal {
@@ -278,6 +279,7 @@ impl cosmic::Application for Minimon {
                 ),
             };
             network_labels.push(ul_label.into());
+            network_labels.push(widget::vertical_space().into());
 
             elements.push(Column::from_vec(network_labels).into());
         }
