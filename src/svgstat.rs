@@ -1,33 +1,33 @@
 use sysinfo::System;
 
 use crate::{
-    colorpicker::DemoSvg,
-    config::{SvgColorVariant, SvgColors, SvgDevKind, SvgGraphKind},
+    colorpicker::DemoGraph,
+    config::{ColorVariant, DeviceKind, GraphColors, GraphKind},
 };
 use std::{collections::VecDeque, fmt::Write};
 
 const MAX_SAMPLES: usize = 21;
 
-const COLOR_CHOICES_RING: [(&str, SvgColorVariant); 4] = [
-    ("Ring1.  ", SvgColorVariant::Color4),
-    ("Ring2.  ", SvgColorVariant::Color3),
-    ("Back.  ", SvgColorVariant::Color1),
-    ("Text.", SvgColorVariant::Color2),
+const COLOR_CHOICES_RING: [(&str, ColorVariant); 4] = [
+    ("Ring1.  ", ColorVariant::Color4),
+    ("Ring2.  ", ColorVariant::Color3),
+    ("Back.  ", ColorVariant::Color1),
+    ("Text.", ColorVariant::Color2),
 ];
 
-const COLOR_CHOICES_LINE: [(&str, SvgColorVariant); 3] = [
-    ("Graph.  ", SvgColorVariant::Color4),
-    ("Back.  ", SvgColorVariant::Color1),
-    ("Frame.  ", SvgColorVariant::Color2),
+const COLOR_CHOICES_LINE: [(&str, ColorVariant); 3] = [
+    ("Graph.  ", ColorVariant::Color4),
+    ("Back.  ", ColorVariant::Color1),
+    ("Frame.  ", ColorVariant::Color2),
 ];
 
 #[derive(Debug)]
 pub struct SvgStat {
     samples: VecDeque<f64>,
     max_val: u64,
-    colors: SvgColors,
+    colors: GraphColors,
     system: System,
-    kind: SvgDevKind,
+    kind: DeviceKind,
 
     /// current value cpu/ram load shown.
     value: String,
@@ -41,27 +41,27 @@ pub struct SvgStat {
     color4_hex: String,
 }
 
-impl DemoSvg for SvgStat {
-    fn svg_demo(&self) -> String {
+impl DemoGraph for SvgStat {
+    fn demo(&self) -> String {
         match self.kind {
-            SvgDevKind::Cpu(SvgGraphKind::Ring) | SvgDevKind::Memory(SvgGraphKind::Ring) => {
+            DeviceKind::Cpu(GraphKind::Ring) | DeviceKind::Memory(GraphKind::Ring) => {
                 // show a number of 40% of max
                 let val = self.max_val as f64 * 0.4;
                 let percentage: u64 = ((val / self.max_val as f64) * 100.0) as u64;
                 self.svg_compose_ring(&format!("{val}"), &format!("{percentage}"))
             }
-            SvgDevKind::Cpu(SvgGraphKind::Line) | SvgDevKind::Memory(SvgGraphKind::Line) => {
+            DeviceKind::Cpu(GraphKind::Line) | DeviceKind::Memory(GraphKind::Line) => {
                 self.svg_compose_line(&VecDeque::from(DEMO_SAMPLES), self.max_val)
             }
             _ => panic!("ERROR: Wrong kind {:?}", self.kind),
         }
     }
 
-    fn svg_colors(&self) -> SvgColors {
+    fn colors(&self) -> GraphColors {
         self.colors
     }
 
-    fn svg_set_colors(&mut self, colors: SvgColors) {
+    fn set_colors(&mut self, colors: GraphColors) {
         self.colors = colors;
         self.color1_hex = colors.color1_as_string();
         self.color2_hex = colors.color2_as_string();
@@ -69,9 +69,9 @@ impl DemoSvg for SvgStat {
         self.color4_hex = colors.color4_as_string();
     }
 
-    fn svg_color_choices(&self) -> Vec<(&'static str, SvgColorVariant)> {
-        if self.kind == SvgDevKind::Cpu(SvgGraphKind::Line)
-            || self.kind == SvgDevKind::Memory(SvgGraphKind::Line)
+    fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
+        if self.kind == DeviceKind::Cpu(GraphKind::Line)
+            || self.kind == DeviceKind::Memory(GraphKind::Line)
         {
             COLOR_CHOICES_LINE.into()
         } else {
@@ -81,13 +81,13 @@ impl DemoSvg for SvgStat {
 }
 
 impl SvgStat {
-    pub fn new(kind: SvgDevKind) -> Self {
+    pub fn new(kind: DeviceKind) -> Self {
         let mut system = System::new();
         system.refresh_memory();
         system.refresh_cpu_all();
 
         let max_val = match kind {
-            SvgDevKind::Cpu(_) => 100,
+            DeviceKind::Cpu(_) => 100,
             _ => system.total_memory() / 1_073_741_824,
         };
 
@@ -102,7 +102,7 @@ impl SvgStat {
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
 
             max_val,
-            colors: SvgColors::default(),
+            colors: GraphColors::default(),
             system,
             kind,
             value,
@@ -112,7 +112,7 @@ impl SvgStat {
             color3_hex: String::new(),
             color4_hex: String::new(),
         };
-        svg.svg_set_colors(SvgColors::default());
+        svg.set_colors(GraphColors::default());
         svg
     }
 
@@ -120,13 +120,13 @@ impl SvgStat {
         *self.samples.back().unwrap_or(&0f64)
     }
 
-    pub fn kind(&self) -> SvgDevKind {
+    pub fn kind(&self) -> DeviceKind {
         self.kind
     }
 
-    pub fn set_kind(&mut self, kind: SvgDevKind) {
+    pub fn set_kind(&mut self, kind: DeviceKind) {
         match kind {
-            SvgDevKind::Cpu(_) | SvgDevKind::Memory(_) => {
+            DeviceKind::Cpu(_) | DeviceKind::Memory(_) => {
                 self.kind = kind;
             }
             _ => {
@@ -170,7 +170,7 @@ impl SvgStat {
 
     pub fn update(&mut self) {
         let new_val: f64 = match self.kind {
-            SvgDevKind::Cpu(_) => {
+            DeviceKind::Cpu(_) => {
                 self.system.refresh_cpu_usage();
                 self.system
                     .cpus()
@@ -179,11 +179,11 @@ impl SvgStat {
                     .sum::<f64>()
                     / self.system.cpus().len() as f64
             }
-            SvgDevKind::Memory(_) => {
+            DeviceKind::Memory(_) => {
                 self.system.refresh_memory();
                 self.system.used_memory() as f64 / 1_073_741_824.0
             }
-            SvgDevKind::Network(_) => panic!("ERROR: Wrong kind {:?}", self.kind),
+            DeviceKind::Network(_) => panic!("ERROR: Wrong kind {:?}", self.kind),
         };
 
         if self.samples.len() >= MAX_SAMPLES {
@@ -191,8 +191,8 @@ impl SvgStat {
         }
         self.samples.push_back(new_val);
 
-        if self.kind == SvgDevKind::Cpu(SvgGraphKind::Ring)
-            || self.kind == SvgDevKind::Memory(SvgGraphKind::Ring)
+        if self.kind == DeviceKind::Cpu(GraphKind::Ring)
+            || self.kind == DeviceKind::Memory(GraphKind::Ring)
         {
             self.format_variable();
         }
@@ -216,22 +216,21 @@ impl SvgStat {
 
         svg
     }
-    
-    fn svg_compose_line(&self, samples: &VecDeque<f64>, max_y: u64) -> String {
 
+    fn svg_compose_line(&self, samples: &VecDeque<f64>, max_y: u64) -> String {
         // Generate list of coordinates for line
         let scaling: f32 = 40.0 / max_y as f32;
         let indexed_string: String = samples
-        .iter()
-        .enumerate()
-        .map(|(index, &value)| {
-            let x = ((index * 2) + 1) as u32;
-            let y = (41.0 - (scaling * value as f32)).round() as u32;
-            format!("{},{}", x, y)  
-        })
-        .collect::<Vec<String>>()
-        .join(" ");
-    
+            .iter()
+            .enumerate()
+            .map(|(index, &value)| {
+                let x = ((index * 2) + 1) as u32;
+                let y = (41.0 - (scaling * value as f32)).round() as u32;
+                format!("{},{}", x, y)
+            })
+            .collect::<Vec<String>>()
+            .join(" ");
+
         let mut svg = String::with_capacity(LINE_LEN);
         svg.push_str(LINESVG_1);
         svg.push_str(&self.color1_hex);
@@ -250,12 +249,11 @@ impl SvgStat {
         svg.push_str(LINESVG_9);
 
         svg
-
     }
 
     pub fn svg(&self) -> String {
-        if self.kind == SvgDevKind::Cpu(SvgGraphKind::Ring)
-            || self.kind == SvgDevKind::Memory(SvgGraphKind::Ring)
+        if self.kind == DeviceKind::Cpu(GraphKind::Ring)
+            || self.kind == DeviceKind::Memory(GraphKind::Ring)
         {
             self.svg_compose_ring(&self.value, &self.percentage)
         } else {
@@ -288,14 +286,15 @@ const DEMO_SAMPLES: [f64; 21] = [
     13.892818450927734,
 ];
 
-const LINESVG_1: &str = "<svg width=\"42\" height=\"42\" viewBox=\"0 0 42 42\" xmlns=\"http://www.w3.org/2000/svg\">\n\
-<rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" opacity=\"1\" fill=\"";// background color
+const LINESVG_1: &str =
+    "<svg width=\"42\" height=\"42\" viewBox=\"0 0 42 42\" xmlns=\"http://www.w3.org/2000/svg\">\n\
+<rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" opacity=\"1\" fill=\""; // background color
 
 const LINESVG_2: &str = "\" stroke=\""; // frame color
 const LINESVG_3: &str = "\"/>\n";
 
 // polyline part
-const LINESVG_4: &str = "<polyline fill=\"none\" opacity=\"1\" stroke=\""; // line color 
+const LINESVG_4: &str = "<polyline fill=\"none\" opacity=\"1\" stroke=\""; // line color
 const LINESVG_5: &str = "\" stroke-width=\"1\" points=\"";
 
 // Polygon part
@@ -307,7 +306,6 @@ const LINESVG_8: &str = "  41,41 1,41\"/>";
 const LINESVG_9: &str = "</svg>";
 
 const LINE_LEN: usize = 640; // Just for preallocation
-
 
 const RINGSVG_1: &str = "
 <svg viewBox=\"0 0 34 34\" xmlns=\"http://www.w3.org/2000/svg\">
@@ -347,4 +345,4 @@ const RINGSVG_5: &str = ";
   <text x=\"17\" y=\"22.35\" class=\"percentage\">";
 
 const RINGSVG_6: &str = "</text></svg>";
-const SVG_LEN: usize = 680;  // For preallocation
+const SVG_LEN: usize = 680; // For preallocation

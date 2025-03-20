@@ -3,8 +3,8 @@ use std::collections::VecDeque;
 use sysinfo::Networks;
 
 use crate::{
-    colorpicker::DemoSvg,
-    config::{SvgColorVariant, SvgColors, SvgDevKind, SvgGraphKind},
+    colorpicker::DemoGraph,
+    config::{ColorVariant, DeviceKind, GraphColors, GraphKind},
 };
 
 const MAX_SAMPLES: usize = 30;
@@ -12,11 +12,11 @@ const GRAPH_SAMPLES: usize = 21;
 const UNITS_SHORT: [&str; 5] = ["b", "K", "M", "G", "T"];
 const UNITS_LONG: [&str; 5] = ["bps", "Kbps", "Mbps", "Gbps", "Tbps"];
 
-const COLOR_CHOICES: [(&str, SvgColorVariant); 4] = [
-    ("Down.  ", SvgColorVariant::Color2),
-    ("Up.  ", SvgColorVariant::Color3),
-    ("Back.  ", SvgColorVariant::Color1),
-    ("Frame.", SvgColorVariant::Color4),
+const COLOR_CHOICES: [(&str, ColorVariant); 4] = [
+    ("Down.  ", ColorVariant::Color2),
+    ("Up.  ", ColorVariant::Color3),
+    ("Back.  ", ColorVariant::Color1),
+    ("Frame.", ColorVariant::Color4),
 ];
 
 #[derive(Debug, PartialEq, Eq)]
@@ -31,8 +31,8 @@ pub struct NetMon {
     download: VecDeque<u64>,
     upload: VecDeque<u64>,
     max_y: Option<u64>,
-    colors: SvgColors,
-    kind: SvgDevKind,
+    colors: GraphColors,
+    kind: DeviceKind,
 
     /// colors cached so we don't need to convert to string every time
     color1_hex: String,
@@ -41,18 +41,18 @@ pub struct NetMon {
     color4_hex: String,
 }
 
-impl DemoSvg for NetMon {
-    fn svg_demo(&self) -> String {
+impl DemoGraph for NetMon {
+    fn demo(&self) -> String {
         let download = VecDeque::from(DL_DEMO);
         let upload = VecDeque::from(UL_DEMO);
         self.svg_compose_double_line(&download, &upload, None)
     }
 
-    fn svg_colors(&self) -> SvgColors {
+    fn colors(&self) -> GraphColors {
         self.colors
     }
 
-    fn svg_set_colors(&mut self, colors: SvgColors) {
+    fn set_colors(&mut self, colors: GraphColors) {
         self.colors = colors;
         self.color1_hex = colors.color1_as_string();
         self.color2_hex = colors.color2_as_string();
@@ -60,7 +60,7 @@ impl DemoSvg for NetMon {
         self.color4_hex = colors.color4_as_string();
     }
 
-    fn svg_color_choices(&self) -> Vec<(&'static str, SvgColorVariant)> {
+    fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
         COLOR_CHOICES.into()
     }
 }
@@ -74,8 +74,8 @@ impl NetMon {
             download: VecDeque::from(vec![0; MAX_SAMPLES]),
             upload: VecDeque::from(vec![0; MAX_SAMPLES]),
             max_y: None,
-            colors: SvgColors::new(SvgDevKind::Network(SvgGraphKind::Line)),
-            kind: SvgDevKind::Network(SvgGraphKind::Line),
+            colors: GraphColors::new(DeviceKind::Network(GraphKind::Line)),
+            kind: DeviceKind::Network(GraphKind::Line),
             color1_hex: String::new(),
             color2_hex: String::new(),
             color3_hex: String::new(),
@@ -87,13 +87,13 @@ impl NetMon {
         self.max_y = max;
     }
 
-    pub fn kind(&self) -> SvgDevKind {
+    pub fn kind(&self) -> DeviceKind {
         self.kind
     }
 
-    pub fn set_kind(&mut self, kind: SvgDevKind) {
+    pub fn set_kind(&mut self, kind: DeviceKind) {
         match kind {
-            SvgDevKind::Network(SvgGraphKind::Line) => (),
+            DeviceKind::Network(GraphKind::Line) => (),
             _ => panic!("ERROR: Wrong kind {:?}", kind),
         }
     }
