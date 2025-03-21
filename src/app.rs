@@ -106,6 +106,7 @@ pub enum Message {
     ConfigChanged(MinimonConfig),
     LaunchSystemMonitor(),
     RefreshRateChanged(f64),
+    LabelSizeChanged(u16),
 }
 
 const APP_ID_DOCK: &str = "com.github.hyperchaotic.cosmic-applet-minimon-dock";
@@ -222,7 +223,7 @@ impl cosmic::Application for Minimon {
         let cosmic = theme.cosmic();
 
         if self.config.enable_cpu_label {
-            elements.push(self.single_label(formated_cpu).into());
+            elements.push(self.figure_label(formated_cpu).into());
         }
 
         if self.config.enable_cpu_chart {
@@ -235,7 +236,7 @@ impl cosmic::Application for Minimon {
         }
 
         if self.config.enable_mem_label {
-            elements.push(self.single_label(formated_mem).into());
+            elements.push(self.figure_label(formated_mem).into());
         }
 
         if self.config.enable_mem_chart {
@@ -256,11 +257,11 @@ impl cosmic::Application for Minimon {
 
             // DL
             let dl_label = match horizontal {
-                true => self.dual_label(format!(
+                true => self.figure_label(format!(
                     "↓ {}",
                     &self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long)
                 )),
-                false => self.dual_label(
+                false => self.figure_label(
                     self.netmon
                         .get_bitrate_dl(ticks_per_sec, UnitVariant::Short),
                 ),
@@ -269,11 +270,11 @@ impl cosmic::Application for Minimon {
             network_labels.push(dl_label.into());
             // UL
             let ul_label = match horizontal {
-                true => self.dual_label(format!(
+                true => self.figure_label(format!(
                     "↑ {}",
                     &self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long)
                 )),
-                false => self.dual_label(
+                false => self.figure_label(
                     self.netmon
                         .get_bitrate_ul(ticks_per_sec, UnitVariant::Short),
                 ),
@@ -535,6 +536,18 @@ impl cosmic::Application for Minimon {
                 .align_y(Alignment::Center)
                 .spacing(0);
 
+            let change_label_setting = settings::item(
+                fl!("change-label-size"),
+                spin_button(
+                    self.config.label_size_default.to_string(),
+                    self.config.label_size_default,
+                    1,
+                    5,
+                    20,
+                    Message::LabelSizeChanged,
+                ),
+            );
+
             let mut content_list = widget::list_column();
             if let Some((_exec, application)) = self.sysmon.as_ref() {
                 content_list = content_list.add(row!(
@@ -553,7 +566,8 @@ impl cosmic::Application for Minimon {
                 .add(settings::item(
                     fl!("refresh-rate"),
                     Element::from(refresh_row),
-                ));
+                ))
+                .add(change_label_setting);
             self.core.applet.popup_container(content_list).into()
         }
     }
@@ -801,6 +815,11 @@ impl cosmic::Application for Minimon {
                 self.set_tick();
                 self.save_config();
             }
+
+            Message::LabelSizeChanged(size) => {
+                self.config.label_size_default = size;
+                self.save_config();
+            }
         }
         Task::none()
     }
@@ -912,39 +931,15 @@ impl Minimon {
         None
     }
 
-    fn single_label<'a>(&self, text: String) -> widget::Text<'a, cosmic::Theme> {
+    fn figure_label<'a>(&self, text: String) -> widget::Text<'a, cosmic::Theme> {
         let size = match self.core.applet.size {
-            Size::PanelSize(PanelSize::XL) => 17,
-            Size::PanelSize(PanelSize::L) => 16,
-            Size::PanelSize(PanelSize::M) => 15,
-            Size::PanelSize(PanelSize::S) => 12,
-            Size::PanelSize(PanelSize::XS) => 11,
-            _ => 12,
+            Size::PanelSize(PanelSize::XL) => self.config.label_size_default + 5,
+            Size::PanelSize(PanelSize::L) => self.config.label_size_default + 3,
+            Size::PanelSize(PanelSize::M) => self.config.label_size_default + 2,
+            Size::PanelSize(PanelSize::S) => self.config.label_size_default + 1,
+            Size::PanelSize(PanelSize::XS) => self.config.label_size_default,
+            _ => self.config.label_size_default,
         };
-        widget::text(text).size(size)
-    }
-
-    fn dual_label<'a>(&self, text: String) -> widget::Text<'a, cosmic::Theme> {
-
-        let horizontal = matches!(
-            self.core.applet.anchor,
-            PanelAnchor::Top | PanelAnchor::Bottom
-        );
-
-        // If the panel is vertical, style use a single-sized label
-        if !horizontal {
-            return self.single_label(text)
-        }
-
-        let size = match self.core.applet.size {
-            Size::PanelSize(PanelSize::XL) => 15,
-            Size::PanelSize(PanelSize::L) => 14,
-            Size::PanelSize(PanelSize::M) => 13,
-            Size::PanelSize(PanelSize::S) => 12,
-            Size::PanelSize(PanelSize::XS) => 11,
-            _ => 12,
-        };
-
         widget::text(text).size(size)
     }
 }

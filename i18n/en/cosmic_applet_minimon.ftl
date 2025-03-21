@@ -12,3 +12,4 @@ net-bandwidth = Network speed
 refresh-rate = Refresh rate (seconds)
 network-colors = Network Colors
 change-colors = Change colors
+change-label-size = Label size
