@@ -12,4 +12,3 @@ net-bandwidth = Nätverkshastighet
 refresh-rate = Uppdateringshastighet (sekunder)
 network-colors = Nätverksfärger
 change-colors = Ändra färger
-change-label-size = Label size
