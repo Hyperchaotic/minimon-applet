@@ -1,4 +1,5 @@
-use cosmic::applet::PanelType;
+use cosmic::applet::cosmic_panel_config::PanelSize;
+use cosmic::applet::{PanelType, Size};
 use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::cosmic_theme::palette::{FromColor, WithAlpha};
 use std::time;
@@ -105,6 +106,7 @@ pub enum Message {
     ConfigChanged(MinimonConfig),
     LaunchSystemMonitor(),
     RefreshRateChanged(f64),
+    LabelSizeChanged(u16),
 }
 
 const APP_ID_DOCK: &str = "com.github.hyperchaotic.cosmic-applet-minimon-dock";
@@ -205,13 +207,14 @@ impl cosmic::Application for Minimon {
                 .into();
         }
 
-        let formated_cpu = if self.svgstat_cpu.latest_sample() < 10.0 {
+        // If we are below 10% and horizontal layout we can show another decimal
+        let formated_cpu = if self.svgstat_cpu.latest_sample() < 10.0 && horizontal {
             format!("{:.2}%", self.svgstat_cpu.latest_sample())
         } else {
             format!("{:.1}%", self.svgstat_cpu.latest_sample())
         };
 
-        let formated_mem = format!("{:.1}GB", self.svgstat_mem.latest_sample());
+        let formated_mem = format!("{:.1} GB", self.svgstat_mem.latest_sample());
 
         // vertical layout
         let mut elements: Vec<Element<Message>> = Vec::new();
@@ -220,7 +223,7 @@ impl cosmic::Application for Minimon {
         let cosmic = theme.cosmic();
 
         if self.config.enable_cpu_label {
-            elements.push(self.core.applet.text(formated_cpu).into());
+            elements.push(self.figure_label(formated_cpu).into());
         }
 
         if self.config.enable_cpu_chart {
@@ -233,7 +236,7 @@ impl cosmic::Application for Minimon {
         }
 
         if self.config.enable_mem_label {
-            elements.push(self.core.applet.text(formated_mem).into());
+            elements.push(self.figure_label(formated_mem).into());
         }
 
         if self.config.enable_mem_chart {
@@ -246,39 +249,40 @@ impl cosmic::Application for Minimon {
         }
 
         // Network
+
         if self.config.enable_net_label {
             let ticks_per_sec = (1000 / self.tick.clone().load(atomic::Ordering::Relaxed)) as usize;
-            if horizontal {
-                // DL
-                let mut dlstr = String::with_capacity(10);
-                dlstr.push('↓');
-                dlstr.push_str(&self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long));
-                elements.push(self.core.applet.text(dlstr).into());
-                // UL
-                let mut ulstr = String::with_capacity(10);
-                ulstr.push('↑');
-                ulstr.push_str(&self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long));
-                elements.push(self.core.applet.text(ulstr).into());
-            } else {
-                elements.push(
-                    self.core
-                        .applet
-                        .text(
-                            self.netmon
-                                .get_bitrate_dl(ticks_per_sec, UnitVariant::Short),
-                        )
-                        .into(),
-                );
-                elements.push(
-                    self.core
-                        .applet
-                        .text(
-                            self.netmon
-                                .get_bitrate_ul(ticks_per_sec, UnitVariant::Short),
-                        )
-                        .into(),
-                );
-            }
+
+            let mut network_labels: Vec<Element<Message>> = Vec::new();
+
+            // DL
+            let dl_label = match horizontal {
+                true => self.figure_label(format!(
+                    "↓ {}",
+                    &self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long)
+                )),
+                false => self.figure_label(
+                    self.netmon
+                        .get_bitrate_dl(ticks_per_sec, UnitVariant::Short),
+                ),
+            };
+            network_labels.push(widget::vertical_space().into());
+            network_labels.push(dl_label.into());
+            // UL
+            let ul_label = match horizontal {
+                true => self.figure_label(format!(
+                    "↑ {}",
+                    &self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long)
+                )),
+                false => self.figure_label(
+                    self.netmon
+                        .get_bitrate_ul(ticks_per_sec, UnitVariant::Short),
+                ),
+            };
+            network_labels.push(ul_label.into());
+            network_labels.push(widget::vertical_space().into());
+
+            elements.push(Column::from_vec(network_labels).into());
         }
 
         if self.config.enable_net_chart {
@@ -443,10 +447,14 @@ impl cosmic::Application for Minimon {
 
             let ticks_per_sec = (1000 / self.tick.clone().load(atomic::Ordering::Relaxed)) as usize;
 
-            let mut dlrate = '↓'.to_string();
-            dlrate.push_str(&self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long));
-            let mut ulrate = '↑'.to_string();
-            ulrate.push_str(&self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long));
+            let dlrate = format!(
+                "↓ {}",
+                &self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long)
+            );
+            let ulrate = format!(
+                "↑ {}",
+                &self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long)
+            );
 
             net_elements.push(Element::from(
                 column!(
@@ -528,6 +536,18 @@ impl cosmic::Application for Minimon {
                 .align_y(Alignment::Center)
                 .spacing(0);
 
+            let change_label_setting = settings::item(
+                fl!("change-label-size"),
+                spin_button(
+                    self.config.label_size_default.to_string(),
+                    self.config.label_size_default,
+                    1,
+                    5,
+                    20,
+                    Message::LabelSizeChanged,
+                ),
+            );
+
             let mut content_list = widget::list_column();
             if let Some((_exec, application)) = self.sysmon.as_ref() {
                 content_list = content_list.add(row!(
@@ -546,7 +566,8 @@ impl cosmic::Application for Minimon {
                 .add(settings::item(
                     fl!("refresh-rate"),
                     Element::from(refresh_row),
-                ));
+                ))
+                .add(change_label_setting);
             self.core.applet.popup_container(content_list).into()
         }
     }
@@ -626,8 +647,7 @@ impl cosmic::Application for Minimon {
                 if let Some(theme) = self.core.applet.theme() {
                     let accent = theme.cosmic().accent_color().color;
                     let srgba = cosmic::cosmic_theme::palette::Srgba::from_color(accent);
-                    self.colorpicker
-                        .set_sliders(srgba.opaque().into());
+                    self.colorpicker.set_sliders(srgba.opaque().into());
                 }
             }
 
@@ -795,6 +815,11 @@ impl cosmic::Application for Minimon {
                 self.set_tick();
                 self.save_config();
             }
+
+            Message::LabelSizeChanged(size) => {
+                self.config.label_size_default = size;
+                self.save_config();
+            }
         }
         Task::none()
     }
@@ -904,5 +929,17 @@ impl Minimon {
             }
         }
         None
+    }
+
+    fn figure_label<'a>(&self, text: String) -> widget::Text<'a, cosmic::Theme> {
+        let size = match self.core.applet.size {
+            Size::PanelSize(PanelSize::XL) => self.config.label_size_default + 5,
+            Size::PanelSize(PanelSize::L) => self.config.label_size_default + 3,
+            Size::PanelSize(PanelSize::M) => self.config.label_size_default + 2,
+            Size::PanelSize(PanelSize::S) => self.config.label_size_default + 1,
+            Size::PanelSize(PanelSize::XS) => self.config.label_size_default,
+            _ => self.config.label_size_default,
+        };
+        widget::text(text).size(size)
     }
 }

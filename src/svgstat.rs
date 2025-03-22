@@ -139,7 +139,7 @@ impl SvgStat {
         let current_val = self.latest_sample();
         let unit = match self.kind {
             DeviceKind::Cpu(_) => "%",
-            DeviceKind::Memory(_) => "GB",
+            DeviceKind::Memory(_) => " GB",
             _ => panic!("ERROR: Wrong kind {:?}", self.kind),
         };
 

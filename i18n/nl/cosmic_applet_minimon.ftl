@@ -12,3 +12,4 @@ net-bandwidth = Netwerksnelheid
 refresh-rate = Vernieuwingsfrequentie (secondes)
 network-colors = As kleuren netwerkgrafiek
 change-colors = As kleuren wijzigen
+change-label-size = Label size

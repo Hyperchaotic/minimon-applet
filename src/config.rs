@@ -149,6 +149,8 @@ pub struct MinimonConfig {
     pub cpu_colors: GraphColors,
     pub mem_colors: GraphColors,
     pub net_colors: GraphColors,
+    /// The minimum size of labels
+    pub label_size_default: u16,
 }
 
 impl Default for MinimonConfig {
@@ -169,6 +171,7 @@ impl Default for MinimonConfig {
             cpu_colors: GraphColors::new(DeviceKind::Cpu(GraphKind::Ring)),
             mem_colors: GraphColors::new(DeviceKind::Memory(GraphKind::Line)),
             net_colors: GraphColors::new(DeviceKind::Network(GraphKind::Line)),
+            label_size_default: 11,
         }
     }
 }
