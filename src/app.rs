@@ -320,9 +320,15 @@ impl cosmic::Application for Minimon {
 
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
         if self.colorpicker.active() {
+            let limits = Limits::NONE
+            .max_width(400.0)
+            .min_width(400.0)
+            .min_height(200.0)
+            .max_height(750.0);
+
             self.core
                 .applet
-                .popup_container(self.colorpicker.view_colorpicker())
+                .popup_container(self.colorpicker.view_colorpicker()).limits(limits)
                 .into()
         } else {
             let theme = cosmic::theme::active();
@@ -336,7 +342,7 @@ impl cosmic::Application for Minimon {
                     widget::svg(widget::svg::Handle::from_memory(
                         self.svgstat_cpu.svg().as_bytes().to_owned(),
                     ))
-                    .width(80)
+                    .width(90)
                     .height(60),
                     cosmic::widget::text::body(cpu),
                 )
@@ -349,6 +355,7 @@ impl cosmic::Application for Minimon {
                 _ => None,
             };
 
+            let cpu_kind = self.svgstat_cpu.kind();
             cpu_elements.push(Element::from(
                 column!(
                     widget::text::title4(fl!("cpu-title")),
@@ -363,13 +370,13 @@ impl cosmic::Application for Minimon {
                             .on_toggle(|value| { Message::ToggleCpuLabel(value) }),
                     ),
                     row!(
-                        widget::dropdown(&self.graph_options, selected, |m| {
-                            Message::SelectGraphType(self.svgstat_cpu.kind(), m)
+                        widget::dropdown(&self.graph_options, selected, move |m| {
+                            Message::SelectGraphType(cpu_kind, m)
                         },)
                         .width(70),
                         widget::horizontal_space(),
                         widget::button::standard(fl!("change-colors"))
-                            .on_press(Message::ColorPickerOpen(self.svgstat_cpu.kind())),
+                            .on_press(Message::ColorPickerOpen(cpu_kind)),
                     )
                 )
                 .spacing(cosmic.space_xs()),
@@ -386,7 +393,7 @@ impl cosmic::Application for Minimon {
                     widget::svg(widget::svg::Handle::from_memory(
                         self.svgstat_mem.svg().as_bytes().to_owned(),
                     ))
-                    .width(80)
+                    .width(90)
                     .height(60),
                     cosmic::widget::text::body(mem),
                 )
@@ -399,6 +406,7 @@ impl cosmic::Application for Minimon {
                 _ => None,
             };
 
+            let mem_kind = self.svgstat_mem.kind();
             mem_elements.push(Element::from(
                 column!(
                     widget::text::title4(fl!("memory-title")),
@@ -413,13 +421,13 @@ impl cosmic::Application for Minimon {
                             .on_toggle(|value| { Message::ToggleMemoryLabel(value) }),
                     ),
                     row!(
-                        widget::dropdown(&self.graph_options, selected, |m| {
-                            Message::SelectGraphType(self.svgstat_mem.kind(), m)
+                        widget::dropdown(&self.graph_options, selected, move |m| {
+                            Message::SelectGraphType(mem_kind, m)
                         },)
                         .width(70),
                         widget::horizontal_space(),
                         widget::button::standard(fl!("change-colors"))
-                            .on_press(Message::ColorPickerOpen(self.svgstat_mem.kind())),
+                            .on_press(Message::ColorPickerOpen(mem_kind)),
                     )
                 )
                 .spacing(cosmic.space_xs()),
@@ -461,7 +469,7 @@ impl cosmic::Application for Minimon {
                     widget::svg(widget::svg::Handle::from_memory(
                         self.netmon.svg().as_bytes().to_owned(),
                     ))
-                    .width(80)
+                    .width(90)
                     .height(60),
                     cosmic::widget::text::body(""),
                     cosmic::widget::text::body(dlrate),
@@ -568,7 +576,14 @@ impl cosmic::Application for Minimon {
                     Element::from(refresh_row),
                 ))
                 .add(change_label_setting);
-            self.core.applet.popup_container(content_list).into()
+
+                let limits = Limits::NONE
+                .max_width(420.0)
+                .min_width(360.0)
+                .min_height(200.0)
+                .max_height(750.0);
+
+                self.core.applet.popup_container(content_list).limits(limits).into()
         }
     }
 
@@ -591,11 +606,12 @@ impl cosmic::Application for Minimon {
                         None,
                         None,
                     );
-                    popup_settings.positioner.size_limits = Limits::NONE
-                        .max_width(400.0)
-                        .min_width(200.0)
+                    popup_settings.positioner.size_limits = Limits::NONE; /* 
+                        .max_width(500.0)
+                        .min_width(400.0)
                         .min_height(200.0)
                         .max_height(720.0);
+*/
                     get_popup(popup_settings)
                 };
             }

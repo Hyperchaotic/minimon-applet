@@ -433,6 +433,7 @@ impl ColorPicker {
                 .spacing(5)
                 .width(Length::Fill),
             );
+            
         c.into()
     }
 }
