@@ -3,6 +3,7 @@ use sysinfo::System;
 use crate::{
     colorpicker::DemoGraph,
     config::{ColorVariant, DeviceKind, GraphColors, GraphKind},
+    svg_graph::SvgColors,
 };
 use std::{collections::VecDeque, fmt::Write};
 
@@ -35,10 +36,7 @@ pub struct SvgStat {
     percentage: String,
 
     /// colors cached so we don't need to convert to string every time
-    color1_hex: String,
-    color2_hex: String,
-    color3_hex: String,
-    color4_hex: String,
+    svg_colors: SvgColors,
 }
 
 impl DemoGraph for SvgStat {
@@ -48,10 +46,18 @@ impl DemoGraph for SvgStat {
                 // show a number of 40% of max
                 let val = self.max_val as f64 * 0.4;
                 let percentage: u64 = ((val / self.max_val as f64) * 100.0) as u64;
-                self.svg_compose_ring(&format!("{val}"), &format!("{percentage}"))
+                crate::svg_graph::ring(
+                    &format!("{val}"),
+                    &format!("{percentage}"),
+                    &self.svg_colors,
+                )
             }
             DeviceKind::Cpu(GraphKind::Line) | DeviceKind::Memory(GraphKind::Line) => {
-                self.svg_compose_line(&VecDeque::from(DEMO_SAMPLES), self.max_val)
+                crate::svg_graph::line(
+                    &VecDeque::from(DEMO_SAMPLES),
+                    self.max_val,
+                    &self.svg_colors,
+                )
             }
             _ => panic!("ERROR: Wrong kind {:?}", self.kind),
         }
@@ -63,10 +69,7 @@ impl DemoGraph for SvgStat {
 
     fn set_colors(&mut self, colors: GraphColors) {
         self.colors = colors;
-        self.color1_hex = colors.color1_as_string();
-        self.color2_hex = colors.color2_as_string();
-        self.color3_hex = colors.color3_as_string();
-        self.color4_hex = colors.color4_as_string();
+        self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
@@ -100,17 +103,13 @@ impl SvgStat {
 
         let mut svg = SvgStat {
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
-
             max_val,
             colors: GraphColors::default(),
             system,
             kind,
             value,
             percentage,
-            color1_hex: String::new(),
-            color2_hex: String::new(),
-            color3_hex: String::new(),
-            color4_hex: String::new(),
+            svg_colors: SvgColors::new(&GraphColors::default()),
         };
         svg.set_colors(GraphColors::default());
         svg
@@ -198,66 +197,13 @@ impl SvgStat {
         }
     }
 
-    fn svg_compose_ring(&self, value: &str, percentage: &str) -> String {
-        let mut svg = String::with_capacity(SVG_LEN);
-        svg.push_str(RINGSVG_1);
-        svg.push_str(&self.color1_hex);
-        svg.push_str(RINGSVG_1_1);
-        svg.push_str(&self.color3_hex);
-        svg.push_str(RINGSVG_2);
-        svg.push_str(&self.color4_hex);
-        svg.push_str(RINGSVG_3);
-        svg.push_str(percentage);
-        svg.push_str(RINGSVG_4);
-        svg.push_str(&self.color2_hex);
-        svg.push_str(RINGSVG_5);
-        svg.push_str(value);
-        svg.push_str(RINGSVG_6);
-
-        svg
-    }
-
-    fn svg_compose_line(&self, samples: &VecDeque<f64>, max_y: u64) -> String {
-        // Generate list of coordinates for line
-        let scaling: f32 = 40.0 / max_y as f32;
-        let indexed_string: String = samples
-            .iter()
-            .enumerate()
-            .map(|(index, &value)| {
-                let x = ((index * 2) + 1) as u32;
-                let y = (41.0 - (scaling * value as f32)).round() as u32;
-                format!("{},{}", x, y)
-            })
-            .collect::<Vec<String>>()
-            .join(" ");
-
-        let mut svg = String::with_capacity(LINE_LEN);
-        svg.push_str(LINESVG_1);
-        svg.push_str(&self.color1_hex);
-        svg.push_str(LINESVG_2);
-        svg.push_str(&self.color2_hex);
-        svg.push_str(LINESVG_3);
-        svg.push_str(LINESVG_4);
-        svg.push_str(&self.color4_hex);
-        svg.push_str(LINESVG_5);
-        svg.push_str(&indexed_string);
-        svg.push_str(LINESVG_6);
-        svg.push_str(&self.color4_hex);
-        svg.push_str(LINESVG_7);
-        svg.push_str(&indexed_string);
-        svg.push_str(LINESVG_8);
-        svg.push_str(LINESVG_9);
-
-        svg
-    }
-
     pub fn svg(&self) -> String {
         if self.kind == DeviceKind::Cpu(GraphKind::Ring)
             || self.kind == DeviceKind::Memory(GraphKind::Ring)
         {
-            self.svg_compose_ring(&self.value, &self.percentage)
+            crate::svg_graph::ring(&self.value, &self.percentage, &self.svg_colors)
         } else {
-            self.svg_compose_line(&self.samples, self.max_val)
+            crate::svg_graph::line(&self.samples, self.max_val, &self.svg_colors)
         }
     }
 }
@@ -285,64 +231,3 @@ const DEMO_SAMPLES: [f64; 21] = [
     14.496528625488281,
     13.892818450927734,
 ];
-
-const LINESVG_1: &str =
-    "<svg width=\"42\" height=\"42\" viewBox=\"0 0 42 42\" xmlns=\"http://www.w3.org/2000/svg\">\n\
-<rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" opacity=\"1\" fill=\""; // background color
-
-const LINESVG_2: &str = "\" stroke=\""; // frame color
-const LINESVG_3: &str = "\"/>\n";
-
-// polyline part
-const LINESVG_4: &str = "<polyline fill=\"none\" opacity=\"1\" stroke=\""; // line color
-const LINESVG_5: &str = "\" stroke-width=\"1\" points=\"";
-
-// Polygon part
-const LINESVG_6: &str = "\"/>\n<polygon opacity=\"0.3\" fill=\""; // polygon color
-const LINESVG_7: &str = "\" points=\""; // polygonpoints
-const LINESVG_8: &str = "  41,41 1,41\"/>";
-
-// End
-const LINESVG_9: &str = "</svg>";
-
-const LINE_LEN: usize = 640; // Just for preallocation
-
-const RINGSVG_1: &str = "
-<svg viewBox=\"0 0 34 34\" xmlns=\"http://www.w3.org/2000/svg\">
- <path
-    d=\"M17 1.0845
-      a 15.9155 15.9155 0 0 1 0 31.831
-      a 15.9155 15.9155 0 0 1 0 -31.831\"
-      fill=\"";
-
-const RINGSVG_1_1: &str = "\" stroke=\"";
-
-const RINGSVG_2: &str = "\"\nstroke-width=\"2\"
-  />
-  <path
-    d=\"M17 32.831
-      a 15.9155 15.9155 0 0 1 0 -31.831
-      a 15.9155 15.9155 0 0 1 0 31.831\"
-    fill=\"none\"
-    stroke=\"";
-
-const RINGSVG_3: &str = "\"
-    stroke-width=\"2\"
-    stroke-dasharray=\"";
-
-const RINGSVG_4: &str = ", 100\"
-  />
-  <style>
-.percentage {
- fill: ";
-
-const RINGSVG_5: &str = ";
-  font-family: \"Noto Sans\", sans-serif;
-  font-size: 1.2em;
-  text-anchor: middle;
-}
-</style>
-  <text x=\"17\" y=\"22.35\" class=\"percentage\">";
-
-const RINGSVG_6: &str = "</text></svg>";
-const SVG_LEN: usize = 680; // For preallocation

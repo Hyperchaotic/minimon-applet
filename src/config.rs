@@ -90,28 +90,7 @@ impl GraphColors {
             },
         }
     }
-
-    pub fn color1_as_string(&self) -> String {
-        GraphColors::to_string(self.color1)
-    }
-
-    pub fn color2_as_string(&self) -> String {
-        GraphColors::to_string(self.color2)
-    }
-
-    pub fn color3_as_string(&self) -> String {
-        GraphColors::to_string(self.color3)
-    }
-
-    pub fn color4_as_string(&self) -> String {
-        GraphColors::to_string(self.color4)
-    }
-
-    fn to_string(col: Srgba<u8>) -> String {
-       // format!("rgba({},{},{},{})", col.red, col.green, col.blue, col.alpha)
-        format!("#{:02x}{:02x}{:02x}{:02x}", col.red, col.green, col.blue, col.alpha)
-    }
-
+    
     pub fn set_color(&mut self, srgb: Srgba<u8>, variant: ColorVariant) {
         match variant {
             ColorVariant::Color1 => self.color1 = srgb,

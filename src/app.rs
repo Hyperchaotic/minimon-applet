@@ -485,7 +485,7 @@ impl cosmic::Application for Minimon {
                 settings::item(
                     fl!("enable-net-chart"),
                     widget::toggler(self.config.enable_net_chart)
-                        .on_toggle(|value| Message::ToggleNetChart(value)),
+                        .on_toggle(Message::ToggleNetChart),
                 )
                 .into(),
             );
@@ -493,7 +493,7 @@ impl cosmic::Application for Minimon {
                 settings::item(
                     fl!("enable-net-label"),
                     widget::toggler(self.config.enable_net_label)
-                        .on_toggle(|value| Message::ToggleNetLabel(value)),
+                        .on_toggle(Message::ToggleNetLabel),
                 )
                 .into(),
             );
