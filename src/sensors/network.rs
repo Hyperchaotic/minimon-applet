@@ -3,8 +3,10 @@ use std::collections::VecDeque;
 use sysinfo::Networks;
 
 use crate::{
-    app::Sensor, colorpicker::DemoGraph, config::{ColorVariant, DeviceKind, GraphColors, GraphKind}, svg_graph::SvgColors
+    colorpicker::DemoGraph, config::{ColorVariant, DeviceKind, GraphColors, GraphKind}, svg_graph::SvgColors
 };
+
+use super::Sensor;
 
 const MAX_SAMPLES: usize = 30;
 const GRAPH_SAMPLES: usize = 21;
@@ -102,6 +104,12 @@ impl Sensor for Network {
             self.upload.pop_front();
         }
         self.upload.push_back(ul);
+    }
+
+    fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
+        let mut dmo = Network::new(self.kind);
+        dmo.set_colors(colors);
+        Box::new(dmo)
     }
 
     fn graph(&self) -> String {

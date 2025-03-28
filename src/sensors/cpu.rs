@@ -1,12 +1,13 @@
 use sysinfo::System;
 
 use crate::{
-    app::Sensor,
     colorpicker::DemoGraph,
     config::{ColorVariant, GraphColors, GraphKind},
     svg_graph::SvgColors,
 };
 use std::{collections::VecDeque, fmt::Write};
+
+use super::Sensor;
 
 const MAX_SAMPLES: usize = 21;
 
@@ -132,8 +133,26 @@ impl Sensor for Cpu {
         self.samples.push_back(new_val);
 
         if self.kind == GraphKind::Ring {
-            self.format_variable();
-        }
+            self.value.clear();
+            let current_val = self.latest_sample();
+            if current_val < 10.0 {
+                write!(self.value, "{:.2}", current_val).unwrap();
+            } else if current_val < 100.0 {
+                write!(self.value, "{:.1}", current_val).unwrap();
+            } else {
+                write!(self.value, "{}", current_val).unwrap();
+            }
+    
+            let percentage: u64 = ((current_val / self.max_val as f64) * 100.0) as u64;
+            self.percentage.clear();
+            write!(self.percentage, "{percentage}").unwrap();
+            }
+    }
+
+    fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
+        let mut dmo = Cpu::new(self.kind);
+        dmo.set_colors(colors);
+        Box::new(dmo)
     }
 
     fn graph(&self) -> String {
@@ -146,6 +165,7 @@ impl Sensor for Cpu {
 }
 
 impl Cpu {
+
     pub fn latest_sample(&self) -> f64 {
         *self.samples.back().unwrap_or(&0f64)
     }
@@ -161,22 +181,6 @@ impl Cpu {
         } else {
             format!("{}{}", current_val, unit)
         }
-    }
-
-    fn format_variable(&mut self) {
-        self.value.clear();
-        let current_val = self.latest_sample();
-        if current_val < 10.0 {
-            write!(self.value, "{:.2}", current_val).unwrap();
-        } else if current_val < 100.0 {
-            write!(self.value, "{:.1}", current_val).unwrap();
-        } else {
-            write!(self.value, "{}", current_val).unwrap();
-        }
-
-        let percentage: u64 = ((current_val / self.max_val as f64) * 100.0) as u64;
-        self.percentage.clear();
-        write!(self.percentage, "{percentage}").unwrap();
     }
 }
 

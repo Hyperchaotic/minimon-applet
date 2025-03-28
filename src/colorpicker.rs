@@ -280,7 +280,8 @@ impl ColorPicker {
             Color::from_rgb(0.0, 0.0, color.blue as f32 / u8::MAX as f32);
     }
 
-    pub fn set_colors(&mut self, colors: GraphColors) {
+    pub fn default_colors(&mut self) {
+        let colors = GraphColors::new(self.kind());
         let dmo = self.demo_svg.as_mut().expect("ERROR: No demo svg!");
         dmo.set_colors(colors);
         self.set_sliders(colors.get_color(self.color_variant));

@@ -12,7 +12,7 @@ pub enum ColorVariant {
     Color4,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GraphKind {
     Ring,
     Line,
@@ -115,10 +115,10 @@ impl GraphColors {
 pub struct MinimonConfig {
     pub enable_cpu_chart: bool,
     pub enable_cpu_label: bool,
-    pub cpu_type: usize,
+    pub cpu_type: GraphKind,
     pub enable_mem_chart: bool,
     pub enable_mem_label: bool,
-    pub mem_type: usize,
+    pub mem_type: GraphKind,
     pub enable_net_chart: bool,
     pub enable_net_label: bool,
     pub refresh_rate: u64,
@@ -137,10 +137,10 @@ impl Default for MinimonConfig {
         Self {
             enable_cpu_chart: true,
             enable_cpu_label: false,
-            cpu_type: 0,
+            cpu_type: GraphKind::Ring,
             enable_mem_chart: true,
             enable_mem_label: false,
-            mem_type: 0,
+            mem_type: GraphKind::Line,
             enable_net_chart: true,
             enable_net_label: false,
             refresh_rate: 1000,

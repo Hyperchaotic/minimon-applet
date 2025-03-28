@@ -32,6 +32,7 @@ use crate::config::{ColorVariant, DeviceKind, GraphColors, GraphKind};
 use crate::sensors::cpu::Cpu;
 use crate::sensors::memory::Memory;
 use crate::sensors::network::{Network, UnitVariant};
+use crate::sensors::Sensor;
 use crate::{config::MinimonConfig, fl};
 use cosmic::widget::Id as WId;
 
@@ -40,15 +41,6 @@ static AUTOSIZE_MAIN_ID: Lazy<WId> = Lazy::new(|| WId::new("autosize-main"));
 const TICK: i64 = 250;
 
 const ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon";
-
-pub trait Sensor {
-    fn new(kind: GraphKind) -> Self 
-        where Self: Sized;
-    fn kind(&self) -> GraphKind;
-    fn set_kind(&mut self, kind: GraphKind);
-    fn update(&mut self);
-    fn graph(&self) -> String;
-}
 
 pub struct Minimon {
     /// Application state which is managed by the COSMIC runtime.
@@ -609,12 +601,8 @@ impl cosmic::Application for Minimon {
                         None,
                         None,
                     );
-                    popup_settings.positioner.size_limits = Limits::NONE; /* 
-                        .max_width(500.0)
-                        .min_width(400.0)
-                        .min_height(200.0)
-                        .max_height(720.0);
-*/
+                    popup_settings.positioner.size_limits = Limits::NONE; 
+
                     get_popup(popup_settings)
                 };
             }
@@ -626,19 +614,16 @@ impl cosmic::Application for Minimon {
             }
             Message::ColorPickerOpen(kind) => {
                 match kind {
-                    DeviceKind::Cpu(graphkind) => {
+                    DeviceKind::Cpu(_) => {
                         self.colorpicker
-                            .activate(kind, Box::new(Cpu::new(graphkind)));
-                        self.colorpicker.set_colors(self.config.cpu_colors);
+                        .activate(kind, self.cpu.demo_graph(self.config.cpu_colors));
                     }
-                    DeviceKind::Memory(graphkind) => {
+                    DeviceKind::Memory(_) => {
                         self.colorpicker
-                            .activate(kind, Box::new(Memory::new(graphkind)));
-                        self.colorpicker.set_colors(self.config.mem_colors);
+                            .activate(kind, self.memory.demo_graph(self.config.mem_colors));
                     }
                     DeviceKind::Network(_) => {
-                        self.colorpicker.activate(kind, Box::new(Network::new(GraphKind::Line)));
-                        self.colorpicker.set_colors(self.config.net_colors);
+                        self.colorpicker.activate(kind, self.network.demo_graph(self.config.net_colors));
                     }
                 }
                 self.colorpicker.set_variant(ColorVariant::Color1);
@@ -658,8 +643,7 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ColorPickerDefaults => {
-                self.colorpicker
-                    .set_colors(GraphColors::new(self.colorpicker.kind()));
+                self.colorpicker.default_colors();
             }
 
             Message::ColorPickerAccent => {
@@ -717,13 +701,13 @@ impl cosmic::Application for Minimon {
             Message::SelectGraphType(dev) => {
                 match dev {
                     DeviceKind::Cpu(kind) => {
-                        self.cpu.set_kind(kind.into());
-                        self.config.cpu_type = kind.into();
+                        self.cpu.set_kind(kind);
+                        self.config.cpu_type = kind;
                     }
                     DeviceKind::Memory(kind) => {
                         self.memory
-                            .set_kind(kind.into());
-                        self.config.mem_type = kind.into();
+                            .set_kind(kind);
+                        self.config.mem_type = kind;
                     }
                     DeviceKind::Network(kind) => {
                         self.network.set_kind(kind);
@@ -793,9 +777,9 @@ impl cosmic::Application for Minimon {
                 self.config = config;
                 self.tick_timer = self.config.refresh_rate as i64;
                 self.cpu.set_colors(self.config.cpu_colors);
-                self.cpu.set_kind(self.config.cpu_type.into());
+                self.cpu.set_kind(self.config.cpu_type);
                 self.memory.set_colors(self.config.mem_colors);
-                self.memory.set_kind(self.config.mem_type.into());
+                self.memory.set_kind(self.config.mem_type);
                 self.network.set_colors(self.config.net_colors);
                 self.set_network_max_y();
                 self.set_tick();
