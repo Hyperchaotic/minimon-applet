@@ -1,0 +1,199 @@
+use sysinfo::System;
+
+use crate::{
+    app::Sensor,
+    colorpicker::DemoGraph,
+    config::{ColorVariant, GraphColors, GraphKind},
+    svg_graph::SvgColors,
+};
+use std::{collections::VecDeque, fmt::Write};
+
+const MAX_SAMPLES: usize = 21;
+
+const COLOR_CHOICES_RING: [(&str, ColorVariant); 4] = [
+    ("Ring1.  ", ColorVariant::Color4),
+    ("Ring2.  ", ColorVariant::Color3),
+    ("Back.  ", ColorVariant::Color1),
+    ("Text.", ColorVariant::Color2),
+];
+
+const COLOR_CHOICES_LINE: [(&str, ColorVariant); 3] = [
+    ("Graph.  ", ColorVariant::Color4),
+    ("Back.  ", ColorVariant::Color1),
+    ("Frame.  ", ColorVariant::Color2),
+];
+
+#[derive(Debug)]
+pub struct Memory {
+    samples: VecDeque<f64>,
+    max_val: u64,
+    colors: GraphColors,
+    system: System,
+    kind: GraphKind,
+
+    /// current value ram load shown.
+    value: String,
+    /// the percentage of the ring to be filled
+    percentage: String,
+
+    /// colors cached so we don't need to convert to string every time
+    svg_colors: SvgColors,
+}
+
+impl DemoGraph for Memory {
+    fn demo(&self) -> String {
+        match self.kind {
+            GraphKind::Ring => {
+                // show a number of 40% of max
+                let val = self.max_val as f64 * 0.4;
+                let percentage: u64 = ((val / self.max_val as f64) * 100.0) as u64;
+                crate::svg_graph::ring(
+                    &format!("{val}"),
+                    &format!("{percentage}"),
+                    &self.svg_colors,
+                )
+            }
+            GraphKind::Line => crate::svg_graph::line(
+                &VecDeque::from(DEMO_SAMPLES),
+                self.max_val,
+                &self.svg_colors,
+            ),
+        }
+    }
+
+    fn colors(&self) -> GraphColors {
+        self.colors
+    }
+
+    fn set_colors(&mut self, colors: GraphColors) {
+        self.colors = colors;
+        self.svg_colors.set_colors(&colors);
+    }
+
+    fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
+        if self.kind == GraphKind::Line {
+            COLOR_CHOICES_LINE.into()
+        } else {
+            COLOR_CHOICES_RING.into()
+        }
+    }
+}
+
+impl Sensor for Memory {
+    fn new(kind: GraphKind) -> Self {
+        let mut system = System::new();
+        system.refresh_memory();
+
+        let max_val = system.total_memory() / 1_073_741_824;
+
+        // value and percentage are pre-allocated and reused as they're changed often.
+        let mut percentage = String::with_capacity(6);
+        write!(percentage, "0").unwrap();
+
+        let mut value = String::with_capacity(6);
+        write!(value, "0").unwrap();
+
+        let mut memory = Memory {
+            samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
+            max_val,
+            colors: GraphColors::default(),
+            system,
+            kind,
+            value,
+            percentage,
+            svg_colors: SvgColors::new(&GraphColors::default()),
+        };
+        memory.set_colors(GraphColors::default());
+        memory
+    }
+
+    fn kind(&self) -> GraphKind {
+        self.kind
+    }
+
+    fn set_kind(&mut self, kind: GraphKind) {
+        assert!(kind == GraphKind::Line || kind == GraphKind::Ring);
+        self.kind = kind;
+    }
+
+    fn update(&mut self) {
+        self.system.refresh_memory();
+        let new_val: f64 = self.system.used_memory() as f64 / 1_073_741_824.0;
+
+        if self.samples.len() >= MAX_SAMPLES {
+            self.samples.pop_front();
+        }
+        self.samples.push_back(new_val);
+
+        if self.kind == GraphKind::Ring {
+            self.format_variable();
+        }
+    }
+
+    fn graph(&self) -> String {
+        if self.kind == GraphKind::Ring {
+            crate::svg_graph::ring(&self.value, &self.percentage, &self.svg_colors)
+        } else {
+            crate::svg_graph::line(&self.samples, self.max_val, &self.svg_colors)
+        }
+    }
+}
+
+impl Memory {
+    pub fn latest_sample(&self) -> f64 {
+        *self.samples.back().unwrap_or(&0f64)
+    }
+
+    pub fn to_string(&self) -> String {
+        let current_val = self.latest_sample();
+        let unit = " GB";
+
+        if current_val < 10.0 {
+            format!("{:.2}{}", current_val, unit)
+        } else if current_val < 100.0 {
+            format!("{:.1}{}", current_val, unit)
+        } else {
+            format!("{}{}", current_val, unit)
+        }
+    }
+
+    fn format_variable(&mut self) {
+        self.value.clear();
+        let current_val = self.latest_sample();
+        if current_val < 10.0 {
+            write!(self.value, "{:.2}", current_val).unwrap();
+        } else if current_val < 100.0 {
+            write!(self.value, "{:.1}", current_val).unwrap();
+        } else {
+            write!(self.value, "{}", current_val).unwrap();
+        }
+
+        let percentage: u64 = ((current_val / self.max_val as f64) * 100.0) as u64;
+        self.percentage.clear();
+        write!(self.percentage, "{percentage}").unwrap();
+    }
+}
+
+const DEMO_SAMPLES: [f64; 21] = [
+    0.0,
+    12.689857482910156,
+    12.642768859863281,
+    12.615306854248047,
+    12.658184051513672,
+    12.65273666381836,
+    12.626102447509766,
+    12.624862670898438,
+    12.613967895507813,
+    12.619949340820313,
+    19.061111450195313,
+    21.691085815429688,
+    21.810935974121094,
+    21.28915786743164,
+    22.041973114013672,
+    21.764171600341797,
+    21.89263916015625,
+    15.258216857910156,
+    14.770732879638672,
+    14.496528625488281,
+    13.892818450927734,
+];

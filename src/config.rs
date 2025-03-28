@@ -115,10 +115,10 @@ impl GraphColors {
 pub struct MinimonConfig {
     pub enable_cpu_chart: bool,
     pub enable_cpu_label: bool,
-    cpu_type: usize,
+    pub cpu_type: usize,
     pub enable_mem_chart: bool,
     pub enable_mem_label: bool,
-    mem_type: usize,
+    pub mem_type: usize,
     pub enable_net_chart: bool,
     pub enable_net_label: bool,
     pub refresh_rate: u64,
@@ -152,20 +152,5 @@ impl Default for MinimonConfig {
             net_colors: GraphColors::new(DeviceKind::Network(GraphKind::Line)),
             label_size_default: 11,
         }
-    }
-}
-
-impl MinimonConfig {
-    pub fn cpu_kind(&self) -> DeviceKind {
-        DeviceKind::Cpu(self.cpu_type.into())
-    }
-    pub fn set_cpu_kind(&mut self, kind: GraphKind) {
-        self.cpu_type = kind.into();
-    }
-    pub fn memory_kind(&self) -> DeviceKind {
-        DeviceKind::Memory(self.mem_type.into())
-    }
-    pub fn set_memory_kind(&mut self, kind: GraphKind) {
-        self.mem_type = kind.into();
     }
 }

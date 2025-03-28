@@ -3,9 +3,7 @@ use std::collections::VecDeque;
 use sysinfo::Networks;
 
 use crate::{
-    colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, GraphColors, GraphKind},
-    svg_graph::SvgColors,
+    app::Sensor, colorpicker::DemoGraph, config::{ColorVariant, DeviceKind, GraphColors, GraphKind}, svg_graph::SvgColors
 };
 
 const MAX_SAMPLES: usize = 30;
@@ -27,17 +25,17 @@ pub enum UnitVariant {
 }
 
 #[derive(Debug)]
-pub struct NetMon {
+pub struct Network {
     networks: Networks,
     download: VecDeque<u64>,
     upload: VecDeque<u64>,
     max_y: Option<u64>,
     colors: GraphColors,
     svg_colors: SvgColors,
-    kind: DeviceKind,
+    kind: GraphKind,
 }
 
-impl DemoGraph for NetMon {
+impl DemoGraph for Network {
     fn demo(&self) -> String {
         let download = VecDeque::from(DL_DEMO);
         let upload = VecDeque::from(UL_DEMO);
@@ -59,38 +57,33 @@ impl DemoGraph for NetMon {
     }
 }
 
-impl NetMon {
-    pub fn new() -> Self {
+impl Sensor for Network {
+
+    fn new(kind: GraphKind) -> Self {
+        assert!(kind==GraphKind::Line);
         let networks = Networks::new_with_refreshed_list();
         let colors = GraphColors::new(DeviceKind::Network(GraphKind::Line));
-        NetMon {
+        Network {
             networks,
             download: VecDeque::from(vec![0; MAX_SAMPLES]),
             upload: VecDeque::from(vec![0; MAX_SAMPLES]),
             max_y: None,
             colors,
-            kind: DeviceKind::Network(GraphKind::Line),
+            kind: GraphKind::Line,
             svg_colors: SvgColors::new(&colors),
         }
     }
 
-    pub fn set_max_y(&mut self, max: Option<u64>) {
-        self.max_y = max;
-    }
-
-    pub fn kind(&self) -> DeviceKind {
+    fn kind(&self) -> GraphKind {
         self.kind
     }
 
-    pub fn set_kind(&mut self, kind: DeviceKind) {
-        match kind {
-            DeviceKind::Network(GraphKind::Line) => (),
-            _ => panic!("ERROR: Wrong kind {:?}", kind),
-        }
+    fn set_kind(&mut self, kind: GraphKind) {
+        assert!(kind==GraphKind::Line);
     }
 
     /// Retrieve the amount of data transmitted since last update.
-    pub fn update(&mut self) {
+    fn update(&mut self) {
         self.networks.refresh(true);
         let mut dl = 0;
         let mut ul = 0;
@@ -109,6 +102,23 @@ impl NetMon {
             self.upload.pop_front();
         }
         self.upload.push_back(ul);
+    }
+
+    fn graph(&self) -> String {
+        crate::svg_graph::double_line(
+            &self.download,
+            &self.upload,
+            GRAPH_SAMPLES,
+            &self.svg_colors,
+            self.max_y,
+        )
+    }
+
+}
+
+impl Network {
+    pub fn set_max_y(&mut self, max: Option<u64>) {
+        self.max_y = max;
     }
 
     fn makestr(val: u64, format: UnitVariant) -> String {
@@ -141,7 +151,7 @@ impl NetMon {
         let start = len.saturating_sub(ticks_per_sec);
         // Sum the last `ticks` elements
         let bps = self.download.iter().skip(start).sum();
-        NetMon::makestr(bps, format)
+        Network::makestr(bps, format)
     }
 
     // Get bits per second
@@ -150,17 +160,7 @@ impl NetMon {
         let start = len.saturating_sub(ticks_per_sec);
         // Sum the last `ticks` elements
         let bps = self.upload.iter().skip(start).sum();
-        NetMon::makestr(bps, format)
-    }
-
-    pub fn svg(&self) -> String {
-        crate::svg_graph::double_line(
-            &self.download,
-            &self.upload,
-            GRAPH_SAMPLES,
-            &self.svg_colors,
-            self.max_y,
-        )
+        Network::makestr(bps, format)
     }
 }
 

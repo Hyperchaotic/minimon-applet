@@ -29,8 +29,9 @@ use cosmic::{
 
 use crate::colorpicker::{ColorPicker, DemoGraph};
 use crate::config::{ColorVariant, DeviceKind, GraphColors, GraphKind};
-use crate::netmon::{NetMon, UnitVariant};
-use crate::svgstat::SvgStat;
+use crate::sensors::cpu::Cpu;
+use crate::sensors::memory::Memory;
+use crate::sensors::network::{Network, UnitVariant};
 use crate::{config::MinimonConfig, fl};
 use cosmic::widget::Id as WId;
 
@@ -39,15 +40,23 @@ static AUTOSIZE_MAIN_ID: Lazy<WId> = Lazy::new(|| WId::new("autosize-main"));
 const TICK: i64 = 250;
 
 const ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon";
-/// This is the struct that represents your application.
-/// It is used to define the data that will be used by your application.
+
+pub trait Sensor {
+    fn new(kind: GraphKind) -> Self 
+        where Self: Sized;
+    fn kind(&self) -> GraphKind;
+    fn set_kind(&mut self, kind: GraphKind);
+    fn update(&mut self);
+    fn graph(&self) -> String;
+}
+
 pub struct Minimon {
     /// Application state which is managed by the COSMIC runtime.
     core: Core,
     /// The svg image to draw for the CPU load
-    svgstat_cpu: super::svgstat::SvgStat,
+    cpu: Cpu,
     /// The svg image to draw for the Memory load
-    svgstat_mem: super::svgstat::SvgStat,
+    memory: Memory,
     /// The popup id.
     popup: Option<Id>,
     /// The color picker dialog
@@ -56,7 +65,7 @@ pub struct Minimon {
     graph_options: Vec<&'static str>,
 
     /// The network monitor
-    netmon: NetMon,
+    network: Network,
     /// Settings stored on disk, including refresh rate, colors, etc.
     config: MinimonConfig,
     /// Countdown timer, as the subscription tick is 250ms
@@ -93,7 +102,7 @@ pub enum Message {
     NetworkSelectUnit(usize),
     TextInputBandwidthChanged(String),
 
-    SelectGraphType(DeviceKind, usize),
+    SelectGraphType(DeviceKind),
     Tick,
     PopupClosed(Id),
 
@@ -125,13 +134,13 @@ impl cosmic::Application for Minimon {
     fn init(core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
         let app = Minimon {
             core,
-            svgstat_cpu: super::svgstat::SvgStat::new(DeviceKind::Cpu(GraphKind::Ring)),
-            svgstat_mem: super::svgstat::SvgStat::new(DeviceKind::Memory(GraphKind::Line)),
+            cpu: Cpu::new(GraphKind::Ring),
+            memory: Memory::new(GraphKind::Line),
             popup: None,
             colorpicker: ColorPicker::new(),
             dropdown_options: ["b", "Kb", "Mb", "Gb", "Tb"].into(),
             graph_options: ["Ring", "Line"].into(),
-            netmon: NetMon::new(),
+            network: Network::new(GraphKind::Line),
             config: MinimonConfig::default(),
             tick_timer: TICK,
             tick: Arc::new(AtomicI64::new(TICK)),
@@ -208,13 +217,13 @@ impl cosmic::Application for Minimon {
         }
 
         // If we are below 10% and horizontal layout we can show another decimal
-        let formated_cpu = if self.svgstat_cpu.latest_sample() < 10.0 && horizontal {
-            format!("{:.2}%", self.svgstat_cpu.latest_sample())
+        let formated_cpu = if self.cpu.latest_sample() < 10.0 && horizontal {
+            format!("{:.2}%", self.cpu.latest_sample())
         } else {
-            format!("{:.1}%", self.svgstat_cpu.latest_sample())
+            format!("{:.1}%", self.cpu.latest_sample())
         };
 
-        let formated_mem = format!("{:.1} GB", self.svgstat_mem.latest_sample());
+        let formated_mem = format!("{:.1} GB", self.memory.latest_sample());
 
         // vertical layout
         let mut elements: Vec<Element<Message>> = Vec::new();
@@ -230,7 +239,7 @@ impl cosmic::Application for Minimon {
             let content = self
                 .core
                 .applet
-                .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_cpu));
+                .icon_button_from_handle(Minimon::make_icon_handle(&self.cpu));
 
             elements.push(content.into());
         }
@@ -243,7 +252,7 @@ impl cosmic::Application for Minimon {
             let content = self
                 .core
                 .applet
-                .icon_button_from_handle(Minimon::make_icon_handle(&self.svgstat_mem));
+                .icon_button_from_handle(Minimon::make_icon_handle(&self.memory));
 
             elements.push(content.into());
         }
@@ -259,10 +268,10 @@ impl cosmic::Application for Minimon {
             let dl_label = match horizontal {
                 true => self.figure_label(format!(
                     "↓ {}",
-                    &self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long)
+                    &self.network.get_bitrate_dl(ticks_per_sec, UnitVariant::Long)
                 )),
                 false => self.figure_label(
-                    self.netmon
+                    self.network
                         .get_bitrate_dl(ticks_per_sec, UnitVariant::Short),
                 ),
             };
@@ -272,10 +281,10 @@ impl cosmic::Application for Minimon {
             let ul_label = match horizontal {
                 true => self.figure_label(format!(
                     "↑ {}",
-                    &self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long)
+                    &self.network.get_bitrate_ul(ticks_per_sec, UnitVariant::Long)
                 )),
                 false => self.figure_label(
-                    self.netmon
+                    self.network
                         .get_bitrate_ul(ticks_per_sec, UnitVariant::Short),
                 ),
             };
@@ -286,7 +295,7 @@ impl cosmic::Application for Minimon {
         }
 
         if self.config.enable_net_chart {
-            let svg = self.netmon.svg();
+            let svg = self.network.graph();
             let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
             let content = self.core.applet.icon_button_from_handle(handle);
 
@@ -336,11 +345,11 @@ impl cosmic::Application for Minimon {
 
             let mut cpu_elements = Vec::new();
 
-            let cpu = self.svgstat_cpu.to_string();
+            let cpu = self.cpu.to_string();
             cpu_elements.push(Element::from(
                 column!(
                     widget::svg(widget::svg::Handle::from_memory(
-                        self.svgstat_cpu.svg().as_bytes().to_owned(),
+                        self.cpu.graph().as_bytes().to_owned(),
                     ))
                     .width(90)
                     .height(60),
@@ -350,12 +359,9 @@ impl cosmic::Application for Minimon {
                 .align_x(Alignment::Center),
             ));
 
-            let selected: Option<usize> = match self.svgstat_cpu.kind() {
-                DeviceKind::Cpu(m) => Some(m.into()),
-                _ => None,
-            };
+            let selected: Option<usize> = Some(self.cpu.kind().into());
 
-            let cpu_kind = self.svgstat_cpu.kind();
+            let cpu_kind = self.cpu.kind();
             cpu_elements.push(Element::from(
                 column!(
                     widget::text::title4(fl!("cpu-title")),
@@ -371,12 +377,12 @@ impl cosmic::Application for Minimon {
                     ),
                     row!(
                         widget::dropdown(&self.graph_options, selected, move |m| {
-                            Message::SelectGraphType(cpu_kind, m)
+                            Message::SelectGraphType(DeviceKind::Cpu(m.into()))
                         },)
                         .width(70),
                         widget::horizontal_space(),
                         widget::button::standard(fl!("change-colors"))
-                            .on_press(Message::ColorPickerOpen(cpu_kind)),
+                            .on_press(Message::ColorPickerOpen(DeviceKind::Cpu(cpu_kind))),
                     )
                 )
                 .spacing(cosmic.space_xs()),
@@ -387,11 +393,11 @@ impl cosmic::Application for Minimon {
                 .spacing(0);
 
             let mut mem_elements = Vec::new();
-            let mem = self.svgstat_mem.to_string();
+            let mem = self.memory.to_string();
             mem_elements.push(Element::from(
                 column!(
                     widget::svg(widget::svg::Handle::from_memory(
-                        self.svgstat_mem.svg().as_bytes().to_owned(),
+                        self.memory.graph().as_bytes().to_owned(),
                     ))
                     .width(90)
                     .height(60),
@@ -401,12 +407,9 @@ impl cosmic::Application for Minimon {
                 .align_x(Alignment::Center),
             ));
 
-            let selected: Option<usize> = match self.svgstat_mem.kind() {
-                DeviceKind::Memory(m) => Some(m.into()),
-                _ => None,
-            };
+            let selected: Option<usize> = Some(self.memory.kind().into());
 
-            let mem_kind = self.svgstat_mem.kind();
+            let mem_kind = self.memory.kind();
             mem_elements.push(Element::from(
                 column!(
                     widget::text::title4(fl!("memory-title")),
@@ -422,12 +425,12 @@ impl cosmic::Application for Minimon {
                     ),
                     row!(
                         widget::dropdown(&self.graph_options, selected, move |m| {
-                            Message::SelectGraphType(mem_kind, m)
+                            Message::SelectGraphType(DeviceKind::Memory(m.into()))
                         },)
                         .width(70),
                         widget::horizontal_space(),
                         widget::button::standard(fl!("change-colors"))
-                            .on_press(Message::ColorPickerOpen(mem_kind)),
+                            .on_press(Message::ColorPickerOpen(DeviceKind::Memory(mem_kind))),
                     )
                 )
                 .spacing(cosmic.space_xs()),
@@ -457,17 +460,17 @@ impl cosmic::Application for Minimon {
 
             let dlrate = format!(
                 "↓ {}",
-                &self.netmon.get_bitrate_dl(ticks_per_sec, UnitVariant::Long)
+                &self.network.get_bitrate_dl(ticks_per_sec, UnitVariant::Long)
             );
             let ulrate = format!(
                 "↑ {}",
-                &self.netmon.get_bitrate_ul(ticks_per_sec, UnitVariant::Long)
+                &self.network.get_bitrate_ul(ticks_per_sec, UnitVariant::Long)
             );
 
             net_elements.push(Element::from(
                 column!(
                     widget::svg(widget::svg::Handle::from_memory(
-                        self.netmon.svg().as_bytes().to_owned(),
+                        self.network.graph().as_bytes().to_owned(),
                     ))
                     .width(90)
                     .height(60),
@@ -530,7 +533,7 @@ impl cosmic::Application for Minimon {
                 row!(
                     widget::horizontal_space(),
                     widget::button::standard(fl!("change-colors"))
-                        .on_press(Message::ColorPickerOpen(self.netmon.kind())),
+                        .on_press(Message::ColorPickerOpen(DeviceKind::Network(self.network.kind()))),
                     widget::horizontal_space()
                 )
                 .into(),
@@ -623,18 +626,18 @@ impl cosmic::Application for Minimon {
             }
             Message::ColorPickerOpen(kind) => {
                 match kind {
-                    DeviceKind::Cpu(_) => {
+                    DeviceKind::Cpu(graphkind) => {
                         self.colorpicker
-                            .activate(kind, Box::new(SvgStat::new(kind)));
+                            .activate(kind, Box::new(Cpu::new(graphkind)));
                         self.colorpicker.set_colors(self.config.cpu_colors);
                     }
-                    DeviceKind::Memory(_) => {
+                    DeviceKind::Memory(graphkind) => {
                         self.colorpicker
-                            .activate(kind, Box::new(SvgStat::new(kind)));
+                            .activate(kind, Box::new(Memory::new(graphkind)));
                         self.colorpicker.set_colors(self.config.mem_colors);
                     }
                     DeviceKind::Network(_) => {
-                        self.colorpicker.activate(kind, Box::new(NetMon::new()));
+                        self.colorpicker.activate(kind, Box::new(Network::new(GraphKind::Line)));
                         self.colorpicker.set_colors(self.config.net_colors);
                     }
                 }
@@ -698,7 +701,7 @@ impl cosmic::Application for Minimon {
             Message::ToggleAdaptiveNet(toggle) => {
                 self.config.enable_adaptive_net = toggle;
                 if toggle {
-                    self.netmon.set_max_y(None);
+                    self.network.set_max_y(None);
                 }
                 self.save_config();
             }
@@ -706,24 +709,24 @@ impl cosmic::Application for Minimon {
             Message::NetworkSelectUnit(unit) => {
                 if !self.config.enable_adaptive_net {
                     self.config.net_unit = Some(unit);
-                    self.set_max_y();
+                    self.set_network_max_y();
                     self.save_config();
                 }
             }
 
-            Message::SelectGraphType(dev, selection) => {
+            Message::SelectGraphType(dev) => {
                 match dev {
-                    DeviceKind::Cpu(_) => {
-                        self.svgstat_cpu.set_kind(DeviceKind::Cpu(selection.into()));
-                        self.config.set_cpu_kind(selection.into());
+                    DeviceKind::Cpu(kind) => {
+                        self.cpu.set_kind(kind.into());
+                        self.config.cpu_type = kind.into();
                     }
-                    DeviceKind::Memory(_) => {
-                        self.svgstat_mem
-                            .set_kind(DeviceKind::Memory(selection.into()));
-                        self.config.set_memory_kind(selection.into());
+                    DeviceKind::Memory(kind) => {
+                        self.memory
+                            .set_kind(kind.into());
+                        self.config.mem_type = kind.into();
                     }
-                    DeviceKind::Network(_) => {
-                        self.netmon.set_kind(DeviceKind::Network(selection.into()));
+                    DeviceKind::Network(kind) => {
+                        self.network.set_kind(kind);
                     }
                 }
                 self.save_config();
@@ -732,12 +735,12 @@ impl cosmic::Application for Minimon {
             Message::TextInputBandwidthChanged(string) => {
                 if string.is_empty() {
                     self.config.net_bandwidth = 0;
-                    self.set_max_y();
+                    self.set_network_max_y();
                     self.save_config();
                 } else if !self.config.enable_adaptive_net {
                     if let Ok(val) = string.parse::<u64>() {
                         self.config.net_bandwidth = val;
-                        self.set_max_y();
+                        self.set_network_max_y();
                         self.save_config();
                     }
                 }
@@ -789,12 +792,12 @@ impl cosmic::Application for Minimon {
             Message::ConfigChanged(config) => {
                 self.config = config;
                 self.tick_timer = self.config.refresh_rate as i64;
-                self.svgstat_cpu.set_colors(self.config.cpu_colors);
-                self.svgstat_cpu.set_kind(self.config.cpu_kind());
-                self.svgstat_mem.set_colors(self.config.mem_colors);
-                self.svgstat_mem.set_kind(self.config.memory_kind());
-                self.netmon.set_colors(self.config.net_colors);
-                self.set_max_y();
+                self.cpu.set_colors(self.config.cpu_colors);
+                self.cpu.set_kind(self.config.cpu_type.into());
+                self.memory.set_colors(self.config.mem_colors);
+                self.memory.set_kind(self.config.mem_type.into());
+                self.network.set_colors(self.config.net_colors);
+                self.set_network_max_y();
                 self.set_tick();
             }
 
@@ -842,8 +845,8 @@ impl cosmic::Application for Minimon {
 }
 
 impl Minimon {
-    fn make_icon_handle(svgstat: &SvgStat) -> cosmic::widget::icon::Handle {
-        cosmic::widget::icon::from_svg_bytes(svgstat.svg().into_bytes())
+    fn make_icon_handle<T: Sensor>(sensor: &T) -> cosmic::widget::icon::Handle {
+        cosmic::widget::icon::from_svg_bytes(sensor.graph().into_bytes())
     }
 
     /// Set to 0 if empty, value if valid, but leave unchanged in value is not valid
@@ -874,15 +877,15 @@ impl Minimon {
         match kind {
             DeviceKind::Cpu(_) => {
                 self.config.cpu_colors = colors;
-                self.svgstat_cpu.set_colors(colors);
+                self.cpu.set_colors(colors);
             }
             DeviceKind::Memory(_) => {
                 self.config.mem_colors = colors;
-                self.svgstat_mem.set_colors(colors);
+                self.memory.set_colors(colors);
             }
             DeviceKind::Network(_) => {
                 self.config.net_colors = colors;
-                self.netmon.set_colors(colors);
+                self.network.set_colors(colors);
             }
         }
     }
@@ -900,9 +903,9 @@ impl Minimon {
         );
     }
 
-    fn set_max_y(&mut self) {
+    fn set_network_max_y(&mut self) {
         if self.config.enable_adaptive_net {
-            self.netmon.set_max_y(None);
+            self.network.set_max_y(None);
         } else {
             let unit = self.config.net_unit.unwrap_or(1);
             let multiplier: [u64; 5] = [1, 1000, 1_000_000, 1_000_000_000, 1_000_000_000_000];
@@ -910,14 +913,14 @@ impl Minimon {
             let sec_per_tic: f64 = self.config.refresh_rate as f64 / 1000.0;
             let new_y = (self.config.net_bandwidth * multiplier[unit]) as f64 * sec_per_tic;
 
-            self.netmon.set_max_y(Some(new_y.round() as u64));
+            self.network.set_max_y(Some(new_y.round() as u64));
         }
     }
 
     fn refresh_stats(&mut self) {
-        self.svgstat_cpu.update();
-        self.svgstat_mem.update();
-        self.netmon.update();
+        self.cpu.update();
+        self.memory.update();
+        self.network.update();
     }
 
     fn spawn_sysmon(&self) {

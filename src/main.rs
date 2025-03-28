@@ -6,8 +6,7 @@ mod app;
 mod colorpicker;
 mod config;
 mod core;
-mod netmon;
-mod svgstat;
+mod sensors;
 mod svg_graph;
 
 /// The `cosmic::app::run()` function is the starting point of your application.
