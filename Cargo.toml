@@ -5,7 +5,7 @@ edition = "2021"
 license = "GPL-3.0"
 
 [profile.release]
-lto = true
+lto = "thin"
 opt-level = 3
 debug = false
 
