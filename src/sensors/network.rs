@@ -3,8 +3,12 @@ use std::collections::VecDeque;
 use sysinfo::Networks;
 
 use crate::{
-    colorpicker::DemoGraph, config::{ColorVariant, DeviceKind, GraphColors, GraphKind}, svg_graph::SvgColors
+    colorpicker::DemoGraph,
+    config::{ColorVariant, DeviceKind, GraphColors, GraphKind},
+    fl,
+    svg_graph::SvgColors,
 };
+use lazy_static::lazy_static;
 
 use super::Sensor;
 
@@ -13,12 +17,20 @@ const GRAPH_SAMPLES: usize = 21;
 const UNITS_SHORT: [&str; 5] = ["b", "K", "M", "G", "T"];
 const UNITS_LONG: [&str; 5] = ["bps", "Kbps", "Mbps", "Gbps", "Tbps"];
 
-const COLOR_CHOICES: [(&str, ColorVariant); 4] = [
-    ("Down.  ", ColorVariant::Color2),
-    ("Up.  ", ColorVariant::Color3),
-    ("Back.  ", ColorVariant::Color1),
-    ("Frame.", ColorVariant::Color4),
-];
+lazy_static! {
+    /// Translated color choices.
+    ///
+    /// The string values are intentionally leaked (`.leak()`) to convert them
+    /// into `'static str` because:
+    /// - These strings are only initialized once at program startup.
+    /// - They are never deallocated since they are used globally.
+    static ref COLOR_CHOICES: [(&'static str, ColorVariant); 4] = [
+        (fl!("graph-network-download").leak(), ColorVariant::Color2),
+        (fl!("graph-network-upload").leak(), ColorVariant::Color3),
+        (fl!("graph-network-back").leak(), ColorVariant::Color1),
+        (fl!("graph-network-frame").leak(), ColorVariant::Color4),
+    ];
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum UnitVariant {
@@ -55,14 +67,13 @@ impl DemoGraph for Network {
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        COLOR_CHOICES.into()
+        (*COLOR_CHOICES).into()
     }
 }
 
 impl Sensor for Network {
-
     fn new(kind: GraphKind) -> Self {
-        assert!(kind==GraphKind::Line);
+        assert!(kind == GraphKind::Line);
         let networks = Networks::new_with_refreshed_list();
         let colors = GraphColors::new(DeviceKind::Network(GraphKind::Line));
         Network {
@@ -81,7 +92,7 @@ impl Sensor for Network {
     }
 
     fn set_kind(&mut self, kind: GraphKind) {
-        assert!(kind==GraphKind::Line);
+        assert!(kind == GraphKind::Line);
     }
 
     /// Retrieve the amount of data transmitted since last update.
@@ -121,7 +132,6 @@ impl Sensor for Network {
             self.max_y,
         )
     }
-
 }
 
 impl Network {

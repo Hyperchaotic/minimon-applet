@@ -4,6 +4,8 @@ use cosmic::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::fl;
+
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum ColorVariant {
     Color1,
@@ -47,9 +49,9 @@ pub enum DeviceKind {
 impl std::fmt::Display for DeviceKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            DeviceKind::Cpu(_) => write!(f, "CPU"),
-            DeviceKind::Memory(_) => write!(f, "Memory"),
-            DeviceKind::Network(_) => write!(f, "Network"),
+            DeviceKind::Cpu(_) => write!(f, "{}", fl!("sensor-cpu")),
+            DeviceKind::Memory(_) => write!(f, "{}", fl!("sensor-memory")),
+            DeviceKind::Network(_) => write!(f, "{}", fl!("sensor-network")),
         }
     }
 }
@@ -90,7 +92,7 @@ impl GraphColors {
             },
         }
     }
-    
+
     pub fn set_color(&mut self, srgb: Srgba<u8>, variant: ColorVariant) {
         match variant {
             ColorVariant::Color1 => self.color1 = srgb,

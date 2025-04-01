@@ -22,6 +22,7 @@ use theme::iced::Slider;
 
 use crate::app::Message;
 use crate::config::{ColorVariant, DeviceKind, GraphColors, GraphKind};
+use crate::fl;
 
 const RED_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"red\" /></svg>";
 const GREEN_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"green\" /></svg>";
@@ -305,7 +306,7 @@ impl ColorPicker {
 
     pub fn view_colorpicker(&self) -> Element<crate::app::Message> {
         let color = self.sliders();
-        let title = format!("{} colors", self.kind);
+        let title = format!("{} {}", self.kind, fl!("colorpicker-colors"));
 
         let mut children = Vec::new();
 
@@ -330,11 +331,9 @@ impl ColorPicker {
                     .align_x(Horizontal::Center),
             )
             .add(
-                widget::svg(widget::svg::Handle::from_memory(
-                    self.demo().into_bytes(),
-                ))
-                .width(Length::Fill)
-                .height(100),
+                widget::svg(widget::svg::Handle::from_memory(self.demo().into_bytes()))
+                    .width(Length::Fill)
+                    .height(100),
             )
             .add(column!(
                 Element::from(
@@ -397,13 +396,18 @@ impl ColorPicker {
                     )
                     .align_y(Alignment::Center)
                 ),
-                 Element::from(
+                Element::from(
                     row!(
                         widget::horizontal_space(),
                         widget::svg(widget::svg::Handle::from_memory(ALPHA_RECT.as_bytes()))
                             .height(20),
                         widget::horizontal_space(),
-                        widget::slider(0..=255, color.alpha, Message::ColorPickerSliderAlphaChanged).width(Length::Fixed(220.0))
+                        widget::slider(
+                            0..=255,
+                            color.alpha,
+                            Message::ColorPickerSliderAlphaChanged
+                        )
+                        .width(Length::Fixed(220.0))
                         .step(1),
                         widget::horizontal_space(),
                         widget::text_input("", color.alpha.to_string())
@@ -413,18 +417,21 @@ impl ColorPicker {
                     )
                     .align_y(Alignment::Center)
                 ),
-           ))
+            ))
             .add(fields)
             .spacing(10)
             .add(
                 row!(
-                    widget::button::standard("Defaults").on_press(Message::ColorPickerDefaults),
-                    widget::button::standard("Accent").on_press(Message::ColorPickerAccent),
+                    widget::button::standard(fl!("colorpicker-defaults"))
+                        .on_press(Message::ColorPickerDefaults),
+                    widget::button::standard(fl!("colorpicker-accent"))
+                        .on_press(Message::ColorPickerAccent),
                     row!(
                         widget::horizontal_space(),
-                        widget::button::destructive("Cancel")
+                        widget::button::destructive(fl!("colorpicker-cancel"))
                             .on_press(Message::ColorPickerClose(false)),
-                        widget::button::suggested("Save").on_press(Message::ColorPickerClose(true))
+                        widget::button::suggested(fl!("colorpicker-save"))
+                            .on_press(Message::ColorPickerClose(true))
                     )
                     .width(Length::Fill)
                     .spacing(5)
@@ -434,7 +441,7 @@ impl ColorPicker {
                 .spacing(5)
                 .width(Length::Fill),
             );
-            
+
         c.into()
     }
 }

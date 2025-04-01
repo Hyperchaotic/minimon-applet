@@ -3,26 +3,44 @@ use sysinfo::System;
 use crate::{
     colorpicker::DemoGraph,
     config::{ColorVariant, GraphColors, GraphKind},
+    fl,
     svg_graph::SvgColors,
 };
+use lazy_static::lazy_static;
 use std::{collections::VecDeque, fmt::Write};
 
 use super::Sensor;
 
 const MAX_SAMPLES: usize = 21;
 
-const COLOR_CHOICES_RING: [(&str, ColorVariant); 4] = [
-    ("Ring1.  ", ColorVariant::Color4),
-    ("Ring2.  ", ColorVariant::Color3),
-    ("Back.  ", ColorVariant::Color1),
-    ("Text.", ColorVariant::Color2),
-];
+lazy_static! {
+    /// Translated color choices.
+    ///
+    /// The string values are intentionally leaked (`.leak()`) to convert them
+    /// into `'static str` because:
+    /// - These strings are only initialized once at program startup.
+    /// - They are never deallocated since they are used globally.
+    static ref COLOR_CHOICES_RING: [(&'static str, ColorVariant); 4] = [
+        (fl!("graph-ring-r1").leak(), ColorVariant::Color4),
+        (fl!("graph-ring-r2").leak(), ColorVariant::Color3),
+        (fl!("graph-ring-back").leak(), ColorVariant::Color1),
+        (fl!("graph-ring-text").leak(), ColorVariant::Color2),
+    ];
+}
 
-const COLOR_CHOICES_LINE: [(&str, ColorVariant); 3] = [
-    ("Graph.  ", ColorVariant::Color4),
-    ("Back.  ", ColorVariant::Color1),
-    ("Frame.  ", ColorVariant::Color2),
-];
+lazy_static! {
+    /// Translated color choices.
+    ///
+    /// The string values are intentionally leaked (`.leak()`) to convert them
+    /// into `'static str` because:
+    /// - These strings are only initialized once at program startup.
+    /// - They are never deallocated since they are used globally.
+    static ref COLOR_CHOICES_LINE: [(&'static str, ColorVariant); 3] = [
+        (fl!("graph-line-graph").leak(), ColorVariant::Color4),
+        (fl!("graph-line-back").leak(), ColorVariant::Color1),
+        (fl!("graph-line-frame").leak(), ColorVariant::Color2),
+    ];
+}
 
 #[derive(Debug)]
 pub struct Memory {
@@ -73,9 +91,9 @@ impl DemoGraph for Memory {
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
         if self.kind == GraphKind::Line {
-            COLOR_CHOICES_LINE.into()
+            (*COLOR_CHOICES_LINE).into()
         } else {
-            COLOR_CHOICES_RING.into()
+            (*COLOR_CHOICES_RING).into()
         }
     }
 }
@@ -136,7 +154,7 @@ impl Sensor for Memory {
             } else {
                 write!(self.value, "{}", current_val).unwrap();
             }
-    
+
             let percentage: u64 = ((current_val / self.max_val as f64) * 100.0) as u64;
             self.percentage.clear();
             write!(self.percentage, "{percentage}").unwrap();
@@ -148,7 +166,7 @@ impl Sensor for Memory {
         dmo.set_colors(colors);
         Box::new(dmo)
     }
-   
+
     fn graph(&self) -> String {
         if self.kind == GraphKind::Ring {
             crate::svg_graph::ring(&self.value, &self.percentage, &self.svg_colors)
@@ -175,7 +193,6 @@ impl Memory {
             format!("{}{}", current_val, unit)
         }
     }
-
 }
 
 const DEMO_SAMPLES: [f64; 21] = [

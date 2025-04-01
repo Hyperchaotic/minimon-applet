@@ -10,5 +10,4 @@ enable-memory-label = Visa minnes-etikett
 use-adaptive = Använd adaptiv skala
 net-bandwidth = Nätverkshastighet
 refresh-rate = Uppdateringshastighet (sekunder)
-network-colors = Nätverksfärger
 change-colors = Ändra färger

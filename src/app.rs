@@ -260,7 +260,9 @@ impl cosmic::Application for Minimon {
             let dl_label = match horizontal {
                 true => self.figure_label(format!(
                     "↓ {}",
-                    &self.network.get_bitrate_dl(ticks_per_sec, UnitVariant::Long)
+                    &self
+                        .network
+                        .get_bitrate_dl(ticks_per_sec, UnitVariant::Long)
                 )),
                 false => self.figure_label(
                     self.network
@@ -273,7 +275,9 @@ impl cosmic::Application for Minimon {
             let ul_label = match horizontal {
                 true => self.figure_label(format!(
                     "↑ {}",
-                    &self.network.get_bitrate_ul(ticks_per_sec, UnitVariant::Long)
+                    &self
+                        .network
+                        .get_bitrate_ul(ticks_per_sec, UnitVariant::Long)
                 )),
                 false => self.figure_label(
                     self.network
@@ -322,14 +326,15 @@ impl cosmic::Application for Minimon {
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
         if self.colorpicker.active() {
             let limits = Limits::NONE
-            .max_width(400.0)
-            .min_width(400.0)
-            .min_height(200.0)
-            .max_height(750.0);
+                .max_width(400.0)
+                .min_width(400.0)
+                .min_height(200.0)
+                .max_height(750.0);
 
             self.core
                 .applet
-                .popup_container(self.colorpicker.view_colorpicker()).limits(limits)
+                .popup_container(self.colorpicker.view_colorpicker())
+                .limits(limits)
                 .into()
         } else {
             let theme = cosmic::theme::active();
@@ -452,11 +457,15 @@ impl cosmic::Application for Minimon {
 
             let dlrate = format!(
                 "↓ {}",
-                &self.network.get_bitrate_dl(ticks_per_sec, UnitVariant::Long)
+                &self
+                    .network
+                    .get_bitrate_dl(ticks_per_sec, UnitVariant::Long)
             );
             let ulrate = format!(
                 "↑ {}",
-                &self.network.get_bitrate_ul(ticks_per_sec, UnitVariant::Long)
+                &self
+                    .network
+                    .get_bitrate_ul(ticks_per_sec, UnitVariant::Long)
             );
 
             net_elements.push(Element::from(
@@ -524,8 +533,9 @@ impl cosmic::Application for Minimon {
             net_bandwidth_items.push(
                 row!(
                     widget::horizontal_space(),
-                    widget::button::standard(fl!("change-colors"))
-                        .on_press(Message::ColorPickerOpen(DeviceKind::Network(self.network.kind()))),
+                    widget::button::standard(fl!("change-colors")).on_press(
+                        Message::ColorPickerOpen(DeviceKind::Network(self.network.kind()))
+                    ),
                     widget::horizontal_space()
                 )
                 .into(),
@@ -572,13 +582,17 @@ impl cosmic::Application for Minimon {
                 ))
                 .add(change_label_setting);
 
-                let limits = Limits::NONE
+            let limits = Limits::NONE
                 .max_width(420.0)
                 .min_width(360.0)
                 .min_height(200.0)
                 .max_height(750.0);
 
-                self.core.applet.popup_container(content_list).limits(limits).into()
+            self.core
+                .applet
+                .popup_container(content_list)
+                .limits(limits)
+                .into()
         }
     }
 
@@ -601,7 +615,7 @@ impl cosmic::Application for Minimon {
                         None,
                         None,
                     );
-                    popup_settings.positioner.size_limits = Limits::NONE; 
+                    popup_settings.positioner.size_limits = Limits::NONE;
 
                     get_popup(popup_settings)
                 };
@@ -616,14 +630,15 @@ impl cosmic::Application for Minimon {
                 match kind {
                     DeviceKind::Cpu(_) => {
                         self.colorpicker
-                        .activate(kind, self.cpu.demo_graph(self.config.cpu_colors));
+                            .activate(kind, self.cpu.demo_graph(self.config.cpu_colors));
                     }
                     DeviceKind::Memory(_) => {
                         self.colorpicker
                             .activate(kind, self.memory.demo_graph(self.config.mem_colors));
                     }
                     DeviceKind::Network(_) => {
-                        self.colorpicker.activate(kind, self.network.demo_graph(self.config.net_colors));
+                        self.colorpicker
+                            .activate(kind, self.network.demo_graph(self.config.net_colors));
                     }
                 }
                 self.colorpicker.set_variant(ColorVariant::Color1);
@@ -705,8 +720,7 @@ impl cosmic::Application for Minimon {
                         self.config.cpu_type = kind;
                     }
                     DeviceKind::Memory(kind) => {
-                        self.memory
-                            .set_kind(kind);
+                        self.memory.set_kind(kind);
                         self.config.mem_type = kind;
                     }
                     DeviceKind::Network(kind) => {
