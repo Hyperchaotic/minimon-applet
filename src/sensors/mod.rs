@@ -1,8 +1,6 @@
 use crate::{colorpicker::DemoGraph, config::{GraphColors, GraphKind}};
 
 pub trait Sensor {
-    fn new(kind: GraphKind) -> Self 
-        where Self: Sized;
     fn kind(&self) -> GraphKind;
     fn set_kind(&mut self, kind: GraphKind);
     fn update(&mut self);
@@ -10,6 +8,7 @@ pub trait Sensor {
     fn graph(&self) -> String;
 }
 
+pub mod disks;
 pub mod cpu;
 pub mod network;
 pub mod memory;

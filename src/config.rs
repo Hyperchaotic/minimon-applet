@@ -4,7 +4,10 @@ use cosmic::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::fl;
+use crate::{
+    fl,
+    sensors::{disks::DisksVariant, network::NetworkVariant},
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum ColorVariant {
@@ -43,7 +46,8 @@ impl From<GraphKind> for usize {
 pub enum DeviceKind {
     Cpu(GraphKind),
     Memory(GraphKind),
-    Network(GraphKind),
+    Network(NetworkVariant),
+    Disks(DisksVariant),
 }
 
 impl std::fmt::Display for DeviceKind {
@@ -52,6 +56,7 @@ impl std::fmt::Display for DeviceKind {
             DeviceKind::Cpu(_) => write!(f, "{}", fl!("sensor-cpu")),
             DeviceKind::Memory(_) => write!(f, "{}", fl!("sensor-memory")),
             DeviceKind::Network(_) => write!(f, "{}", fl!("sensor-network")),
+            DeviceKind::Disks(_) => write!(f, "{}", fl!("sensor-disks")),
         }
     }
 }
@@ -90,6 +95,12 @@ impl GraphColors {
                 color3: Srgba::from_components((255, 0, 0, 255)),
                 color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
             },
+            DeviceKind::Disks(_) => GraphColors {
+                color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                color2: Srgba::from_components((47, 141, 255, 255)),
+                color3: Srgba::from_components((255, 0, 0, 255)),
+                color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+            },
         }
     }
 
@@ -114,45 +125,116 @@ impl GraphColors {
 
 #[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq)]
 #[version = 1]
+pub struct CpuConfig {
+    pub chart: bool,
+    pub label: bool,
+    pub kind: GraphKind,
+    pub colors: GraphColors,
+}
+
+impl Default for CpuConfig {
+    fn default() -> Self {
+        Self {
+            chart: true,
+            label: false,
+            kind: GraphKind::Ring,
+            colors: GraphColors::new(DeviceKind::Cpu(GraphKind::Ring)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq)]
+#[version = 1]
+pub struct MemoryConfig {
+    pub chart: bool,
+    pub label: bool,
+    pub kind: GraphKind,
+    pub colors: GraphColors,
+}
+
+impl Default for MemoryConfig {
+    fn default() -> Self {
+        Self {
+            chart: true,
+            label: false,
+            kind: GraphKind::Ring,
+            colors: GraphColors::new(DeviceKind::Memory(GraphKind::Line)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq)]
+#[version = 1]
+pub struct NetworkConfig {
+    pub chart: bool,
+    pub label: bool,
+    pub adaptive_net: bool,
+    pub bandwidth: u64,
+    pub unit: Option<usize>,
+    pub combined: bool,
+    pub colors_combined: GraphColors,
+    pub colors_download: GraphColors,
+    pub colors_upload: GraphColors,
+}
+
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        Self {
+            chart: true,
+            label: false,
+            adaptive_net: true,
+            bandwidth: 62_500_000, // 500Mbit/s
+            unit: Some(0),
+            combined: true,
+            colors_combined: GraphColors::new(DeviceKind::Network(NetworkVariant::Combined)),
+            colors_download: GraphColors::new(DeviceKind::Network(NetworkVariant::Download)),
+            colors_upload: GraphColors::new(DeviceKind::Network(NetworkVariant::Upload)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq)]
+#[version = 1]
+pub struct DisksConfig {
+    pub chart: bool,
+    pub label: bool,
+    pub colors_combined: GraphColors,
+    pub colors_write: GraphColors,
+    pub colors_read: GraphColors,
+}
+
+impl Default for DisksConfig {
+    fn default() -> Self {
+        Self {
+            chart: false,
+            label: false,
+            colors_combined: GraphColors::new(DeviceKind::Disks(DisksVariant::Combined)),
+            colors_write: GraphColors::new(DeviceKind::Disks(DisksVariant::Write)),
+            colors_read: GraphColors::new(DeviceKind::Disks(DisksVariant::Read)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq)]
+#[version = 1]
 pub struct MinimonConfig {
-    pub enable_cpu_chart: bool,
-    pub enable_cpu_label: bool,
-    pub cpu_type: GraphKind,
-    pub enable_mem_chart: bool,
-    pub enable_mem_label: bool,
-    pub mem_type: GraphKind,
-    pub enable_net_chart: bool,
-    pub enable_net_label: bool,
     pub refresh_rate: u64,
-    pub enable_adaptive_net: bool,
-    pub net_bandwidth: u64,
-    pub net_unit: Option<usize>,
-    pub cpu_colors: GraphColors,
-    pub mem_colors: GraphColors,
-    pub net_colors: GraphColors,
-    /// The minimum size of labels
     pub label_size_default: u16,
+    pub cpu: CpuConfig,
+    pub memory: MemoryConfig,
+    pub network: NetworkConfig,
+    pub disks: DisksConfig,
 }
 
 impl Default for MinimonConfig {
     fn default() -> Self {
         Self {
-            enable_cpu_chart: true,
-            enable_cpu_label: false,
-            cpu_type: GraphKind::Ring,
-            enable_mem_chart: true,
-            enable_mem_label: false,
-            mem_type: GraphKind::Line,
-            enable_net_chart: true,
-            enable_net_label: false,
             refresh_rate: 1000,
-            enable_adaptive_net: true,
-            net_bandwidth: 62_500_000, // 500Mbit/s
-            net_unit: Some(0),
-            cpu_colors: GraphColors::new(DeviceKind::Cpu(GraphKind::Ring)),
-            mem_colors: GraphColors::new(DeviceKind::Memory(GraphKind::Line)),
-            net_colors: GraphColors::new(DeviceKind::Network(GraphKind::Line)),
             label_size_default: 11,
+            cpu: CpuConfig::default(),
+            memory: MemoryConfig::default(),
+            network: NetworkConfig::default(),
+            disks: DisksConfig::default(),
         }
     }
 }

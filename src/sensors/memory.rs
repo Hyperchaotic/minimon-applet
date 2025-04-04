@@ -99,32 +99,6 @@ impl DemoGraph for Memory {
 }
 
 impl Sensor for Memory {
-    fn new(kind: GraphKind) -> Self {
-        let mut system = System::new();
-        system.refresh_memory();
-
-        let max_val = system.total_memory() / 1_073_741_824;
-
-        // value and percentage are pre-allocated and reused as they're changed often.
-        let mut percentage = String::with_capacity(6);
-        write!(percentage, "0").unwrap();
-
-        let mut value = String::with_capacity(6);
-        write!(value, "0").unwrap();
-
-        let mut memory = Memory {
-            samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
-            max_val,
-            colors: GraphColors::default(),
-            system,
-            kind,
-            value,
-            percentage,
-            svg_colors: SvgColors::new(&GraphColors::default()),
-        };
-        memory.set_colors(GraphColors::default());
-        memory
-    }
 
     fn kind(&self) -> GraphKind {
         self.kind
@@ -177,6 +151,33 @@ impl Sensor for Memory {
 }
 
 impl Memory {
+    pub fn new(kind: GraphKind) -> Self {
+        let mut system = System::new();
+        system.refresh_memory();
+
+        let max_val = system.total_memory() / 1_073_741_824;
+
+        // value and percentage are pre-allocated and reused as they're changed often.
+        let mut percentage = String::with_capacity(6);
+        write!(percentage, "0").unwrap();
+
+        let mut value = String::with_capacity(6);
+        write!(value, "0").unwrap();
+
+        let mut memory = Memory {
+            samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
+            max_val,
+            colors: GraphColors::default(),
+            system,
+            kind,
+            value,
+            percentage,
+            svg_colors: SvgColors::new(&GraphColors::default()),
+        };
+        memory.set_colors(GraphColors::default());
+        memory
+    }
+
     pub fn latest_sample(&self) -> f64 {
         *self.samples.back().unwrap_or(&0f64)
     }

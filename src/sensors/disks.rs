@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use sysinfo::Networks;
+use sysinfo::Disks as DisksInfo;
 
 use crate::{
     colorpicker::DemoGraph,
@@ -14,8 +14,8 @@ use super::Sensor;
 
 const MAX_SAMPLES: usize = 30;
 const GRAPH_SAMPLES: usize = 21;
-const UNITS_SHORT: [&str; 5] = ["b", "K", "M", "G", "T"];
-const UNITS_LONG: [&str; 5] = ["bps", "Kbps", "Mbps", "Gbps", "Tbps"];
+const UNITS_SHORT: [&str; 5] = ["B", "K", "M", "G", "T"];
+const UNITS_LONG: [&str; 5] = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s"];
 
 lazy_static! {
     /// Translated color choices.
@@ -25,10 +25,10 @@ lazy_static! {
     /// - These strings are only initialized once at program startup.
     /// - They are never deallocated since they are used globally.
     static ref COLOR_CHOICES: [(&'static str, ColorVariant); 4] = [
-        (fl!("graph-network-download").leak(), ColorVariant::Color2),
-        (fl!("graph-network-upload").leak(), ColorVariant::Color3),
-        (fl!("graph-network-back").leak(), ColorVariant::Color1),
-        (fl!("graph-network-frame").leak(), ColorVariant::Color4),
+        (fl!("graph-disks-write").leak(), ColorVariant::Color2),
+        (fl!("graph-disks-read").leak(), ColorVariant::Color3),
+        (fl!("graph-disks-back").leak(), ColorVariant::Color1),
+        (fl!("graph-disks-frame").leak(), ColorVariant::Color4),
     ];
 }
 
@@ -39,24 +39,23 @@ pub enum UnitVariant {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum NetworkVariant {
-    Download,
-    Upload,
+pub enum DisksVariant {
+    Write,
+    Read,
     Combined,
 }
 
 #[derive(Debug)]
-pub struct Network {
-    networks: Networks,
-    download: VecDeque<u64>,
-    upload: VecDeque<u64>,
-    max_y: Option<u64>,
+pub struct Disks {
+    disks: DisksInfo,
+    write: VecDeque<u64>,
+    read: VecDeque<u64>,
     colors: GraphColors,
     svg_colors: SvgColors,
-    kind: NetworkVariant,
+    kind: DisksVariant,
 }
 
-impl DemoGraph for Network {
+impl DemoGraph for Disks {
     fn demo(&self) -> String {
         let download = VecDeque::from(DL_DEMO);
         let upload = VecDeque::from(UL_DEMO);
@@ -78,7 +77,7 @@ impl DemoGraph for Network {
     }
 }
 
-impl Sensor for Network {
+impl Sensor for Disks {
     fn kind(&self) -> GraphKind {
         GraphKind::Line
     }
@@ -89,60 +88,57 @@ impl Sensor for Network {
 
     /// Retrieve the amount of data transmitted since last update.
     fn update(&mut self) {
-        self.networks.refresh(true);
-        let mut dl = 0;
-        let mut ul = 0;
+        self.disks.refresh(true);
+        let mut wr = 0;
+        let mut rd = 0;
 
-        for (_, network) in &self.networks {
-            dl += network.received() * 8;
-            ul += network.transmitted() * 8;
+        for disk in self.disks.list() {
+            let usage = disk.usage();
+            wr += usage.written_bytes;
+            rd += usage.read_bytes;
         }
 
-        if self.download.len() >= MAX_SAMPLES {
-            self.download.pop_front();
+        if self.write.len() >= MAX_SAMPLES {
+            self.write.pop_front();
         }
-        self.download.push_back(dl);
+        self.write.push_back(wr);
 
-        if self.upload.len() >= MAX_SAMPLES {
-            self.upload.pop_front();
+        if self.read.len() >= MAX_SAMPLES {
+            self.read.pop_front();
         }
-        self.upload.push_back(ul);
+        self.read.push_back(rd);
     }
 
     fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
-        let mut dmo = Network::new(self.kind);
+        let mut dmo = Disks::new(self.kind);
         dmo.set_colors(colors);
         Box::new(dmo)
     }
 
     fn graph(&self) -> String {
         crate::svg_graph::double_line(
-            &self.download,
-            &self.upload,
+            &self.write,
+            &self.read,
             GRAPH_SAMPLES,
             &self.svg_colors,
-            self.max_y,
+            None,
         )
     }
 }
 
-impl Network {
-    pub fn new(kind: NetworkVariant) -> Self {
-        let networks = Networks::new_with_refreshed_list();
-        let colors = GraphColors::new(DeviceKind::Network(kind));
-        Network {
-            networks,
-            download: VecDeque::from(vec![0; MAX_SAMPLES]),
-            upload: VecDeque::from(vec![0; MAX_SAMPLES]),
-            max_y: None,
+impl Disks {
+    pub fn new(kind: DisksVariant) -> Self {
+
+        let disks = DisksInfo::new_with_refreshed_list();
+        let colors = GraphColors::new(DeviceKind::Disks(kind));
+        Disks {
+            disks,
+            write: VecDeque::from(vec![0; MAX_SAMPLES]),
+            read: VecDeque::from(vec![0; MAX_SAMPLES]),
             colors,
-            kind,
+            kind: DisksVariant::Combined,
             svg_colors: SvgColors::new(&colors),
         }
-    }
-
-    pub fn set_max_y(&mut self, max: Option<u64>) {
-        self.max_y = max;
     }
 
     fn makestr(val: u64, format: UnitVariant) -> String {
@@ -171,7 +167,7 @@ impl Network {
 
     // If the sample rate doesn't match exactly one second (more or less),
     // we grab enough samples to cover it and average the value of samples cover a longer duration.
-    fn last_second_bitrate(samples: &VecDeque<u64>, sample_interval_ms: u64) -> u64 {
+    fn last_second_rate(samples: &VecDeque<u64>, sample_interval_ms: u64) -> u64 {
         let mut total_duration = 0u64;
         let mut total_bitrate = 0u64;
 
@@ -191,17 +187,18 @@ impl Network {
         (total_bitrate as f64 * scale).floor() as u64
     }
 
-    // Get bits per second
-    pub fn download_label(&self, sample_interval_ms: u64, format: UnitVariant) -> String {
-        let rate = Network::last_second_bitrate(&self.download, sample_interval_ms);
-        Network::makestr(rate, format)
+    // Get bytes per second
+    pub fn write_label(&self, sample_interval_ms: u64, format: UnitVariant) -> String {
+        let val = Disks::last_second_rate(&self.write, sample_interval_ms);
+        Disks::makestr(val, format)
     }
 
-    // Get bits per second
-    pub fn upload_label(&self, sample_interval_ms: u64, format: UnitVariant) -> String {
-        let rate = Network::last_second_bitrate(&self.upload, sample_interval_ms);
-        Network::makestr(rate, format)
+    // Get bytes per second
+    pub fn read_label(&self, sample_interval_ms: u64, format: UnitVariant) -> String {
+        let val = Disks::last_second_rate(&self.read, sample_interval_ms);
+        Disks::makestr(val, format)
     }
+
 }
 
 const DL_DEMO: [u64; 21] = [

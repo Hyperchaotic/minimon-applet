@@ -99,33 +99,6 @@ impl DemoGraph for Cpu {
 }
 
 impl Sensor for Cpu {
-    fn new(kind: GraphKind) -> Self {
-        let mut system = System::new();
-        system.refresh_cpu_all();
-
-        let max_val = 100;
-
-        // value and percentage are pre-allocated and reused as they're changed often.
-        let mut percentage = String::with_capacity(6);
-        write!(percentage, "0").unwrap();
-
-        let mut value = String::with_capacity(6);
-        write!(value, "0").unwrap();
-
-        let mut cpu = Cpu {
-            samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
-            max_val,
-            colors: GraphColors::default(),
-            system,
-            kind,
-            value,
-            percentage,
-            svg_colors: SvgColors::new(&GraphColors::default()),
-        };
-        cpu.set_colors(GraphColors::default());
-        cpu
-    }
-
     fn kind(&self) -> GraphKind {
         self.kind
     }
@@ -183,6 +156,33 @@ impl Sensor for Cpu {
 }
 
 impl Cpu {
+    pub fn new(kind: GraphKind) -> Self {
+        let mut system = System::new();
+        system.refresh_cpu_all();
+
+        let max_val = 100;
+
+        // value and percentage are pre-allocated and reused as they're changed often.
+        let mut percentage = String::with_capacity(6);
+        write!(percentage, "0").unwrap();
+
+        let mut value = String::with_capacity(6);
+        write!(value, "0").unwrap();
+
+        let mut cpu = Cpu {
+            samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
+            max_val,
+            colors: GraphColors::default(),
+            system,
+            kind,
+            value,
+            percentage,
+            svg_colors: SvgColors::new(&GraphColors::default()),
+        };
+        cpu.set_colors(GraphColors::default());
+        cpu
+    }
+
     pub fn latest_sample(&self) -> f64 {
         *self.samples.back().unwrap_or(&0f64)
     }
