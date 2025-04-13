@@ -1,14 +1,20 @@
-use crate::{colorpicker::DemoGraph, config::{GraphColors, GraphKind}};
+use cosmic::Element;
+
+use crate::{
+    colorpicker::DemoGraph,
+    config::{GraphColors, GraphKind, MinimonConfig},
+};
 
 pub trait Sensor {
-    fn kind(&self) -> GraphKind;
-    fn set_kind(&mut self, kind: GraphKind);
+    fn graph_kind(&self) -> GraphKind;
+    fn set_graph_kind(&mut self, kind: GraphKind);
     fn update(&mut self);
     fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph>;
     fn graph(&self) -> String;
+    fn settings_ui(&self, config: &MinimonConfig) -> Element<crate::app::Message>;
 }
 
-pub mod disks;
 pub mod cpu;
-pub mod network;
+pub mod disks;
 pub mod memory;
+pub mod network;

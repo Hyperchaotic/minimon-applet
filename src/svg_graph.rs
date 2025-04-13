@@ -15,7 +15,10 @@ pub struct SvgColors {
 impl From<GraphColors> for SvgColors {
     fn from(graph_colors: GraphColors) -> Self {
         fn to_hex(color: Srgba<u8>) -> String {
-            format!("#{:02X}{:02X}{:02X}{:02X}", color.red, color.green, color.blue, color.alpha)
+            format!(
+                "#{:02X}{:02X}{:02X}{:02X}",
+                color.red, color.green, color.blue, color.alpha
+            )
         }
 
         SvgColors {
@@ -29,11 +32,11 @@ impl From<GraphColors> for SvgColors {
 
 impl SvgColors {
     pub fn new(colors: &GraphColors) -> SvgColors {
-        (*colors).into() 
+        (*colors).into()
     }
 
     pub fn set_colors(&mut self, colors: &GraphColors) {
-        *self = (*colors).into(); 
+        *self = (*colors).into();
     }
 }
 
@@ -101,7 +104,6 @@ pub fn double_line(
 
     let len = samples.len();
 
-
     let start = len.saturating_sub(graph_samples);
 
     let max = max_y.unwrap_or_else(|| {
@@ -157,6 +159,57 @@ pub fn double_line(
     svg.push_str(&colors.color3);
     svg.push_str(DBLLINESVG_7);
     svg.push_str(&indexed_string2);
+    svg.push_str(DBLLINESVG_8);
+
+    svg.push_str(DBLLINESVG_9);
+
+    svg
+}
+
+pub fn line_adaptive(
+    samples: &VecDeque<u64>,
+    graph_samples: usize,
+    colors: &SvgColors,
+    max_y: Option<u64>,
+) -> String {
+    let len = samples.len();
+    let start = len.saturating_sub(graph_samples);
+
+    let max = max_y.unwrap_or_else(|| {
+        let calculated_max = samples.iter().copied().max().unwrap_or(40);
+        std::cmp::max(40, calculated_max) // Ensure min value is 40
+    });
+
+    // Generate list of coordinates for line
+    let scaling: f64 = 40.0 / max as f64;
+
+    let indexed_string: String = samples
+        .iter()
+        .skip(start)
+        .enumerate()
+        .map(|(index, &value)| {
+            let x = ((index * 2) + 1) as u32;
+            let y = (41.0 - (scaling * value as f64)).round() as u32;
+            format!("{},{} ", x, y)
+        })
+        .collect();
+
+    let mut svg = String::with_capacity(DBLLINESVG_LEN);
+    svg.push_str(DBLLINESVG_1);
+    svg.push_str(&colors.color1);
+    svg.push_str(DBLLINESVG_2);
+    svg.push_str(&colors.color4);
+    svg.push_str(DBLLINESVG_3);
+
+    //First graph and polygon
+    svg.push_str(DBLLINESVG_4);
+    svg.push_str(&colors.color2);
+    svg.push_str(DBLLINESVG_5);
+    svg.push_str(&indexed_string);
+    svg.push_str(DBLLINESVG_6);
+    svg.push_str(&colors.color2);
+    svg.push_str(DBLLINESVG_7);
+    svg.push_str(&indexed_string);
     svg.push_str(DBLLINESVG_8);
 
     svg.push_str(DBLLINESVG_9);
@@ -248,86 +301,91 @@ const DBLLINESVG_8: &str = "  41,41 1,41\"/>";
 const DBLLINESVG_9: &str = "</svg>";
 
 const DBLLINESVG_LEN: usize = 1000; // For preallocation
+/* 
+pub fn dbl_circle(
+    samples: &VecDeque<u64>,
+    samples2: &VecDeque<u64>,
+    graph_samples: usize,
+    colors: &SvgColors,
+) -> String {
+    let mut dl: u64 = 0;
+    let mut ul: u64 = 0;
 
-/*
-    pub fn dbl_circle(&self) -> String {
-        let mut ul: u64 = 0;
-        let mut dl: u64 = 0;
 
-        if self.max_val > 0 && !self.download.is_empty() {
-            let scaling_dl: f32 = 94.0 / self.max_val as f32;
-            let scaling_ul: f32 = 69.0 / self.max_val as f32;
+    if self.max_val > 0 && !self.download.is_empty() {
+        let scaling_dl: f32 = 94.0 / self.max_val as f32;
+        let scaling_ul: f32 = 69.0 / self.max_val as f32;
 
-            dl = *self.download.get(self.download.len() - 1).unwrap_or(&0u64);
-            ul = *self.upload.get(self.upload.len() - 1).unwrap_or(&0u64);
-            dl = (dl as f32 * scaling_dl) as u64;
-            ul = (ul as f32 * scaling_ul) as u64;
-        }
-
-        let background = "none";
-        let strokebg = "white";
-        let outerstrokefg = "blue";
-        let outerpercentage = dl.to_string();
-        let innerstrokefg = "red";
-        let innerpercentage = ul.to_string();
-        let mut svg = String::with_capacity(SVG_LEN);
-        svg.push_str(SVGSTATSTART);
-        svg.push_str(&background);
-        svg.push_str(SVGSTATPART2);
-        svg.push_str(&strokebg);
-        svg.push_str(SVGSTATPART3);
-        svg.push_str(&outerstrokefg);
-        svg.push_str(SVGSTATPART4);
-        svg.push_str(&outerpercentage);
-        svg.push_str(SVGSTATPART5);
-        svg.push_str(&strokebg);
-        svg.push_str(SVGSTATPART6);
-        svg.push_str(&innerstrokefg);
-        svg.push_str(SVGSTATPART7);
-        svg.push_str(&innerpercentage);
-        svg.push_str(SVGSTATPART8);
-
-        svg
+        dl = *self.download.get(self.download.len() - 1).unwrap_or(&0u64);
+        ul = *self.upload.get(self.upload.len() - 1).unwrap_or(&0u64);
+        dl = (dl as f32 * scaling_dl) as u64;
+        ul = (ul as f32 * scaling_ul) as u64;
     }
 
-const SVG_LEN: usize = SVGSTATSTART.len()
-    + SVGSTATPART2.len()
-    + SVGSTATPART3.len()
-    + SVGSTATPART4.len()
-    + SVGSTATPART5.len()
-    + SVGSTATPART6.len()
-    + SVGSTATPART7.len()
-    + SVGSTATPART8.len()
+    let background = "none";
+    let strokebg = "white";
+    let outerstrokefg = "blue";
+    let outerpercentage = dl.to_string();
+    let innerstrokefg = "red";
+    let innerpercentage = ul.to_string();
+    let mut svg = String::with_capacity(SVG_LEN);
+    svg.push_str(DBLCIRCLESTART);
+    svg.push_str(&background);
+    svg.push_str(DBLCIRCLEPART2);
+    svg.push_str(&strokebg);
+    svg.push_str(DBLCIRCLEPART3);
+    svg.push_str(&outerstrokefg);
+    svg.push_str(DBLCIRCLEPART4);
+    svg.push_str(&outerpercentage);
+    svg.push_str(DBLCIRCLEPART5);
+    svg.push_str(&strokebg);
+    svg.push_str(DBLCIRCLEPART6);
+    svg.push_str(&innerstrokefg);
+    svg.push_str(DBLCIRCLEPART7);
+    svg.push_str(&innerpercentage);
+    svg.push_str(DBLCIRCLEPART8);
+
+    svg
+}
+
+const SVG_LEN: usize = DBLCIRCLESTART.len()
+    + DBLCIRCLEPART2.len()
+    + DBLCIRCLEPART3.len()
+    + DBLCIRCLEPART4.len()
+    + DBLCIRCLEPART5.len()
+    + DBLCIRCLEPART6.len()
+    + DBLCIRCLEPART7.len()
+    + DBLCIRCLEPART8.len()
     + 40;
 
-const SVGSTATSTART: &str = "<svg viewBox=\"0 0 34 34\" xmlns=\"http://www.w3.org/2000/svg\">
+const DBLCIRCLESTART: &str = "<svg viewBox=\"0 0 34 34\" xmlns=\"http://www.w3.org/2000/svg\">
   <path d=\"M17 2.0845
       a 13.9155 13.9155 0 0 1 0 29.831
       a 13.9155 13.9155 0 0 1 0 -29.831\" fill=\""; // background
 
-const SVGSTATPART2: &str = "\" stroke=\""; // outerstrokebg
+const DBLCIRCLEPART2: &str = "\" stroke=\""; // outerstrokebg
 
-const SVGSTATPART3: &str = "\" stroke-width=\"4\"/>
+const DBLCIRCLEPART3: &str = "\" stroke-width=\"4\"/>
   <path d=\"M17 31.931
       a 13.9155 13.9155 0 0 1 0 -29.831
       a 13.9155 13.9155 0 0 1 0 29.931\" fill=\"none\" stroke=\""; //outerstrokefg
 
-const SVGSTATPART4: &str = "\" stroke-width=\"4\" stroke-dasharray=\""; //outerpercentage
+const DBLCIRCLEPART4: &str = "\" stroke-width=\"4\" stroke-dasharray=\""; //outerpercentage
 
-const SVGSTATPART5: &str = ", 94\"/>
+const DBLCIRCLEPART5: &str = ", 94\"/>
   <path d=\"M17 28
       a 7.9155 7.9155 0 0 1 0 -22
       a 7.9155 7.9155 0 0 1 0 22\" fill=\"none\" stroke=\""; //innerstrokebg
 
-const SVGSTATPART6: &str = "\" stroke-width=\"3.7\"/>
+const DBLCIRCLEPART6: &str = "\" stroke-width=\"3.7\"/>
   <path d=\"M17 28
       a 7.9155 7.9155 0 0 1 0 -22
       a 7.9155 7.9155 0 0 1 0 22\" fill=\"none\" stroke=\""; //innerstrokefg
 
-const SVGSTATPART7: &str = "\" stroke-width=\"3.7\" stroke-dasharray=\""; //innerpercentage
+const DBLCIRCLEPART7: &str = "\" stroke-width=\"3.7\" stroke-dasharray=\""; //innerpercentage
 
-const SVGSTATPART8: &str = ", 69\"/></svg>";
-
+const DBLCIRCLEPART8: &str = ", 69\"/></svg>";
+*/
 /*
 <svg viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">
   <path d="M17 2.0845
@@ -346,5 +404,4 @@ const SVGSTATPART8: &str = ", 69\"/></svg>";
       a 7.9155 7.9155 0 0 1 0 -22
       a 7.9155 7.9155 0 0 1 0 22" fill="none" stroke="red" stroke-width="3.7" stroke-dasharray="30, 69"/>
 </svg>
-*/
 */

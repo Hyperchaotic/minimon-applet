@@ -1,17 +1,18 @@
 use cosmic::applet::cosmic_panel_config::PanelSize;
 use cosmic::applet::{PanelType, Size};
 use cosmic::cosmic_config::CosmicConfigEntry;
+use cosmic::cosmic_theme::palette::bool_mask::BoolMask;
 use cosmic::cosmic_theme::palette::{FromColor, WithAlpha};
-use std::time;
+use std::{net, time};
 
 use cosmic::app::{Core, Task};
 use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
 use cosmic::iced::window::Id;
 use cosmic::iced::Limits;
 use cosmic::iced::{self, Subscription};
-use cosmic::widget::{settings, spin_button, toggler};
-use cosmic::Element;
+use cosmic::widget::{container, list, settings, spin_button, text};
 use cosmic::{widget, widget::autosize};
+use cosmic::{Apply, Element};
 
 use once_cell::sync::Lazy;
 use std::sync::atomic::{self, AtomicI64};
@@ -19,20 +20,16 @@ use std::sync::Arc;
 
 use cosmic::{
     applet::cosmic_panel_config::PanelAnchor,
-    iced::{
-        widget::{column, row},
-        Alignment,
-    },
+    iced::{widget::column, widget::row, Alignment},
     iced_widget::{Column, Row},
-    widget::container,
 };
 
 use crate::colorpicker::{ColorPicker, DemoGraph};
-use crate::config::{ColorVariant, DeviceKind, GraphColors, GraphKind};
+use crate::config::{ColorVariant, DeviceKind, GraphColors, GraphKind, NetworkVariant};
 use crate::sensors::cpu::Cpu;
 use crate::sensors::disks::{self, Disks, DisksVariant};
 use crate::sensors::memory::Memory;
-use crate::sensors::network::{self, Network, NetworkVariant};
+use crate::sensors::network::{self, Network};
 use crate::sensors::Sensor;
 use crate::{config::MinimonConfig, fl};
 use cosmic::widget::Id as WId;
@@ -43,6 +40,52 @@ const TICK: i64 = 250;
 
 const ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon";
 
+use lazy_static::lazy_static;
+
+lazy_static! {
+    /// Translated color choices.
+    ///
+    /// The string values are intentionally leaked (`.leak()`) to convert them
+    /// into `'static str` because:
+    /// - These strings are only initialized once at program startup.
+    /// - They are never deallocated since they are used globally.
+    static ref SETTINGS_GENERAL: &'static str = fl!("settings-subpage-general").leak();
+    static ref SETTINGS_BACK: &'static str = fl!("settings-subpage-back").leak();
+    static ref SETTINGS_CPU: &'static str = fl!("cpu-title").leak();
+    static ref SETTINGS_MEMORY: &'static str = fl!("memory-title").leak();
+    static ref SETTINGS_NETWORK: &'static str = fl!("net-title").leak();
+}
+
+macro_rules! network_select {
+    ($self:ident, $variant:expr) => {
+        match $variant {
+            NetworkVariant::Combined | NetworkVariant::Download => {
+                (&mut $self.network1, &mut $self.config.network1)
+            }
+            _ => (&mut $self.network2, &mut $self.config.network2),
+        }
+    };
+}
+
+macro_rules! disks_select {
+    ($self:ident, $variant:expr) => {
+        match $variant {
+            DisksVariant::Combined | DisksVariant::Write => {
+                (&mut $self.disks1, &mut $self.config.disks1)
+            }
+            _ => (&mut $self.disks2, &mut $self.config.disks2),
+        }
+    };
+}
+
+#[derive(Debug, Clone, Copy)]
+enum SettingsVariant {
+    General,
+    Cpu,
+    Memory,
+    Network,
+}
+
 pub struct Minimon {
     /// Application state which is managed by the COSMIC runtime.
     core: Core,
@@ -50,17 +93,22 @@ pub struct Minimon {
     cpu: Cpu,
     /// The svg image to draw for the Memory load
     memory: Memory,
-    /// The network monitor
-    network: Network,
+
+    /// The network monitor, if combined we only use the first one
+    network1: Network,
+    network2: Network,
+
     /// The network monitor
     disks: Disks,
 
     /// The popup id.
     popup: Option<Id>,
+
+    /// Current settings sub page
+    settings_page: Option<SettingsVariant>,
+
     /// The color picker dialog
     colorpicker: ColorPicker,
-    dropdown_options: Vec<&'static str>,
-    graph_options: Vec<&'static str>,
 
     /// Settings stored on disk, including refresh rate, colors, etc.
     config: MinimonConfig,
@@ -94,16 +142,17 @@ pub enum Message {
     ColorTextInputBlueChanged(String),
     ColorTextInputAlphaChanged(String),
 
-    ToggleAdaptiveNet(bool),
-    NetworkSelectUnit(usize),
-    TextInputBandwidthChanged(String),
+    ToggleNetCombined(bool),
+    ToggleAdaptiveNet(NetworkVariant, bool),
+    NetworkSelectUnit(NetworkVariant, usize),
+    TextInputBandwidthChanged(NetworkVariant, String),
 
     SelectGraphType(DeviceKind),
     Tick,
     PopupClosed(Id),
 
-    ToggleNetChart(bool),
-    ToggleNetLabel(bool),
+    ToggleNetChart(NetworkVariant, bool),
+    ToggleNetLabel(NetworkVariant, bool),
     ToggleCpuChart(bool),
     ToggleCpuLabel(bool),
     ToggleMemoryChart(bool),
@@ -112,6 +161,12 @@ pub enum Message {
     LaunchSystemMonitor(),
     RefreshRateChanged(f64),
     LabelSizeChanged(u16),
+
+    SettingsBack,
+    SettingsGeneral,
+    SettingsCpu,
+    SettingsMemory,
+    SettingsNetwork,
 }
 
 const APP_ID_DOCK: &str = "com.github.hyperchaotic.cosmic-applet-minimon-dock";
@@ -132,12 +187,12 @@ impl cosmic::Application for Minimon {
             core,
             cpu: Cpu::new(GraphKind::Ring),
             memory: Memory::new(GraphKind::Line),
-            network: Network::new(NetworkVariant::Combined),
+            network1: Network::new(NetworkVariant::Combined),
+            network2: Network::new(NetworkVariant::Upload),
             disks: Disks::new(DisksVariant::Combined),
             popup: None,
+            settings_page: None,
             colorpicker: ColorPicker::new(),
-            dropdown_options: ["b", "Kb", "Mb", "Gb", "Tb"].into(),
-            graph_options: ["Ring", "Line"].into(),
             config: MinimonConfig::default(),
             tick_timer: TICK,
             tick: Arc::new(AtomicI64::new(TICK)),
@@ -202,8 +257,10 @@ impl cosmic::Application for Minimon {
             && !self.config.cpu.label
             && !self.config.memory.chart
             && !self.config.memory.label
-            && !self.config.network.chart
-            && !self.config.network.label
+            && !self.config.network1.chart
+            && !self.config.network1.label
+            && !self.config.network2.chart
+            && !self.config.network2.label
             && !self.config.disks.chart
             && !self.config.disks.label
         {
@@ -259,8 +316,9 @@ impl cosmic::Application for Minimon {
         }
 
         // Network
-        if self.config.network.label {
+        let combined = self.config.network1.variant == NetworkVariant::Combined;
 
+        if self.config.network1.label {
             let mut network_labels: Vec<Element<Message>> = Vec::new();
 
             // DL
@@ -268,37 +326,70 @@ impl cosmic::Application for Minimon {
                 true => self.figure_label(format!(
                     "↓ {}",
                     &self
-                        .network
+                        .network1
                         .download_label(sample_rate_ms, network::UnitVariant::Long)
                 )),
                 false => self.figure_label(
-                    self.network
+                    self.network1
                         .download_label(sample_rate_ms, network::UnitVariant::Short),
                 ),
             };
-            network_labels.push(widget::vertical_space().into());
+            if combined {
+                network_labels.push(widget::vertical_space().into());
+            }
             network_labels.push(dl_label.into());
-            // UL
+
+            if combined {
+                // UL
+                let ul_label = match horizontal {
+                    true => self.figure_label(format!(
+                        "↑ {}",
+                        &self
+                            .network1
+                            .upload_label(sample_rate_ms, network::UnitVariant::Long)
+                    )),
+                    false => self.figure_label(
+                        self.network1
+                            .upload_label(sample_rate_ms, network::UnitVariant::Short),
+                    ),
+                };
+                network_labels.push(ul_label.into());
+                network_labels.push(widget::vertical_space().into());
+            }
+            elements.push(Column::from_vec(network_labels).into());
+        }
+
+        if self.config.network1.chart {
+            let svg = self.network1.graph();
+            let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+            let content = self.core.applet.icon_button_from_handle(handle);
+
+            elements.push(content.into());
+        }
+
+        // Network
+        if self.config.network2.label && !combined {
+            let mut network_labels: Vec<Element<Message>> = Vec::new();
+
             let ul_label = match horizontal {
                 true => self.figure_label(format!(
                     "↑ {}",
                     &self
-                        .network
+                        .network2
                         .upload_label(sample_rate_ms, network::UnitVariant::Long)
                 )),
                 false => self.figure_label(
-                    self.network
+                    self.network1
                         .upload_label(sample_rate_ms, network::UnitVariant::Short),
                 ),
             };
             network_labels.push(ul_label.into());
-            network_labels.push(widget::vertical_space().into());
 
             elements.push(Column::from_vec(network_labels).into());
         }
 
-        if self.config.network.chart {
-            let svg = self.network.graph();
+        if self.config.network2.chart && !combined {
+            let svg = self.network2.graph();
             let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
             let content = self.core.applet.icon_button_from_handle(handle);
 
@@ -306,17 +397,17 @@ impl cosmic::Application for Minimon {
         }
 
         // TESTING DISKS
-/* 
-        let dsks = self.disks.graph();
-        let handle = cosmic::widget::icon::from_svg_bytes(dsks.into_bytes());
-        let dsks_content = self.core.applet.icon_button_from_handle(handle);
-        elements.push(dsks_content.into());
+        /*
+                let dsks = self.disks.graph();
+                let handle = cosmic::widget::icon::from_svg_bytes(dsks.into_bytes());
+                let dsks_content = self.core.applet.icon_button_from_handle(handle);
+                elements.push(dsks_content.into());
 
 
-        elements.push(self.figure_label(self.disks.write_label(sample_rate_ms, disks::UnitVariant::Long)).into());
-        elements.push(self.figure_label(self.disks.read_label(sample_rate_ms, disks::UnitVariant::Long)).into());
+                elements.push(self.figure_label(self.disks.write_label(sample_rate_ms, disks::UnitVariant::Long)).into());
+                elements.push(self.figure_label(self.disks.read_label(sample_rate_ms, disks::UnitVariant::Long)).into());
 
-*/
+        */
         let wrapper: Element<Message> = match horizontal {
             true => Row::from_vec(elements)
                 .align_y(Alignment::Center)
@@ -357,250 +448,109 @@ impl cosmic::Application for Minimon {
                 .into()
         } else {
             let theme = cosmic::theme::active();
-            let cosmic = theme.cosmic();
 
-            let mut cpu_elements = Vec::new();
+            let padding = if self.core.is_condensed() {
+                theme.cosmic().space_s()
+            } else {
+                theme.cosmic().space_l()
+            };
 
-            let cpu = self.cpu.to_string();
-            cpu_elements.push(Element::from(
-                column!(
-                    widget::svg(widget::svg::Handle::from_memory(
-                        self.cpu.graph().as_bytes().to_owned(),
-                    ))
-                    .width(90)
-                    .height(60),
-                    cosmic::widget::text::body(cpu),
-                )
-                .padding(5)
-                .align_x(Alignment::Center),
-            ));
+            let mut content = Column::new();
 
-            let selected: Option<usize> = Some(self.cpu.kind().into());
-
-            let cpu_kind = self.cpu.kind();
-            cpu_elements.push(Element::from(
-                column!(
-                    widget::text::title4(fl!("cpu-title")),
-                    settings::item(
-                        fl!("enable-cpu-chart"),
-                        toggler(self.config.cpu.chart)
-                            .on_toggle(|value| { Message::ToggleCpuChart(value) }),
-                    ),
-                    settings::item(
-                        fl!("enable-cpu-label"),
-                        toggler(self.config.cpu.label)
-                            .on_toggle(|value| { Message::ToggleCpuLabel(value) }),
-                    ),
-                    row!(
-                        widget::dropdown(&self.graph_options, selected, move |m| {
-                            Message::SelectGraphType(DeviceKind::Cpu(m.into()))
-                        },)
-                        .width(70),
-                        widget::horizontal_space(),
-                        widget::button::standard(fl!("change-colors"))
-                            .on_press(Message::ColorPickerOpen(DeviceKind::Cpu(cpu_kind))),
-                    )
-                )
-                .spacing(cosmic.space_xs()),
-            ));
-
-            let cpu_row = Row::with_children(cpu_elements)
-                .align_y(Alignment::Center)
-                .spacing(0);
-
-            let mut mem_elements = Vec::new();
-            let mem = self.memory.to_string();
-            mem_elements.push(Element::from(
-                column!(
-                    widget::svg(widget::svg::Handle::from_memory(
-                        self.memory.graph().as_bytes().to_owned(),
-                    ))
-                    .width(90)
-                    .height(60),
-                    cosmic::widget::text::body(mem),
-                )
-                .padding(5)
-                .align_x(Alignment::Center),
-            ));
-
-            let selected: Option<usize> = Some(self.memory.kind().into());
-
-            let mem_kind = self.memory.kind();
-            mem_elements.push(Element::from(
-                column!(
-                    widget::text::title4(fl!("memory-title")),
-                    settings::item(
-                        fl!("enable-memory-chart"),
-                        toggler(self.config.memory.chart)
-                            .on_toggle(|value| { Message::ToggleMemoryChart(value) }),
-                    ),
-                    settings::item(
-                        fl!("enable-memory-label"),
-                        toggler(self.config.memory.label)
-                            .on_toggle(|value| { Message::ToggleMemoryLabel(value) }),
-                    ),
-                    row!(
-                        widget::dropdown(&self.graph_options, selected, move |m| {
-                            Message::SelectGraphType(DeviceKind::Memory(m.into()))
-                        },)
-                        .width(70),
-                        widget::horizontal_space(),
-                        widget::button::standard(fl!("change-colors"))
-                            .on_press(Message::ColorPickerOpen(DeviceKind::Memory(mem_kind))),
-                    )
-                )
-                .spacing(cosmic.space_xs()),
-            ));
-
-            let mem_row = Row::with_children(mem_elements)
-                .align_y(Alignment::Center)
-                .spacing(0);
-
-            let mut refresh_elements = Vec::new();
-            let refresh_rate = self.config.refresh_rate as f64 / 1000.0;
-            refresh_elements.push(Element::from(spin_button(
-                format!("{:.2}", refresh_rate),
-                refresh_rate,
-                0.250,
-                0.250,
-                5.00,
-                Message::RefreshRateChanged,
-            )));
-            let refresh_row = Row::with_children(refresh_elements)
-                .align_y(Alignment::Center)
-                .spacing(0);
-
-            let mut net_elements = Vec::new();
-
-            let sample_rate_ms = self.config.refresh_rate;
-
-            let dlrate = format!(
-                "↓ {}",
-                &self
-                    .network
-                    .download_label(sample_rate_ms, network::UnitVariant::Long)
-            );
-            let ulrate = format!(
-                "↑ {}",
-                &self
-                    .network
-                    .upload_label(sample_rate_ms, network::UnitVariant::Long)
-            );
-
-            net_elements.push(Element::from(
-                column!(
-                    widget::svg(widget::svg::Handle::from_memory(
-                        self.network.graph().as_bytes().to_owned(),
-                    ))
-                    .width(90)
-                    .height(60),
-                    cosmic::widget::text::body(""),
-                    cosmic::widget::text::body(dlrate),
-                    cosmic::widget::text::body(ulrate),
-                )
-                .padding(5)
-                .align_x(Alignment::Center),
-            ));
-
-            let mut net_bandwidth_items = Vec::new();
-            net_bandwidth_items.push(Element::from(widget::text::title4(fl!("net-title"))));
-            net_bandwidth_items.push(
-                settings::item(
-                    fl!("enable-net-chart"),
-                    widget::toggler(self.config.network.chart)
-                        .on_toggle(Message::ToggleNetChart),
-                )
-                .into(),
-            );
-            net_bandwidth_items.push(
-                settings::item(
-                    fl!("enable-net-label"),
-                    widget::toggler(self.config.network.label)
-                        .on_toggle(Message::ToggleNetLabel),
-                )
-                .into(),
-            );
-            net_bandwidth_items.push(
-                settings::item(
-                    fl!("use-adaptive"),
-                    row!(widget::checkbox("", self.config.network.adaptive_net)
-                        .on_toggle(|v| { Message::ToggleAdaptiveNet(v) }),),
-                )
-                .into(),
-            );
-
-            if !self.config.network.adaptive_net {
-                net_bandwidth_items.push(
-                    settings::item(
-                        fl!("net-bandwidth"),
-                        row!(
-                            widget::text_input("", self.config.network.bandwidth.to_string())
-                                .width(100)
-                                .on_input(Message::TextInputBandwidthChanged),
-                            widget::dropdown(
-                                &self.dropdown_options,
-                                self.config.network.unit,
-                                Message::NetworkSelectUnit,
+            if let Some(variant) = self.settings_page {
+                match variant {
+                    SettingsVariant::Cpu => {
+                        content = content.push(Minimon::sub_page_header(
+                            &SETTINGS_CPU,
+                            &SETTINGS_BACK,
+                            Message::SettingsBack,
+                        ));
+                        content = content.push(self.cpu.settings_ui(&self.config));
+                    }
+                    SettingsVariant::Memory => {
+                        content = content.push(Minimon::sub_page_header(
+                            &SETTINGS_MEMORY,
+                            &SETTINGS_BACK,
+                            Message::SettingsBack,
+                        ));
+                        content = content.push(self.memory.settings_ui(&self.config));
+                    }
+                    SettingsVariant::Network => {
+                        content = content.push(Minimon::sub_page_header(
+                            &SETTINGS_NETWORK,
+                            &SETTINGS_BACK,
+                            Message::SettingsBack,
+                        ));
+                        content = content.push(settings::item(
+                            fl!("enable-net-combined"),
+                            widget::toggler(
+                                self.config.network1.variant == NetworkVariant::Combined,
                             )
-                            .width(50)
-                        ),
-                    )
-                    .into(),
-                );
-            }
+                            .on_toggle(move |t| Message::ToggleNetCombined(t)),
+                        ));
+                        content = content.push(self.network1.settings_ui(&self.config));
+                        if self.config.network1.variant == NetworkVariant::Download {
+                            content = content.push(self.network2.settings_ui(&self.config));
+                        }
+                    }
+                    SettingsVariant::General => {
+                        content = content.push(Minimon::sub_page_header(
+                            &SETTINGS_GENERAL,
+                            &SETTINGS_BACK,
+                            Message::SettingsBack,
+                        ));
+                        content = content.push(self.general_settings_ui());
+                    }
+                }
+            } else {
+                if let Some((_exec, application)) = self.sysmon.as_ref() {
+                    content = content.push(Element::from(row!(
+                        widget::horizontal_space(),
+                        widget::button::standard(application)
+                            .on_press(Message::LaunchSystemMonitor())
+                            .trailing_icon(widget::button::link::icon()),
+                        widget::horizontal_space()
+                    )));
+                }
 
-            net_bandwidth_items.push(
-                row!(
-                    widget::horizontal_space(),
-                    widget::button::standard(fl!("change-colors")).on_press(
-                        Message::ColorPickerOpen(DeviceKind::Network(NetworkVariant::Combined))
-                    ),
-                    widget::horizontal_space()
-                )
-                .into(),
-            );
+                let cpu = widget::text::body(self.cpu.to_string());
+                let memory = widget::text::body(self.memory.to_string());
 
-            let net_right_column = Column::with_children(net_bandwidth_items);
-
-            net_elements.push(Element::from(net_right_column.spacing(cosmic.space_xs())));
-
-            let net_row = Row::with_children(net_elements)
-                .align_y(Alignment::Center)
-                .spacing(0);
-
-            let change_label_setting = settings::item(
-                fl!("change-label-size"),
-                spin_button(
-                    self.config.label_size_default.to_string(),
-                    self.config.label_size_default,
-                    1,
-                    5,
-                    20,
-                    Message::LabelSizeChanged,
-                ),
-            );
-
-            let mut content_list = widget::list_column();
-            if let Some((_exec, application)) = self.sysmon.as_ref() {
-                content_list = content_list.add(row!(
-                    widget::horizontal_space(),
-                    widget::button::standard(application)
-                        .on_press(Message::LaunchSystemMonitor())
-                        .trailing_icon(widget::button::link::icon()),
-                    widget::horizontal_space()
+                let sample_rate_ms = self.config.refresh_rate;
+                let network = widget::text::body(format!(
+                    "↓ {} ↑ {}",
+                    &self
+                        .network1
+                        .download_label(sample_rate_ms, network::UnitVariant::Long),
+                    &self
+                        .network1
+                        .upload_label(sample_rate_ms, network::UnitVariant::Long)
                 ));
-            }
-            let content_list = content_list // = widget::list_column()
-                .spacing(5)
-                .add(Element::from(cpu_row))
-                .add(Element::from(mem_row))
-                .add(Element::from(net_row))
-                .add(settings::item(
-                    fl!("refresh-rate"),
-                    Element::from(refresh_row),
-                ))
-                .add(change_label_setting);
 
+                let sensor_settings = list::ListColumn::new()
+                    .add(Minimon::go_next_with_item(
+                        "General settings",
+                        text::body(""),
+                        Message::SettingsGeneral,
+                    ))
+                    .add(Minimon::go_next_with_item("CPU", cpu, Message::SettingsCpu))
+                    .add(Minimon::go_next_with_item(
+                        "Memory",
+                        memory,
+                        Message::SettingsMemory,
+                    ))
+                    .add(Minimon::go_next_with_item(
+                        "Network",
+                        network,
+                        Message::SettingsNetwork,
+                    ))
+                    .padding(0);
+
+                content = content.push(sensor_settings);
+            }
+
+            content = content.padding(padding).spacing(padding);
+            //let content = column!(sensor_settings);
             let limits = Limits::NONE
                 .max_width(420.0)
                 .min_width(360.0)
@@ -609,7 +559,7 @@ impl cosmic::Application for Minimon {
 
             self.core
                 .applet
-                .popup_container(content_list)
+                .popup_container(content)
                 .limits(limits)
                 .into()
         }
@@ -655,13 +605,16 @@ impl cosmic::Application for Minimon {
                         self.colorpicker
                             .activate(kind, self.memory.demo_graph(self.config.memory.colors));
                     }
-                    DeviceKind::Network(_) => {
+                    DeviceKind::Network(variant) => {
+                        let (network, config) = network_select!(self, variant);
                         self.colorpicker
-                            .activate(kind, self.network.demo_graph(self.config.network.colors_combined));
+                            .activate(kind, network.demo_graph(config.colors));
                     }
                     DeviceKind::Disks(_) => {
-                        self.colorpicker
-                            .activate(kind, self.network.demo_graph(self.config.disks.colors_combined));
+                        self.colorpicker.activate(
+                            kind,
+                            self.network1.demo_graph(self.config.disks.colors_combined),
+                        );
                     }
                 }
                 self.colorpicker.set_variant(ColorVariant::Color1);
@@ -720,49 +673,64 @@ impl cosmic::Application for Minimon {
                 self.colorpicker.set_variant(variant);
             }
 
-            Message::ToggleAdaptiveNet(toggle) => {
-                self.config.network.adaptive_net = toggle;
+            Message::ToggleNetCombined(toggle) => {
+                if toggle.is_true() {
+                    self.network1.kind = NetworkVariant::Combined;
+                    self.config.network1.variant = NetworkVariant::Combined;
+                } else {
+                    self.network1.kind = NetworkVariant::Download;
+                    self.config.network1.variant = NetworkVariant::Download;
+                }
+                self.network2.kind = NetworkVariant::Upload;
+                self.config.network2.variant = NetworkVariant::Upload;
+                self.save_config();
+            }
+
+            Message::ToggleAdaptiveNet(variant, toggle) => {
+                let (network, config) = network_select!(self, variant);
+                config.adaptive = toggle;
                 if toggle {
-                    self.network.set_max_y(None);
+                    network.set_max_y(None);
                 }
                 self.save_config();
             }
 
-            Message::NetworkSelectUnit(unit) => {
-                if !self.config.network.adaptive_net {
-                    self.config.network.unit = Some(unit);
-                    self.set_network_max_y();
-                    self.save_config();
-                }
+            Message::NetworkSelectUnit(variant, unit) => {
+                let (_, config) = network_select!(self, variant);
+                config.unit = Some(unit);
+                self.set_network_max_y(variant);
+                self.save_config();
             }
 
             Message::SelectGraphType(dev) => {
                 match dev {
                     DeviceKind::Cpu(kind) => {
-                        self.cpu.set_kind(kind);
+                        self.cpu.set_graph_kind(kind);
                         self.config.cpu.kind = kind;
                     }
                     DeviceKind::Memory(kind) => {
-                        self.memory.set_kind(kind);
+                        self.memory.set_graph_kind(kind);
                         self.config.memory.kind = kind;
                     }
-                    _ => () // Disks and Network don't have graph selection
+                    _ => (), // Disks and Network don't have graph selection
                 }
                 self.save_config();
             }
 
-            Message::TextInputBandwidthChanged(string) => {
-                if string.is_empty() {
-                    self.config.network.bandwidth = 0;
-                    self.set_network_max_y();
-                    self.save_config();
-                } else if !self.config.network.adaptive_net {
-                    if let Ok(val) = string.parse::<u64>() {
-                        self.config.network.bandwidth = val;
-                        self.set_network_max_y();
-                        self.save_config();
-                    }
+            Message::TextInputBandwidthChanged(variant, string) => {
+                let value = if string.is_empty() {
+                    Some(0)
+                } else {
+                    string.parse::<u64>().ok()
+                };
+
+                if let Some(val) = value {
+                    let (_, config) = network_select!(self, variant);
+                    config.bandwidth = val;
                 }
+
+                self.set_network_max_y(variant);
+                self.save_config();
             }
 
             Message::Tick => {
@@ -784,12 +752,15 @@ impl cosmic::Application for Minimon {
                 self.config.cpu.chart = toggled;
                 self.save_config();
             }
+
             Message::ToggleMemoryChart(toggled) => {
                 self.config.memory.chart = toggled;
                 self.save_config();
             }
-            Message::ToggleNetChart(toggled) => {
-                self.config.network.chart = toggled;
+
+            Message::ToggleNetChart(variant, toggled) => {
+                let (_, config) = network_select!(self, variant);
+                config.chart = toggled;
                 self.save_config();
             }
 
@@ -803,8 +774,9 @@ impl cosmic::Application for Minimon {
                 self.save_config();
             }
 
-            Message::ToggleNetLabel(toggled) => {
-                self.config.network.label = toggled;
+            Message::ToggleNetLabel(variant, toggled) => {
+                let (_, config) = network_select!(self, variant);
+                config.label = toggled;
                 self.save_config();
             }
 
@@ -812,12 +784,20 @@ impl cosmic::Application for Minimon {
                 self.config = config;
                 self.tick_timer = self.config.refresh_rate as i64;
                 self.cpu.set_colors(self.config.cpu.colors);
-                self.cpu.set_kind(self.config.cpu.kind);
+                self.cpu.set_graph_kind(self.config.cpu.kind);
                 self.memory.set_colors(self.config.memory.colors);
-                self.memory.set_kind(self.config.memory.kind);
-                self.network.set_colors(self.config.network.colors_combined);
-                self.set_network_max_y();
+                self.memory.set_graph_kind(self.config.memory.kind);
+                self.network1.set_colors(self.config.network1.colors);
+                self.network2.set_colors(self.config.network2.colors);
+                self.network1.kind = self.config.network1.variant;
+                self.network2.kind = self.config.network2.variant;
+                self.set_network_max_y(NetworkVariant::Download);
+                self.set_network_max_y(NetworkVariant::Upload);
                 self.set_tick();
+                print!(
+                    "net1 - {:?}. net2 - {:?}.",
+                    self.config.network1.variant, self.config.network2.variant
+                )
             }
 
             Message::ColorTextInputRedChanged(value) => {
@@ -858,12 +838,97 @@ impl cosmic::Application for Minimon {
                 self.config.label_size_default = size;
                 self.save_config();
             }
+
+            Message::SettingsBack => self.settings_page = None,
+            Message::SettingsGeneral => self.settings_page = Some(SettingsVariant::General),
+            Message::SettingsCpu => self.settings_page = Some(SettingsVariant::Cpu),
+            Message::SettingsMemory => self.settings_page = Some(SettingsVariant::Memory),
+            Message::SettingsNetwork => self.settings_page = Some(SettingsVariant::Network),
         }
         Task::none()
     }
 }
 
 impl Minimon {
+    pub fn sub_page_header<'a, Message: 'static + Clone>(
+        sub_page: &'a str,
+        parent_page: &'a str,
+        on_press: Message,
+    ) -> Element<'a, Message> {
+        let previous_button = widget::button::icon(widget::icon::from_name("go-previous-symbolic"))
+            .extra_small()
+            .padding(0)
+            .label(parent_page)
+            .spacing(4)
+            .class(widget::button::ButtonClass::Link)
+            .on_press(on_press);
+
+        let sub_page_header = widget::row::with_capacity(2).push(text::title3(sub_page));
+
+        widget::column::with_capacity(2)
+            .push(previous_button)
+            .push(sub_page_header)
+            .spacing(6)
+            .width(iced::Length::Shrink)
+            .into()
+    }
+
+    pub fn go_next_with_item<'a, Msg: Clone + 'static>(
+        description: &'a str,
+        item: impl Into<cosmic::Element<'a, Msg>>,
+        msg_opt: impl Into<Option<Msg>> + Clone,
+    ) -> cosmic::Element<'a, Msg> {
+        settings::item_row(vec![
+            widget::text::body(description)
+                .wrapping(iced::core::text::Wrapping::Word)
+                .into(),
+            widget::horizontal_space().into(),
+            widget::row::with_capacity(2)
+                .push(item)
+                .push(widget::icon::from_name("go-next-symbolic").size(16).icon())
+                .align_y(Alignment::Center)
+                .spacing(cosmic::theme::spacing().space_s)
+                .into(),
+        ])
+        .apply(widget::container)
+        .class(cosmic::theme::Container::List)
+        .apply(widget::button::custom)
+        .padding(0)
+        .class(cosmic::theme::Button::Transparent)
+        .on_press_maybe(msg_opt.into())
+        .into()
+    }
+
+    fn general_settings_ui(&self) -> Element<crate::app::Message> {
+        let refresh_rate = self.config.refresh_rate as f64 / 1000.0;
+
+        let refresh_row = settings::item(
+            fl!("refresh-rate"),
+            spin_button(
+                format!("{:.2}", refresh_rate),
+                refresh_rate,
+                0.250,
+                0.250,
+                5.00,
+                Message::RefreshRateChanged,
+            ),
+        );
+
+        let label_row = settings::item(
+            fl!("change-label-size"),
+            spin_button(
+                self.config.label_size_default.to_string(),
+                self.config.label_size_default,
+                1,
+                5,
+                20,
+                Message::LabelSizeChanged,
+            ),
+        );
+
+        column!(refresh_row, label_row).spacing(10).into()
+    }
+
     fn make_icon_handle<T: Sensor>(sensor: &T) -> cosmic::widget::icon::Handle {
         cosmic::widget::icon::from_svg_bytes(sensor.graph().into_bytes())
     }
@@ -902,13 +967,14 @@ impl Minimon {
                 self.config.memory.colors = colors;
                 self.memory.set_colors(colors);
             }
-            DeviceKind::Network(_) => {
-                self.config.network.colors_combined = colors;
-                self.network.set_colors(colors);
+            DeviceKind::Network(variant) => {
+                let (network, config) = network_select!(self, variant);
+                config.colors = colors;
+                network.set_colors(colors);
             }
             DeviceKind::Disks(_) => {
                 self.config.disks.colors_combined = colors;
-                self.network.set_colors(colors);
+                self.network1.set_colors(colors);
             }
         }
     }
@@ -926,24 +992,24 @@ impl Minimon {
         );
     }
 
-    fn set_network_max_y(&mut self) {
-        if self.config.network.adaptive_net {
-            self.network.set_max_y(None);
+    fn set_network_max_y(&mut self, variant: NetworkVariant) {
+        let (network, config) = network_select!(self, variant);
+        if config.adaptive {
+            network.set_max_y(None);
         } else {
-            let unit = self.config.network.unit.unwrap_or(1);
-            let multiplier: [u64; 5] = [1, 1000, 1_000_000, 1_000_000_000, 1_000_000_000_000];
-
-            let sec_per_tic: f64 = self.config.refresh_rate as f64 / 1000.0;
-            let new_y = (self.config.network.bandwidth * multiplier[unit]) as f64 * sec_per_tic;
-
-            self.network.set_max_y(Some(new_y.round() as u64));
+            let unit = config.unit.unwrap_or(1).min(4); // ensure safe index
+            let multiplier = [1, 1_000, 1_000_000, 1_000_000_000, 1_000_000_000_000];
+            let sec_per_tic = self.config.refresh_rate as f64 / 1000.0;
+            let new_y = (config.bandwidth * multiplier[unit]) as f64 * sec_per_tic;
+            network.set_max_y(Some(new_y.round() as u64));
         }
     }
 
     fn refresh_stats(&mut self) {
         self.cpu.update();
         self.memory.update();
-        self.network.update();
+        self.network1.update();
+        self.network2.update();
         self.disks.update();
     }
 

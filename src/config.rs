@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     fl,
-    sensors::{disks::DisksVariant, network::NetworkVariant},
+    sensors::{disks::DisksVariant},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
@@ -89,17 +89,45 @@ impl GraphColors {
                 color4: Srgba::from_components((187, 41, 187, 255)),
                 ..Default::default()
             },
-            DeviceKind::Network(_) => GraphColors {
-                color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                color2: Srgba::from_components((47, 141, 255, 255)),
-                color3: Srgba::from_components((255, 0, 0, 255)),
-                color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+            DeviceKind::Network(k) => match k {
+                NetworkVariant::Combined => GraphColors {
+                    color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                    color2: Srgba::from_components((47, 141, 255, 255)),
+                    color3: Srgba::from_components((255, 0, 0, 255)),
+                    color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                },
+                NetworkVariant::Download => GraphColors {
+                    color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                    color2: Srgba::from_components((47, 141, 255, 255)),
+                    color3: Srgba::from_components((255, 0, 0, 0)),
+                    color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                },
+                NetworkVariant::Upload => GraphColors {
+                    color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                    color2: Srgba::from_components((47, 141, 255, 0)),
+                    color3: Srgba::from_components((255, 0, 0, 255)),
+                    color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                },
             },
-            DeviceKind::Disks(_) => GraphColors {
-                color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                color2: Srgba::from_components((47, 141, 255, 255)),
-                color3: Srgba::from_components((255, 0, 0, 255)),
-                color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+            DeviceKind::Disks(k) => match k {
+                DisksVariant::Combined => GraphColors {
+                    color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                    color2: Srgba::from_components((47, 141, 255, 255)),
+                    color3: Srgba::from_components((255, 0, 0, 255)),
+                    color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                },
+                DisksVariant::Write => GraphColors {
+                    color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                    color2: Srgba::from_components((47, 141, 255, 255)),
+                    color3: Srgba::from_components((255, 0, 0, 0)),
+                    color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                },
+                DisksVariant::Read => GraphColors {
+                    color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                    color2: Srgba::from_components((47, 141, 255, 0)),
+                    color3: Srgba::from_components((255, 0, 0, 255)),
+                    color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                },
             },
         }
     }
@@ -123,7 +151,7 @@ impl GraphColors {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
 #[version = 1]
 pub struct CpuConfig {
     pub chart: bool,
@@ -163,18 +191,23 @@ impl Default for MemoryConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum NetworkVariant {
+    Download,
+    Upload,
+    Combined,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq)]
 #[version = 1]
 pub struct NetworkConfig {
     pub chart: bool,
     pub label: bool,
-    pub adaptive_net: bool,
+    pub adaptive: bool,
     pub bandwidth: u64,
     pub unit: Option<usize>,
-    pub combined: bool,
-    pub colors_combined: GraphColors,
-    pub colors_download: GraphColors,
-    pub colors_upload: GraphColors,
+    pub colors: GraphColors,
+    pub variant: NetworkVariant,
 }
 
 impl Default for NetworkConfig {
@@ -182,13 +215,11 @@ impl Default for NetworkConfig {
         Self {
             chart: true,
             label: false,
-            adaptive_net: true,
+            adaptive: true,
             bandwidth: 62_500_000, // 500Mbit/s
             unit: Some(0),
-            combined: true,
-            colors_combined: GraphColors::new(DeviceKind::Network(NetworkVariant::Combined)),
-            colors_download: GraphColors::new(DeviceKind::Network(NetworkVariant::Download)),
-            colors_upload: GraphColors::new(DeviceKind::Network(NetworkVariant::Upload)),
+            colors: GraphColors::new(DeviceKind::Network(NetworkVariant::Upload)),
+            variant: NetworkVariant::Download,
         }
     }
 }
@@ -220,9 +251,13 @@ impl Default for DisksConfig {
 pub struct MinimonConfig {
     pub refresh_rate: u64,
     pub label_size_default: u16,
+
     pub cpu: CpuConfig,
     pub memory: MemoryConfig,
-    pub network: NetworkConfig,
+
+    pub network1: NetworkConfig,
+    pub network2: NetworkConfig,
+
     pub disks: DisksConfig,
 }
 
@@ -233,7 +268,8 @@ impl Default for MinimonConfig {
             label_size_default: 11,
             cpu: CpuConfig::default(),
             memory: MemoryConfig::default(),
-            network: NetworkConfig::default(),
+            network1: NetworkConfig::default(),
+            network2: NetworkConfig::default(),
             disks: DisksConfig::default(),
         }
     }

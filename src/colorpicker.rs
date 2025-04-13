@@ -311,6 +311,7 @@ impl ColorPicker {
         let mut children = Vec::new();
 
         let dmo = self.demo_svg.as_ref().expect("ERROR: No demo svg!");
+        children.push(widget::horizontal_space().into());
         for (s, c) in dmo.color_choices() {
             children.push(Element::from(widget::radio(
                 s,
@@ -318,6 +319,7 @@ impl ColorPicker {
                 if self.variant() == c { Some(c) } else { None },
                 Message::ColorPickerSelectVariant,
             )));
+            children.push(widget::horizontal_space().into());
         }
 
         let fields = cosmic::widget::row::with_children(children);

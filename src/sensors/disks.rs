@@ -4,11 +4,29 @@ use sysinfo::Disks as DisksInfo;
 
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, GraphColors, GraphKind},
+    config::{ColorVariant, DeviceKind, GraphColors, GraphKind, MinimonConfig},
     fl,
     svg_graph::SvgColors,
 };
+
+use cosmic::Element;
+
+use cosmic::widget::{settings, toggler};
+use cosmic::widget;
+
+use cosmic::{
+    iced::{
+        widget::{column, row},
+        Alignment,
+    },
+    iced_widget::Row,
+};
+
+
+use crate::app::Message;
+
 use lazy_static::lazy_static;
+
 
 use super::Sensor;
 
@@ -78,11 +96,11 @@ impl DemoGraph for Disks {
 }
 
 impl Sensor for Disks {
-    fn kind(&self) -> GraphKind {
+    fn graph_kind(&self) -> GraphKind {
         GraphKind::Line
     }
 
-    fn set_kind(&mut self, kind: GraphKind) {
+    fn set_graph_kind(&mut self, kind: GraphKind) {
         assert!(kind == GraphKind::Line);
     }
 
@@ -124,6 +142,11 @@ impl Sensor for Disks {
             None,
         )
     }
+
+    fn settings_ui(&self, config: &MinimonConfig) -> Element<crate::app::Message> {
+        Element::new(cosmic::widget::text::body("")).into()
+    }
+    
 }
 
 impl Disks {

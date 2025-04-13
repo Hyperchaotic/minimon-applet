@@ -1,15 +1,33 @@
+use cosmic::Element;
 use sysinfo::System;
 
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, GraphColors, GraphKind},
+    config::{ColorVariant, DeviceKind, GraphColors, GraphKind, MinimonConfig},
     fl,
     svg_graph::SvgColors,
 };
+
+use cosmic::widget::{settings, toggler};
+use cosmic::widget;
+
+use cosmic::{
+    iced::{
+        widget::{column, row},
+        Alignment,
+    },
+    iced_widget::Row,
+};
+
+
+use crate::app::Message;
+
 use lazy_static::lazy_static;
 use std::{collections::VecDeque, fmt::Write};
 
 use super::Sensor;
+
+const GRAPH_OPTIONS: [&'static str; 2] = ["Ring", "Line"];
 
 const MAX_SAMPLES: usize = 21;
 
@@ -49,6 +67,7 @@ pub struct Memory {
     colors: GraphColors,
     system: System,
     kind: GraphKind,
+    graph_options: Vec<&'static str>,
 
     /// current value ram load shown.
     value: String,
@@ -99,12 +118,11 @@ impl DemoGraph for Memory {
 }
 
 impl Sensor for Memory {
-
-    fn kind(&self) -> GraphKind {
+    fn graph_kind(&self) -> GraphKind {
         self.kind
     }
 
-    fn set_kind(&mut self, kind: GraphKind) {
+    fn set_graph_kind(&mut self, kind: GraphKind) {
         assert!(kind == GraphKind::Line || kind == GraphKind::Ring);
         self.kind = kind;
     }
@@ -148,6 +166,59 @@ impl Sensor for Memory {
             crate::svg_graph::line(&self.samples, self.max_val, &self.svg_colors)
         }
     }
+
+    fn settings_ui(&self, config: &MinimonConfig) -> Element<crate::app::Message> {
+        let theme = cosmic::theme::active();
+        let cosmic = theme.cosmic();
+
+        let mut mem_elements = Vec::new();
+        let mem = self.to_string();
+        mem_elements.push(Element::from(
+            column!(
+                widget::svg(widget::svg::Handle::from_memory(
+                    self.graph().as_bytes().to_owned(),
+                ))
+                .width(90)
+                .height(60),
+                cosmic::widget::text::body(mem),
+            )
+            .padding(5)
+            .align_x(Alignment::Center),
+        ));
+
+        let selected: Option<usize> = Some(self.graph_kind().into());
+
+        let mem_kind = self.graph_kind();
+        mem_elements.push(Element::from(
+            column!(
+                widget::text::title4(fl!("memory-title")),
+                settings::item(
+                    fl!("enable-memory-chart"),
+                    toggler(config.memory.chart)
+                        .on_toggle(|value| { Message::ToggleMemoryChart(value) }),
+                ),
+                settings::item(
+                    fl!("enable-memory-label"),
+                    toggler(config.memory.label)
+                        .on_toggle(|value| { Message::ToggleMemoryLabel(value) }),
+                ),
+                row!(
+                    widget::dropdown(&self.graph_options, selected, move |m| {
+                        Message::SelectGraphType(DeviceKind::Memory(m.into()))
+                    },)
+                    .width(70),
+                    widget::horizontal_space(),
+                    widget::button::standard(fl!("change-colors"))
+                        .on_press(Message::ColorPickerOpen(DeviceKind::Memory(mem_kind))),
+                )
+            )
+            .spacing(cosmic.space_xs()),
+        ));
+
+        Row::with_children(mem_elements)
+            .align_y(Alignment::Center)
+            .spacing(0).into()
+    }
 }
 
 impl Memory {
@@ -170,6 +241,7 @@ impl Memory {
             colors: GraphColors::default(),
             system,
             kind,
+            graph_options: GRAPH_OPTIONS.to_vec(),
             value,
             percentage,
             svg_colors: SvgColors::new(&GraphColors::default()),
