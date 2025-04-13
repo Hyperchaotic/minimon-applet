@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use cosmic::{iced_widget::Column, Element, Theme};
+use cosmic::{iced_widget::Column, Element};
 use sysinfo::Networks;
 
 use crate::{

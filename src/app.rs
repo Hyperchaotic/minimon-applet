@@ -161,6 +161,7 @@ pub enum Message {
     LaunchSystemMonitor(),
     RefreshRateChanged(f64),
     LabelSizeChanged(u16),
+    ToggleMonospaceLabels(bool),
 
     SettingsBack,
     SettingsGeneral,
@@ -839,6 +840,10 @@ impl cosmic::Application for Minimon {
                 self.save_config();
             }
 
+            Message::ToggleMonospaceLabels(toggle) => {
+                self.config.monospace_labels = toggle;
+                self.save_config();
+            }
             Message::SettingsBack => self.settings_page = None,
             Message::SettingsGeneral => self.settings_page = Some(SettingsVariant::General),
             Message::SettingsCpu => self.settings_page = Some(SettingsVariant::Cpu),
@@ -926,7 +931,13 @@ impl Minimon {
             ),
         );
 
-        column!(refresh_row, label_row).spacing(10).into()
+        let mono_row = settings::item(
+            fl!("settings-monospace_font"),
+            row!(widget::checkbox("", self.config.monospace_labels)
+                .on_toggle(Message::ToggleMonospaceLabels)),
+        );
+
+        column!(refresh_row, label_row, mono_row).spacing(10).into()
     }
 
     fn make_icon_handle<T: Sensor>(sensor: &T) -> cosmic::widget::icon::Handle {
@@ -1049,6 +1060,13 @@ impl Minimon {
             Size::PanelSize(PanelSize::XS) => self.config.label_size_default,
             _ => self.config.label_size_default,
         };
-        widget::text(text).size(size)
+
+        if self.config.monospace_labels {
+          widget::text(text).size(size).font(cosmic::font::mono())
+        } else {
+            widget::text(text).size(size)
+        }
+
+        
     }
 }

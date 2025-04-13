@@ -251,6 +251,7 @@ impl Default for DisksConfig {
 pub struct MinimonConfig {
     pub refresh_rate: u64,
     pub label_size_default: u16,
+    pub monospace_labels: bool,
 
     pub cpu: CpuConfig,
     pub memory: MemoryConfig,
@@ -266,6 +267,7 @@ impl Default for MinimonConfig {
         Self {
             refresh_rate: 1000,
             label_size_default: 11,
+            monospace_labels: false,
             cpu: CpuConfig::default(),
             memory: MemoryConfig::default(),
             network1: NetworkConfig::default(),

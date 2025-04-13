@@ -44,3 +44,4 @@ graph-disks-frame = Frame.
 settings-subpage-back = Back
 settings-subpage-general = General settings
 enable-net-combined = Combine download and upload
+settings-monospace_font = Monospace font for labels
