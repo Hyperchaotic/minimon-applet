@@ -52,3 +52,4 @@ disks-title-read = Disk read in bytes per second
 enable-disks-chart = Show disk chart
 enable-disks-label = Show disk label
 enable-disks-combined = Combine disk Write and Read
+choose-sysmon = System Monitor

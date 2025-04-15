@@ -57,7 +57,17 @@ lazy_static! {
     static ref SETTINGS_MEMORY: &'static str = fl!("memory-title").leak();
     static ref SETTINGS_NETWORK: &'static str = fl!("net-title").leak();
     static ref SETTINGS_DISKS: &'static str = fl!("disks-title").leak();
+
+    // The UI require static lifetime of dropdown items
+    static ref SYSMON_LIST: Vec<(String, String)> = Minimon::get_sysmon_list();
+
+    static ref SYSMON_NAMES: Vec<&'static str> = SYSMON_LIST
+    .iter()
+    .map(|(_, name)| (name.as_str()))
+    .collect();
+
 }
+
 
 macro_rules! network_select {
     ($self:ident, $variant:expr) => {
@@ -123,8 +133,6 @@ pub struct Minimon {
     tick_timer: i64,
     /// tick can be 250, 500 or 1000, depending on refresh rate modolu tick
     tick: Arc<AtomicI64>,
-    /// System Monitor Application
-    sysmon: Option<(String, String)>,
 }
 
 #[derive(Debug, Clone)]
@@ -178,6 +186,8 @@ pub enum Message {
     SettingsMemory,
     SettingsNetwork,
     SettingsDisks,
+
+    SysmonSelect(usize),
 }
 
 const APP_ID_DOCK: &str = "com.github.hyperchaotic.cosmic-applet-minimon-dock";
@@ -208,7 +218,6 @@ impl cosmic::Application for Minimon {
             config: MinimonConfig::default(),
             tick_timer: TICK,
             tick: Arc::new(AtomicI64::new(TICK)),
-            sysmon: Minimon::get_sysmon(),
         };
 
         (app, Task::none())
@@ -407,15 +416,21 @@ impl cosmic::Application for Minimon {
                     }
                 }
             } else {
-                if let Some((_exec, application)) = self.sysmon.as_ref() {
-                    content = content.push(Element::from(row!(
-                        widget::horizontal_space(),
-                        widget::button::standard(application)
-                            .on_press(Message::LaunchSystemMonitor())
-                            .trailing_icon(widget::button::link::icon()),
-                        widget::horizontal_space()
-                    )));
-                }
+                let list = &*SYSMON_NAMES;
+                let safe_index = if self.config.sysmon < list.len() {
+                    self.config.sysmon
+                } else {
+                    0
+                };
+                let name = list[safe_index];
+
+                content = content.push(Element::from(row!(
+                    widget::horizontal_space(),
+                    widget::button::standard(name)
+                        .on_press(Message::LaunchSystemMonitor())
+                        .trailing_icon(widget::button::link::icon()),
+                    widget::horizontal_space()
+                )));
 
                 let cpu = widget::text::body(self.cpu.to_string());
                 let memory = widget::text::body(self.memory.to_string());
@@ -770,7 +785,7 @@ impl cosmic::Application for Minimon {
             }
 
             Message::LaunchSystemMonitor() => {
-                self.spawn_sysmon();
+                Minimon::spawn_sysmon_by_index(self.config.sysmon);
             }
 
             Message::RefreshRateChanged(rate) => {
@@ -794,6 +809,10 @@ impl cosmic::Application for Minimon {
             Message::SettingsMemory => self.settings_page = Some(SettingsVariant::Memory),
             Message::SettingsNetwork => self.settings_page = Some(SettingsVariant::Network),
             Message::SettingsDisks => self.settings_page = Some(SettingsVariant::Disks),
+            Message::SysmonSelect(sysmon) => {
+                self.config.sysmon = sysmon;
+                self.save_config();
+            }
         }
         Task::none()
     }
@@ -882,7 +901,19 @@ impl Minimon {
                 .on_toggle(Message::ToggleMonospaceLabels)),
         );
 
-        column!(refresh_row, label_row, mono_row).spacing(10).into()
+        let sysmon_row = settings::item(
+            fl!("choose-sysmon"),
+            row!(widget::dropdown(
+                &SYSMON_NAMES,
+                Some(self.config.sysmon),
+                Message::SysmonSelect
+            )
+            .width(220)),
+        );
+
+        column!(refresh_row, label_row, mono_row, sysmon_row)
+            .spacing(10)
+            .into()
     }
 
     fn cpu_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
@@ -1186,31 +1217,59 @@ impl Minimon {
         self.disks2.update();
     }
 
-    fn spawn_sysmon(&self) {
-        if let Some((exec, _application)) = self.sysmon.as_ref() {
-            let _child = std::process::Command::new(exec).spawn();
-        }
+    fn spawn_sysmon_by_index(index: usize) {
+        let list = &*SYSMON_LIST;
+        let safe_index = if index < list.len() { index } else { 0 };
+        let (command, _) = &list[safe_index];
+
+        let _ = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(command)
+            .spawn();
     }
 
-    /// Check if a system monitor application exist
-    fn get_sysmon() -> Option<(String, String)> {
-        let system_monitors = vec![
+    fn get_sysmon_list() -> Vec<(String, String)> {
+        let mut found: Vec<(String, String)> = Vec::new();
+
+        // Native system monitors
+        let native_monitors = vec![
             ("observatory", "COSMIC Observatory"),
-            ("gnome-system-monitor", "System Monitor"),
-            ("xfce4-taskmanager", "Task Manager"),
-            ("plasma-systemmonitor", "System Monitor"),
-            ("mate-system-monitor", "System Monitor"),
-            ("lxqt-taskmanager", "Task Manager"),
+            ("gnome-system-monitor", "GNOME System Monitor"),
+            ("xfce4-taskmanager", "XFCE Task Manager"),
+            ("plasma-systemmonitor", "Plasma System Monitor"),
+            ("mate-system-monitor", "MATE System Monitor"),
+            ("lxqt-taskmanager", "LXQt Task Manager"),
         ];
 
-        for (command, name) in system_monitors {
-            if let Ok(o) = std::process::Command::new("which").arg(command).output() {
-                if !o.stdout.is_empty() {
-                    return Some((command.to_string(), name.to_string()));
+        for (command, name) in native_monitors {
+            if let Ok(output) = std::process::Command::new("which").arg(command).output() {
+                if output.status.success() && !output.stdout.is_empty() {
+                    found.push((command.to_string(), name.to_string()));
                 }
             }
         }
-        None
+
+        // Flatpak-based system monitors
+        let flatpak_monitors = vec![
+            ("net.nokyan.Resources", "Resources"),
+            ("com.github.gi_r.Usage", "Usage"),
+            ("org.gnome.SystemMonitor", "GNOME System Monitor (Flatpak)"),
+            ("io.missioncenter.MissionCenter", "Mission Center"),
+        ];
+
+        for (flatpak_id, name) in flatpak_monitors {
+            if std::process::Command::new("flatpak")
+                .arg("info")
+                .arg(flatpak_id)
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+            {
+                found.push((format!("flatpak run {}", flatpak_id), name.to_string()));
+            }
+        }
+
+        found
     }
 
     fn figure_label<'a>(&self, text: String) -> widget::Text<'a, cosmic::Theme> {

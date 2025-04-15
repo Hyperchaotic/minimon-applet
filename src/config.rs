@@ -237,6 +237,8 @@ pub struct MinimonConfig {
 
     pub disks1: DisksConfig,
     pub disks2: DisksConfig,
+
+    pub sysmon: usize,
 }
 
 impl Default for MinimonConfig {
@@ -251,6 +253,7 @@ impl Default for MinimonConfig {
             network2: NetworkConfig::default(),
             disks1: DisksConfig::default(),
             disks2: DisksConfig::default(),
+            sysmon: 0,
         }
     }
 }
