@@ -68,7 +68,6 @@ lazy_static! {
 
 }
 
-
 macro_rules! network_select {
     ($self:ident, $variant:expr) => {
         match $variant {
@@ -399,7 +398,7 @@ impl cosmic::Application for Minimon {
                         content = content.push(settings::item(
                             fl!("enable-disks-combined"),
                             widget::toggler(self.config.disks1.variant == DisksVariant::Combined)
-                                .on_toggle(move |t| Message::ToggleDisksCombined(t)),
+                                .on_toggle(Message::ToggleDisksCombined),
                         ));
                         content = content.push(self.disks1.settings_ui(&self.config));
                         if self.config.disks1.variant == DisksVariant::Write {
@@ -416,21 +415,23 @@ impl cosmic::Application for Minimon {
                     }
                 }
             } else {
-                let list = &*SYSMON_NAMES;
-                let safe_index = if self.config.sysmon < list.len() {
-                    self.config.sysmon
-                } else {
-                    0
-                };
-                let name = list[safe_index];
+                if SYSMON_LIST.len() > 0 {
+                    let list = &*SYSMON_NAMES;
+                    let safe_index = if self.config.sysmon < list.len() {
+                        self.config.sysmon
+                    } else {
+                        0
+                    };
+                    let name = list[safe_index];
 
-                content = content.push(Element::from(row!(
-                    widget::horizontal_space(),
-                    widget::button::standard(name)
-                        .on_press(Message::LaunchSystemMonitor())
-                        .trailing_icon(widget::button::link::icon()),
-                    widget::horizontal_space()
-                )));
+                    content = content.push(Element::from(row!(
+                        widget::horizontal_space(),
+                        widget::button::standard(name)
+                            .on_press(Message::LaunchSystemMonitor())
+                            .trailing_icon(widget::button::link::icon()),
+                        widget::horizontal_space()
+                    )));
+                }
 
                 let cpu = widget::text::body(self.cpu.to_string());
                 let memory = widget::text::body(self.memory.to_string());
