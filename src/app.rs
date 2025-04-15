@@ -3,7 +3,7 @@ use cosmic::applet::{PanelType, Size};
 use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::cosmic_theme::palette::bool_mask::BoolMask;
 use cosmic::cosmic_theme::palette::{FromColor, WithAlpha};
-use std::{net, time};
+use std::time;
 
 use cosmic::app::{Core, Task};
 use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
@@ -25,9 +25,11 @@ use cosmic::{
 };
 
 use crate::colorpicker::{ColorPicker, DemoGraph};
-use crate::config::{ColorVariant, DeviceKind, GraphColors, GraphKind, NetworkVariant};
+use crate::config::{
+    ColorVariant, DeviceKind, DisksVariant, GraphColors, GraphKind, NetworkVariant,
+};
 use crate::sensors::cpu::Cpu;
-use crate::sensors::disks::{self, Disks, DisksVariant};
+use crate::sensors::disks::{self, Disks};
 use crate::sensors::memory::Memory;
 use crate::sensors::network::{self, Network};
 use crate::sensors::Sensor;
@@ -54,6 +56,7 @@ lazy_static! {
     static ref SETTINGS_CPU: &'static str = fl!("cpu-title").leak();
     static ref SETTINGS_MEMORY: &'static str = fl!("memory-title").leak();
     static ref SETTINGS_NETWORK: &'static str = fl!("net-title").leak();
+    static ref SETTINGS_DISKS: &'static str = fl!("disks-title").leak();
 }
 
 macro_rules! network_select {
@@ -84,6 +87,7 @@ enum SettingsVariant {
     Cpu,
     Memory,
     Network,
+    Disks,
 }
 
 pub struct Minimon {
@@ -99,7 +103,8 @@ pub struct Minimon {
     network2: Network,
 
     /// The network monitor
-    disks: Disks,
+    disks1: Disks,
+    disks2: Disks,
 
     /// The popup id.
     popup: Option<Id>,
@@ -143,16 +148,20 @@ pub enum Message {
     ColorTextInputAlphaChanged(String),
 
     ToggleNetCombined(bool),
+    ToggleNetChart(NetworkVariant, bool),
+    ToggleNetLabel(NetworkVariant, bool),
     ToggleAdaptiveNet(NetworkVariant, bool),
     NetworkSelectUnit(NetworkVariant, usize),
     TextInputBandwidthChanged(NetworkVariant, String),
+
+    ToggleDisksCombined(bool),
+    ToggleDisksChart(DisksVariant, bool),
+    ToggleDisksLabel(DisksVariant, bool),
 
     SelectGraphType(DeviceKind),
     Tick,
     PopupClosed(Id),
 
-    ToggleNetChart(NetworkVariant, bool),
-    ToggleNetLabel(NetworkVariant, bool),
     ToggleCpuChart(bool),
     ToggleCpuLabel(bool),
     ToggleMemoryChart(bool),
@@ -168,6 +177,7 @@ pub enum Message {
     SettingsCpu,
     SettingsMemory,
     SettingsNetwork,
+    SettingsDisks,
 }
 
 const APP_ID_DOCK: &str = "com.github.hyperchaotic.cosmic-applet-minimon-dock";
@@ -190,7 +200,8 @@ impl cosmic::Application for Minimon {
             memory: Memory::new(GraphKind::Line),
             network1: Network::new(NetworkVariant::Combined),
             network2: Network::new(NetworkVariant::Upload),
-            disks: Disks::new(DisksVariant::Combined),
+            disks1: Disks::new(DisksVariant::Combined),
+            disks2: Disks::new(DisksVariant::Read),
             popup: None,
             settings_page: None,
             colorpicker: ColorPicker::new(),
@@ -262,8 +273,10 @@ impl cosmic::Application for Minimon {
             && !self.config.network1.label
             && !self.config.network2.chart
             && !self.config.network2.label
-            && !self.config.disks.chart
-            && !self.config.disks.label
+            && !self.config.disks1.chart
+            && !self.config.disks1.label
+            && !self.config.disks2.chart
+            && !self.config.disks2.label
         {
             return self
                 .core
@@ -316,8 +329,8 @@ impl cosmic::Application for Minimon {
             elements.push(content.into());
         }
 
-        // Network
-        let combined = self.config.network1.variant == NetworkVariant::Combined;
+        // Network ==============================================================================================
+        let nw_combined = self.config.network1.variant == NetworkVariant::Combined;
 
         if self.config.network1.label {
             let mut network_labels: Vec<Element<Message>> = Vec::new();
@@ -335,12 +348,12 @@ impl cosmic::Application for Minimon {
                         .download_label(sample_rate_ms, network::UnitVariant::Short),
                 ),
             };
-            if combined {
+            if nw_combined {
                 network_labels.push(widget::vertical_space().into());
             }
             network_labels.push(dl_label.into());
 
-            if combined {
+            if nw_combined {
                 // UL
                 let ul_label = match horizontal {
                     true => self.figure_label(format!(
@@ -369,7 +382,7 @@ impl cosmic::Application for Minimon {
         }
 
         // Network
-        if self.config.network2.label && !combined {
+        if self.config.network2.label && !nw_combined {
             let mut network_labels: Vec<Element<Message>> = Vec::new();
 
             let ul_label = match horizontal {
@@ -380,7 +393,7 @@ impl cosmic::Application for Minimon {
                         .upload_label(sample_rate_ms, network::UnitVariant::Long)
                 )),
                 false => self.figure_label(
-                    self.network1
+                    self.network2
                         .upload_label(sample_rate_ms, network::UnitVariant::Short),
                 ),
             };
@@ -389,7 +402,7 @@ impl cosmic::Application for Minimon {
             elements.push(Column::from_vec(network_labels).into());
         }
 
-        if self.config.network2.chart && !combined {
+        if self.config.network2.chart && !nw_combined {
             let svg = self.network2.graph();
             let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
             let content = self.core.applet.icon_button_from_handle(handle);
@@ -397,18 +410,88 @@ impl cosmic::Application for Minimon {
             elements.push(content.into());
         }
 
-        // TESTING DISKS
-        /*
-                let dsks = self.disks.graph();
-                let handle = cosmic::widget::icon::from_svg_bytes(dsks.into_bytes());
-                let dsks_content = self.core.applet.icon_button_from_handle(handle);
-                elements.push(dsks_content.into());
+        // Disks ==============================================================================================
 
+        let disks_combined = self.config.disks1.variant == DisksVariant::Combined;
 
-                elements.push(self.figure_label(self.disks.write_label(sample_rate_ms, disks::UnitVariant::Long)).into());
-                elements.push(self.figure_label(self.disks.read_label(sample_rate_ms, disks::UnitVariant::Long)).into());
+        if self.config.disks1.label {
+            let mut disks_labels: Vec<Element<Message>> = Vec::new();
 
-        */
+            // Write
+            let wr_label = match horizontal {
+                true => self.figure_label(format!(
+                    "W {}",
+                    &self
+                        .disks1
+                        .write_label(sample_rate_ms, disks::UnitVariant::Long)
+                )),
+                false => self.figure_label(
+                    self.disks1
+                        .write_label(sample_rate_ms, disks::UnitVariant::Short),
+                ),
+            };
+            if disks_combined {
+                disks_labels.push(widget::vertical_space().into());
+            }
+            disks_labels.push(wr_label.into());
+
+            if disks_combined {
+                // Read
+                let rd_label = match horizontal {
+                    true => self.figure_label(format!(
+                        "R {}",
+                        &self
+                            .disks1
+                            .read_label(sample_rate_ms, disks::UnitVariant::Long)
+                    )),
+                    false => self.figure_label(
+                        self.disks1
+                            .read_label(sample_rate_ms, disks::UnitVariant::Short),
+                    ),
+                };
+                disks_labels.push(rd_label.into());
+                disks_labels.push(widget::vertical_space().into());
+            }
+            elements.push(Column::from_vec(disks_labels).into());
+        }
+
+        if self.config.disks1.chart {
+            let svg = self.disks1.graph();
+            let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+            let content = self.core.applet.icon_button_from_handle(handle);
+
+            elements.push(content.into());
+        }
+
+        // Network
+        if self.config.disks2.label && !disks_combined {
+            let mut disks_labels: Vec<Element<Message>> = Vec::new();
+
+            let rd_label = match horizontal {
+                true => self.figure_label(format!(
+                    "R {}",
+                    &self
+                        .disks2
+                        .read_label(sample_rate_ms, disks::UnitVariant::Long)
+                )),
+                false => self.figure_label(
+                    self.disks2
+                        .read_label(sample_rate_ms, disks::UnitVariant::Short),
+                ),
+            };
+            disks_labels.push(rd_label.into());
+
+            elements.push(Column::from_vec(disks_labels).into());
+        }
+
+        if self.config.disks2.chart && !disks_combined {
+            let svg = self.disks2.graph();
+            let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+            let content = self.core.applet.icon_button_from_handle(handle);
+
+            elements.push(content.into());
+        }
+
         let wrapper: Element<Message> = match horizontal {
             true => Row::from_vec(elements)
                 .align_y(Alignment::Center)
@@ -487,11 +570,27 @@ impl cosmic::Application for Minimon {
                             widget::toggler(
                                 self.config.network1.variant == NetworkVariant::Combined,
                             )
-                            .on_toggle(move |t| Message::ToggleNetCombined(t)),
+                            .on_toggle(Message::ToggleNetCombined),
                         ));
                         content = content.push(self.network1.settings_ui(&self.config));
                         if self.config.network1.variant == NetworkVariant::Download {
                             content = content.push(self.network2.settings_ui(&self.config));
+                        }
+                    }
+                    SettingsVariant::Disks => {
+                        content = content.push(Minimon::sub_page_header(
+                            &SETTINGS_DISKS,
+                            &SETTINGS_BACK,
+                            Message::SettingsBack,
+                        ));
+                        content = content.push(settings::item(
+                            fl!("enable-disks-combined"),
+                            widget::toggler(self.config.disks1.variant == DisksVariant::Combined)
+                                .on_toggle(move |t| Message::ToggleDisksCombined(t)),
+                        ));
+                        content = content.push(self.disks1.settings_ui(&self.config));
+                        if self.config.disks1.variant == DisksVariant::Write {
+                            content = content.push(self.disks2.settings_ui(&self.config));
                         }
                     }
                     SettingsVariant::General => {
@@ -528,6 +627,16 @@ impl cosmic::Application for Minimon {
                         .upload_label(sample_rate_ms, network::UnitVariant::Long)
                 ));
 
+                let disks = widget::text::body(format!(
+                    "W {} R {}",
+                    &self
+                        .disks1
+                        .write_label(sample_rate_ms, disks::UnitVariant::Long),
+                    &self
+                        .disks1
+                        .read_label(sample_rate_ms, disks::UnitVariant::Long)
+                ));
+
                 let sensor_settings = list::ListColumn::new()
                     .add(Minimon::go_next_with_item(
                         "General settings",
@@ -544,6 +653,11 @@ impl cosmic::Application for Minimon {
                         "Network",
                         network,
                         Message::SettingsNetwork,
+                    ))
+                    .add(Minimon::go_next_with_item(
+                        "Disks",
+                        disks,
+                        Message::SettingsDisks,
                     ))
                     .padding(0);
 
@@ -611,11 +725,10 @@ impl cosmic::Application for Minimon {
                         self.colorpicker
                             .activate(kind, network.demo_graph(config.colors));
                     }
-                    DeviceKind::Disks(_) => {
-                        self.colorpicker.activate(
-                            kind,
-                            self.network1.demo_graph(self.config.disks.colors_combined),
-                        );
+                    DeviceKind::Disks(variant) => {
+                        let (disks, _) = disks_select!(self, variant);
+                        self.colorpicker
+                            .activate(kind, disks.demo_graph(disks.colors()));
                     }
                 }
                 self.colorpicker.set_variant(ColorVariant::Color1);
@@ -684,6 +797,31 @@ impl cosmic::Application for Minimon {
                 }
                 self.network2.kind = NetworkVariant::Upload;
                 self.config.network2.variant = NetworkVariant::Upload;
+                self.save_config();
+            }
+
+            Message::ToggleDisksCombined(toggle) => {
+                if toggle.is_true() {
+                    self.disks1.kind = DisksVariant::Combined;
+                    self.config.disks1.variant = DisksVariant::Combined;
+                } else {
+                    self.disks1.kind = DisksVariant::Write;
+                    self.config.disks1.variant = DisksVariant::Write;
+                }
+                self.disks2.kind = DisksVariant::Read;
+                self.config.disks2.variant = DisksVariant::Read;
+                self.save_config();
+            }
+
+            Message::ToggleDisksChart(variant, toggled) => {
+                let (_, config) = disks_select!(self, variant);
+                config.chart = toggled;
+                self.save_config();
+            }
+
+            Message::ToggleDisksLabel(variant, toggled) => {
+                let (_, config) = disks_select!(self, variant);
+                config.label = toggled;
                 self.save_config();
             }
 
@@ -792,12 +930,14 @@ impl cosmic::Application for Minimon {
                 self.network2.set_colors(self.config.network2.colors);
                 self.network1.kind = self.config.network1.variant;
                 self.network2.kind = self.config.network2.variant;
+                self.disks1.kind = self.config.disks1.variant;
+                self.disks2.kind = self.config.disks2.variant;
                 self.set_network_max_y(NetworkVariant::Download);
                 self.set_network_max_y(NetworkVariant::Upload);
                 self.set_tick();
                 print!(
-                    "net1 - {:?}. net2 - {:?}.",
-                    self.config.network1.variant, self.config.network2.variant
+                    "disk1 - {:?}. disk2 - {:?}.",
+                    self.config.disks1.variant, self.config.disks2.variant
                 )
             }
 
@@ -849,6 +989,7 @@ impl cosmic::Application for Minimon {
             Message::SettingsCpu => self.settings_page = Some(SettingsVariant::Cpu),
             Message::SettingsMemory => self.settings_page = Some(SettingsVariant::Memory),
             Message::SettingsNetwork => self.settings_page = Some(SettingsVariant::Network),
+            Message::SettingsDisks => self.settings_page = Some(SettingsVariant::Disks),
         }
         Task::none()
     }
@@ -983,9 +1124,10 @@ impl Minimon {
                 config.colors = colors;
                 network.set_colors(colors);
             }
-            DeviceKind::Disks(_) => {
-                self.config.disks.colors_combined = colors;
-                self.network1.set_colors(colors);
+            DeviceKind::Disks(variant) => {
+                let (disks, config) = disks_select!(self, variant);
+                config.colors = colors;
+                disks.set_colors(colors);
             }
         }
     }
@@ -1021,7 +1163,8 @@ impl Minimon {
         self.memory.update();
         self.network1.update();
         self.network2.update();
-        self.disks.update();
+        self.disks1.update();
+        self.disks2.update();
     }
 
     fn spawn_sysmon(&self) {
@@ -1062,11 +1205,9 @@ impl Minimon {
         };
 
         if self.config.monospace_labels {
-          widget::text(text).size(size).font(cosmic::font::mono())
+            widget::text(text).size(size).font(cosmic::font::mono())
         } else {
             widget::text(text).size(size)
         }
-
-        
     }
 }

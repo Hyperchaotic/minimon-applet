@@ -8,8 +8,8 @@ use crate::{
 };
 use cosmic::Element;
 
-use cosmic::widget::{settings, toggler};
 use cosmic::widget;
+use cosmic::widget::{settings, toggler};
 
 use cosmic::{
     iced::{
@@ -18,7 +18,6 @@ use cosmic::{
     },
     iced_widget::Row,
 };
-
 
 use crate::app::Message;
 
@@ -58,7 +57,7 @@ lazy_static! {
     ];
 }
 
-const GRAPH_OPTIONS: [&'static str; 2] = ["Ring", "Line"];
+const GRAPH_OPTIONS: [&str; 2] = ["Ring", "Line"];
 
 #[derive(Debug)]
 pub struct Cpu {
@@ -173,10 +172,7 @@ impl Sensor for Cpu {
         }
     }
 
-    fn settings_ui(
-        &self, 
-        config: &MinimonConfig
-    ) -> Element<crate::app::Message> {
+    fn settings_ui(&self, config: &MinimonConfig) -> Element<crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 
@@ -203,13 +199,11 @@ impl Sensor for Cpu {
             column!(
                 settings::item(
                     fl!("enable-cpu-chart"),
-                    toggler(config.cpu.chart)
-                        .on_toggle(|value| { Message::ToggleCpuChart(value) }),
+                    toggler(config.cpu.chart).on_toggle(|value| { Message::ToggleCpuChart(value) }),
                 ),
                 settings::item(
                     fl!("enable-cpu-label"),
-                    toggler(config.cpu.label)
-                        .on_toggle(|value| { Message::ToggleCpuLabel(value) }),
+                    toggler(config.cpu.label).on_toggle(|value| { Message::ToggleCpuLabel(value) }),
                 ),
                 row!(
                     widget::dropdown(&self.graph_options, selected, move |m| {

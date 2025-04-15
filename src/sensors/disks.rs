@@ -9,10 +9,10 @@ use crate::{
     svg_graph::SvgColors,
 };
 
-use cosmic::Element;
+use cosmic::{widget::Column, Element};
 
-use cosmic::widget::{settings, toggler};
 use cosmic::widget;
+use cosmic::widget::settings;
 
 use cosmic::{
     iced::{
@@ -22,11 +22,10 @@ use cosmic::{
     iced_widget::Row,
 };
 
-
 use crate::app::Message;
+use crate::config::DisksVariant;
 
 use lazy_static::lazy_static;
-
 
 use super::Sensor;
 
@@ -42,12 +41,31 @@ lazy_static! {
     /// into `'static str` because:
     /// - These strings are only initialized once at program startup.
     /// - They are never deallocated since they are used globally.
-    static ref COLOR_CHOICES: [(&'static str, ColorVariant); 4] = [
+    static ref COLOR_CHOICES_COMBINED: [(&'static str, ColorVariant); 4] = [
         (fl!("graph-disks-write").leak(), ColorVariant::Color2),
         (fl!("graph-disks-read").leak(), ColorVariant::Color3),
         (fl!("graph-disks-back").leak(), ColorVariant::Color1),
         (fl!("graph-disks-frame").leak(), ColorVariant::Color4),
     ];
+    static ref COLOR_CHOICES_WRITE: [(&'static str, ColorVariant); 3] = [
+        (fl!("graph-disks-write").leak(), ColorVariant::Color2),
+        (fl!("graph-disks-back").leak(), ColorVariant::Color1),
+        (fl!("graph-disks-frame").leak(), ColorVariant::Color4),
+    ];
+    static ref COLOR_CHOICES_READ: [(&'static str, ColorVariant); 3] = [
+        (fl!("graph-disks-read").leak(), ColorVariant::Color3),
+        (fl!("graph-disks-back").leak(), ColorVariant::Color1),
+        (fl!("graph-disks-frame").leak(), ColorVariant::Color4),
+    ];
+}
+
+macro_rules! disks_select {
+    ($self:ident, $variant:expr) => {
+        match $variant {
+            DisksVariant::Combined | DisksVariant::Write => &$self.disks1,
+            _ => &$self.disks2,
+        }
+    };
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -56,29 +74,35 @@ pub enum UnitVariant {
     Long,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum DisksVariant {
-    Write,
-    Read,
-    Combined,
-}
-
 #[derive(Debug)]
 pub struct Disks {
     disks: DisksInfo,
     write: VecDeque<u64>,
     read: VecDeque<u64>,
+    max_y: Option<u64>,
     colors: GraphColors,
     svg_colors: SvgColors,
-    kind: DisksVariant,
+    pub kind: DisksVariant,
 }
 
 impl DemoGraph for Disks {
     fn demo(&self) -> String {
-        let download = VecDeque::from(DL_DEMO);
-        let upload = VecDeque::from(UL_DEMO);
+        let write = VecDeque::from(DL_DEMO);
+        let read = VecDeque::from(UL_DEMO);
 
-        crate::svg_graph::double_line(&download, &upload, GRAPH_SAMPLES, &self.svg_colors, None)
+        match self.kind {
+            DisksVariant::Combined => {
+                crate::svg_graph::double_line(&write, &read, GRAPH_SAMPLES, &self.svg_colors, None)
+            }
+            DisksVariant::Write => {
+                crate::svg_graph::line_adaptive(&write, GRAPH_SAMPLES, &self.svg_colors, None)
+            }
+            DisksVariant::Read => {
+                let mut cols = self.svg_colors.clone();
+                cols.color2 = cols.color3.clone();
+                crate::svg_graph::line_adaptive(&read, GRAPH_SAMPLES, &cols, None)
+            }
+        }
     }
 
     fn colors(&self) -> GraphColors {
@@ -91,7 +115,11 @@ impl DemoGraph for Disks {
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        (*COLOR_CHOICES).into()
+        match self.kind {
+            DisksVariant::Combined => (*COLOR_CHOICES_COMBINED).into(),
+            DisksVariant::Write => (*COLOR_CHOICES_WRITE).into(),
+            DisksVariant::Read => (*COLOR_CHOICES_READ).into(),
+        }
     }
 }
 
@@ -134,37 +162,130 @@ impl Sensor for Disks {
     }
 
     fn graph(&self) -> String {
-        crate::svg_graph::double_line(
-            &self.write,
-            &self.read,
-            GRAPH_SAMPLES,
-            &self.svg_colors,
-            None,
-        )
+        match self.kind {
+            DisksVariant::Combined => crate::svg_graph::double_line(
+                &self.write,
+                &self.read,
+                GRAPH_SAMPLES,
+                &self.svg_colors,
+                self.max_y,
+            ),
+            DisksVariant::Write => crate::svg_graph::line_adaptive(
+                &self.write,
+                GRAPH_SAMPLES,
+                &self.svg_colors,
+                self.max_y,
+            ),
+            DisksVariant::Read => {
+                let mut cols = self.svg_colors.clone();
+                cols.color2 = cols.color3.clone();
+                crate::svg_graph::line_adaptive(&self.read, GRAPH_SAMPLES, &cols, self.max_y)
+            }
+        }
     }
 
-    fn settings_ui(&self, config: &MinimonConfig) -> Element<crate::app::Message> {
-        Element::new(cosmic::widget::text::body("")).into()
+    fn settings_ui(&self, mmconfig: &MinimonConfig) -> Element<crate::app::Message> {
+        let theme = cosmic::theme::active();
+        let cosmic = theme.cosmic();
+        let mut disk_elements = Vec::new();
+
+        let sample_rate_ms = mmconfig.refresh_rate;
+
+        let wrrate = format!("W {}", &self.write_label(sample_rate_ms, UnitVariant::Long));
+
+        let rdrate = format!("R {}", &self.read_label(sample_rate_ms, UnitVariant::Long));
+
+        let config = disks_select!(mmconfig, self.kind);
+        let k = self.kind;
+
+        let mut rate = column!(Element::from(
+            widget::svg(widget::svg::Handle::from_memory(
+                self.graph().as_bytes().to_owned(),
+            ))
+            .width(90)
+            .height(60)
+        ));
+
+        rate = rate.push(Element::from(cosmic::widget::text::body("")));
+
+        match self.kind {
+            DisksVariant::Combined => {
+                rate = rate.push(cosmic::widget::text::body(wrrate));
+                rate = rate.push(cosmic::widget::text::body(rdrate));
+            }
+            DisksVariant::Write => {
+                rate = rate.push(cosmic::widget::text::body(wrrate));
+            }
+            DisksVariant::Read => {
+                rate = rate.push(cosmic::widget::text::body(rdrate));
+            }
+        };
+        disk_elements.push(Element::from(rate));
+
+        let mut disk_bandwidth_items = Vec::new();
+
+        let title = match self.kind {
+            DisksVariant::Combined => fl!("disks-title-combined"),
+            DisksVariant::Write => fl!("disks-title-write"),
+            DisksVariant::Read => fl!("disks-title-read"),
+        };
+
+        disk_bandwidth_items.push(Element::from(widget::text::title4(title)));
+
+        disk_bandwidth_items.push(
+            settings::item(
+                fl!("enable-disks-chart"),
+                widget::toggler(config.chart).on_toggle(move |t| Message::ToggleDisksChart(k, t)),
+            )
+            .into(),
+        );
+        disk_bandwidth_items.push(
+            settings::item(
+                fl!("enable-disks-label"),
+                widget::toggler(config.label).on_toggle(move |t| Message::ToggleDisksLabel(k, t)),
+            )
+            .into(),
+        );
+
+        disk_bandwidth_items.push(
+            row!(
+                widget::horizontal_space(),
+                widget::button::standard(fl!("change-colors"))
+                    .on_press(Message::ColorPickerOpen(DeviceKind::Disks(self.kind))),
+                widget::horizontal_space()
+            )
+            .into(),
+        );
+
+        let disk_right_column = Column::with_children(disk_bandwidth_items);
+
+        disk_elements.push(Element::from(disk_right_column.spacing(cosmic.space_xs())));
+
+        Row::with_children(disk_elements)
+            .align_y(Alignment::Center)
+            .spacing(0)
+            .into()
     }
-    
 }
 
 impl Disks {
     pub fn new(kind: DisksVariant) -> Self {
-
         let disks = DisksInfo::new_with_refreshed_list();
         let colors = GraphColors::new(DeviceKind::Disks(kind));
         Disks {
             disks,
             write: VecDeque::from(vec![0; MAX_SAMPLES]),
             read: VecDeque::from(vec![0; MAX_SAMPLES]),
+            max_y: None,
             colors,
-            kind: DisksVariant::Combined,
+            kind,
             svg_colors: SvgColors::new(&colors),
         }
     }
 
     fn makestr(val: u64, format: UnitVariant) -> String {
+        let mut formatted = String::with_capacity(20);
+
         let mut value = val as f64;
         let mut unit_index = 0;
         let units = if format == UnitVariant::Short {
@@ -179,13 +300,29 @@ impl Disks {
             unit_index += 1;
         }
 
-        if value < 10.0 {
-            format!("{:.2} {}", value, units[unit_index])
+        let s = if value < 10.0 {
+            &format!("{:.2} ", value)
         } else if value < 99.0 {
-            format!("{:.1} {}", value, units[unit_index])
+            &format!("{:.1} ", value)
         } else {
-            format!("{:.0} {}", value, units[unit_index])
+            &format!("{:.0} ", value)
+        };
+
+        if s.len() == 3 {
+            formatted.push(' ');
         }
+
+        formatted.push_str(s);
+        formatted.push_str(units[unit_index]);
+
+        if format == UnitVariant::Long {
+            let padding = 9usize.saturating_sub(formatted.len());
+            if padding > 0 {
+                formatted = " ".repeat(padding) + &formatted;
+            }
+        }
+
+        formatted
     }
 
     // If the sample rate doesn't match exactly one second (more or less),
@@ -221,7 +358,6 @@ impl Disks {
         let val = Disks::last_second_rate(&self.read, sample_interval_ms);
         Disks::makestr(val, format)
     }
-
 }
 
 const DL_DEMO: [u64; 21] = [

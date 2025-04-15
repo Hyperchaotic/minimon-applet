@@ -351,13 +351,13 @@ impl Network {
             formatted.push(' ');
         }
 
-        formatted.push_str(&s);
-        if unit_index == 0 {
+        formatted.push_str(s);
+        if unit_index == 0 && format == UnitVariant::Long {
             formatted.push(' ');
         }
         formatted.push_str(units[unit_index]);
 
-        if formatted.len() < 9 {
+        if formatted.len() < 9 && format == UnitVariant::Long {
             formatted.insert(0, ' ');
         }
 

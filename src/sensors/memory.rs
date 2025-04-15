@@ -8,8 +8,8 @@ use crate::{
     svg_graph::SvgColors,
 };
 
-use cosmic::widget::{settings, toggler};
 use cosmic::widget;
+use cosmic::widget::{settings, toggler};
 
 use cosmic::{
     iced::{
@@ -19,7 +19,6 @@ use cosmic::{
     iced_widget::Row,
 };
 
-
 use crate::app::Message;
 
 use lazy_static::lazy_static;
@@ -27,7 +26,7 @@ use std::{collections::VecDeque, fmt::Write};
 
 use super::Sensor;
 
-const GRAPH_OPTIONS: [&'static str; 2] = ["Ring", "Line"];
+const GRAPH_OPTIONS: [&str; 2] = ["Ring", "Line"];
 
 const MAX_SAMPLES: usize = 21;
 
@@ -187,7 +186,6 @@ impl Sensor for Memory {
         ));
 
         let selected: Option<usize> = Some(self.graph_kind().into());
-
         let mem_kind = self.graph_kind();
         mem_elements.push(Element::from(
             column!(
@@ -217,7 +215,8 @@ impl Sensor for Memory {
 
         Row::with_children(mem_elements)
             .align_y(Alignment::Center)
-            .spacing(0).into()
+            .spacing(0)
+            .into()
     }
 }
 
