@@ -53,3 +53,4 @@ enable-disks-chart = Show disk chart
 enable-disks-label = Show disk label
 enable-disks-combined = Combine disk Write and Read
 choose-sysmon = System Monitor
+memory-as-percentage = As percentage

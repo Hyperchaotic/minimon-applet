@@ -66,6 +66,7 @@ pub struct Memory {
     colors: GraphColors,
     system: System,
     kind: GraphKind,
+    show_percentage: bool,
     graph_options: Vec<&'static str>,
 
     /// current value ram load shown.
@@ -137,7 +138,17 @@ impl Sensor for Memory {
 
         if self.kind == GraphKind::Ring {
             self.value.clear();
-            let current_val = self.latest_sample();
+            let mut current_val = self.latest_sample();
+
+            let percentage: u64 = ((current_val / self.max_val as f64) * 100.0) as u64;
+            self.percentage.clear();
+            write!(self.percentage, "{percentage}").unwrap();
+
+            // If set, convert to percentage
+            if self.show_percentage {
+                current_val = (current_val * 100.0) / self.max_val as f64;
+            }
+
             if current_val < 10.0 {
                 write!(self.value, "{:.2}", current_val).unwrap();
             } else if current_val < 100.0 {
@@ -146,9 +157,6 @@ impl Sensor for Memory {
                 write!(self.value, "{}", current_val).unwrap();
             }
 
-            let percentage: u64 = ((current_val / self.max_val as f64) * 100.0) as u64;
-            self.percentage.clear();
-            write!(self.percentage, "{percentage}").unwrap();
         }
     }
 
@@ -171,7 +179,7 @@ impl Sensor for Memory {
         let cosmic = theme.cosmic();
 
         let mut mem_elements = Vec::new();
-        let mem = self.to_string();
+        let mem = self.to_string(false);
         mem_elements.push(Element::from(
             column!(
                 widget::svg(widget::svg::Handle::from_memory(
@@ -200,6 +208,12 @@ impl Sensor for Memory {
                     toggler(config.memory.label)
                         .on_toggle(|value| { Message::ToggleMemoryLabel(value) }),
                 ),
+                settings::item(
+                    fl!("memory-as-percentage"),
+                    toggler(config.memory.percentage)
+                        .on_toggle(Message::ToggleMemoryPercentage),
+                ),
+
                 row!(
                     widget::dropdown(&self.graph_options, selected, move |m| {
                         Message::SelectGraphType(DeviceKind::Memory(m.into()))
@@ -240,6 +254,7 @@ impl Memory {
             colors: GraphColors::default(),
             system,
             kind,
+            show_percentage: false,
             graph_options: GRAPH_OPTIONS.to_vec(),
             value,
             percentage,
@@ -249,13 +264,28 @@ impl Memory {
         memory
     }
 
+    pub fn set_percentage(&mut self, percentage: bool) {
+        self.show_percentage = percentage;
+    }
+
     pub fn latest_sample(&self) -> f64 {
         *self.samples.back().unwrap_or(&0f64)
     }
 
-    pub fn to_string(&self) -> String {
-        let current_val = self.latest_sample();
-        let unit = " GB";
+    pub fn to_string(&self, tight: bool) -> String {
+        let mut current_val = self.latest_sample();
+        let unit: &str;
+
+        if self.show_percentage {
+            current_val = (current_val * 100.0) / self.max_val as f64;
+            unit = "%";
+        } else {
+            if !tight {
+            unit = " GB";
+            } else {
+                unit = "GB";
+            }
+        }
 
         if current_val < 10.0 {
             format!("{:.2}{}", current_val, unit)

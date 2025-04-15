@@ -3,6 +3,7 @@ use cosmic::applet::{PanelType, Size};
 use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::cosmic_theme::palette::bool_mask::BoolMask;
 use cosmic::cosmic_theme::palette::{FromColor, WithAlpha};
+use cosmic::widget::divider::horizontal;
 use std::time;
 
 use cosmic::app::{Core, Task};
@@ -173,6 +174,7 @@ pub enum Message {
     ToggleCpuLabel(bool),
     ToggleMemoryChart(bool),
     ToggleMemoryLabel(bool),
+    ToggleMemoryPercentage(bool),
     ConfigChanged(MinimonConfig),
     LaunchSystemMonitor(),
     RefreshRateChanged(f64),
@@ -434,7 +436,7 @@ impl cosmic::Application for Minimon {
                 }
 
                 let cpu = widget::text::body(self.cpu.to_string());
-                let memory = widget::text::body(self.memory.to_string());
+                let memory = widget::text::body(self.memory.to_string(false));
 
                 let sample_rate_ms = self.config.refresh_rate;
                 let network = widget::text::body(format!(
@@ -733,6 +735,12 @@ impl cosmic::Application for Minimon {
                 self.save_config();
             }
 
+            Message::ToggleMemoryPercentage(toggled) => {
+                self.config.memory.percentage = toggled;
+                self.memory.set_percentage(toggled);
+                self.save_config();
+            }
+
             Message::ToggleNetLabel(variant, toggled) => {
                 let (_, config) = network_select!(self, variant);
                 config.label = toggled;
@@ -746,6 +754,7 @@ impl cosmic::Application for Minimon {
                 self.cpu.set_graph_kind(self.config.cpu.kind);
                 self.memory.set_colors(self.config.memory.colors);
                 self.memory.set_graph_kind(self.config.memory.kind);
+                self.memory.set_percentage(self.config.memory.percentage);
                 self.network1.set_colors(self.config.network1.colors);
                 self.network2.set_colors(self.config.network2.colors);
                 self.network1.kind = self.config.network1.variant;
@@ -942,13 +951,11 @@ impl Minimon {
         elements
     }
 
-    fn memory_panel_ui(&self, _horizontal: bool) -> Vec<Element<crate::app::Message>> {
+    fn memory_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
         let mut elements: Vec<Element<Message>> = Vec::new();
 
-        let formated_mem = format!("{:.1} GB", self.memory.latest_sample());
-        if self.config.memory.label {
-            elements.push(self.figure_label(formated_mem).into());
-        }
+        let formated_mem = self.memory.to_string(!horizontal);
+        elements.push(self.figure_label(formated_mem).into());
 
         if self.config.memory.chart {
             let content = self

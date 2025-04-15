@@ -257,18 +257,24 @@ impl Cpu {
     pub fn latest_sample(&self) -> f64 {
         *self.samples.back().unwrap_or(&0f64)
     }
+}
 
-    pub fn to_string(&self) -> String {
+use std::fmt;
+
+impl fmt::Display for Cpu {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let current_val = self.latest_sample();
         let unit = "%";
 
-        if current_val < 10.0 {
+        let output = if current_val < 10.0 {
             format!("{:.2}{}", current_val, unit)
         } else if current_val < 100.0 {
             format!("{:.1}{}", current_val, unit)
         } else {
             format!("{}{}", current_val, unit)
-        }
+        };
+
+        write!(f, "{}", output)
     }
 }
 

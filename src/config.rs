@@ -149,6 +149,7 @@ pub struct MemoryConfig {
     pub label: bool,
     pub kind: GraphKind,
     pub colors: GraphColors,
+    pub percentage: bool,
 }
 
 impl Default for MemoryConfig {
@@ -158,6 +159,7 @@ impl Default for MemoryConfig {
             label: false,
             kind: GraphKind::Ring,
             colors: GraphColors::new(DeviceKind::Memory(GraphKind::Line)),
+            percentage: false,
         }
     }
 }
