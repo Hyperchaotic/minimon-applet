@@ -249,13 +249,14 @@ impl cosmic::Application for Minimon {
         Some(Message::PopupClosed(id))
     }
     fn view(&self) -> Element<Message> {
+        let theme = cosmic::theme::active();
+        let cosmic = theme.cosmic();
         let horizontal = matches!(
             self.core.applet.anchor,
             PanelAnchor::Top | PanelAnchor::Bottom
         );
 
         let mut limits = Limits::NONE.min_width(1.).min_height(1.);
-
         if let Some(b) = self.core.applet.suggested_bounds {
             if b.width as i32 > 0 {
                 limits = limits.max_width(b.width);
@@ -265,6 +266,7 @@ impl cosmic::Application for Minimon {
             }
         }
 
+        // If nothing is showing, use symbolic icon
         if !self.config.cpu.chart
             && !self.config.cpu.label
             && !self.config.memory.chart
@@ -286,212 +288,14 @@ impl cosmic::Application for Minimon {
                 .into();
         }
 
-        let sample_rate_ms = self.config.refresh_rate;
-
-        // If we are below 10% and horizontal layout we can show another decimal
-        let formated_cpu = if self.cpu.latest_sample() < 10.0 && horizontal {
-            format!("{:.2}%", self.cpu.latest_sample())
-        } else {
-            format!("{:.1}%", self.cpu.latest_sample())
-        };
-
-        let formated_mem = format!("{:.1} GB", self.memory.latest_sample());
-
-        // vertical layout
+        // Build the full list of panel elements
         let mut elements: Vec<Element<Message>> = Vec::new();
+        elements.extend(self.cpu_panel_ui(horizontal));
+        elements.extend(self.memory_panel_ui(horizontal));
+        elements.extend(self.network_panel_ui(horizontal));
+        elements.extend(self.disks_panel_ui(horizontal));
 
-        let theme = cosmic::theme::active();
-        let cosmic = theme.cosmic();
-
-        if self.config.cpu.label {
-            elements.push(self.figure_label(formated_cpu).into());
-        }
-
-        if self.config.cpu.chart {
-            let content = self
-                .core
-                .applet
-                .icon_button_from_handle(Minimon::make_icon_handle(&self.cpu));
-
-            elements.push(content.into());
-        }
-
-        if self.config.memory.label {
-            elements.push(self.figure_label(formated_mem).into());
-        }
-
-        if self.config.memory.chart {
-            let content = self
-                .core
-                .applet
-                .icon_button_from_handle(Minimon::make_icon_handle(&self.memory));
-
-            elements.push(content.into());
-        }
-
-        // Network ==============================================================================================
-        let nw_combined = self.config.network1.variant == NetworkVariant::Combined;
-
-        if self.config.network1.label {
-            let mut network_labels: Vec<Element<Message>> = Vec::new();
-
-            // DL
-            let dl_label = match horizontal {
-                true => self.figure_label(format!(
-                    "↓ {}",
-                    &self
-                        .network1
-                        .download_label(sample_rate_ms, network::UnitVariant::Long)
-                )),
-                false => self.figure_label(
-                    self.network1
-                        .download_label(sample_rate_ms, network::UnitVariant::Short),
-                ),
-            };
-            if nw_combined {
-                network_labels.push(widget::vertical_space().into());
-            }
-            network_labels.push(dl_label.into());
-
-            if nw_combined {
-                // UL
-                let ul_label = match horizontal {
-                    true => self.figure_label(format!(
-                        "↑ {}",
-                        &self
-                            .network1
-                            .upload_label(sample_rate_ms, network::UnitVariant::Long)
-                    )),
-                    false => self.figure_label(
-                        self.network1
-                            .upload_label(sample_rate_ms, network::UnitVariant::Short),
-                    ),
-                };
-                network_labels.push(ul_label.into());
-                network_labels.push(widget::vertical_space().into());
-            }
-            elements.push(Column::from_vec(network_labels).into());
-        }
-
-        if self.config.network1.chart {
-            let svg = self.network1.graph();
-            let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
-            let content = self.core.applet.icon_button_from_handle(handle);
-
-            elements.push(content.into());
-        }
-
-        // Network
-        if self.config.network2.label && !nw_combined {
-            let mut network_labels: Vec<Element<Message>> = Vec::new();
-
-            let ul_label = match horizontal {
-                true => self.figure_label(format!(
-                    "↑ {}",
-                    &self
-                        .network2
-                        .upload_label(sample_rate_ms, network::UnitVariant::Long)
-                )),
-                false => self.figure_label(
-                    self.network2
-                        .upload_label(sample_rate_ms, network::UnitVariant::Short),
-                ),
-            };
-            network_labels.push(ul_label.into());
-
-            elements.push(Column::from_vec(network_labels).into());
-        }
-
-        if self.config.network2.chart && !nw_combined {
-            let svg = self.network2.graph();
-            let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
-            let content = self.core.applet.icon_button_from_handle(handle);
-
-            elements.push(content.into());
-        }
-
-        // Disks ==============================================================================================
-
-        let disks_combined = self.config.disks1.variant == DisksVariant::Combined;
-
-        if self.config.disks1.label {
-            let mut disks_labels: Vec<Element<Message>> = Vec::new();
-
-            // Write
-            let wr_label = match horizontal {
-                true => self.figure_label(format!(
-                    "W {}",
-                    &self
-                        .disks1
-                        .write_label(sample_rate_ms, disks::UnitVariant::Long)
-                )),
-                false => self.figure_label(
-                    self.disks1
-                        .write_label(sample_rate_ms, disks::UnitVariant::Short),
-                ),
-            };
-            if disks_combined {
-                disks_labels.push(widget::vertical_space().into());
-            }
-            disks_labels.push(wr_label.into());
-
-            if disks_combined {
-                // Read
-                let rd_label = match horizontal {
-                    true => self.figure_label(format!(
-                        "R {}",
-                        &self
-                            .disks1
-                            .read_label(sample_rate_ms, disks::UnitVariant::Long)
-                    )),
-                    false => self.figure_label(
-                        self.disks1
-                            .read_label(sample_rate_ms, disks::UnitVariant::Short),
-                    ),
-                };
-                disks_labels.push(rd_label.into());
-                disks_labels.push(widget::vertical_space().into());
-            }
-            elements.push(Column::from_vec(disks_labels).into());
-        }
-
-        if self.config.disks1.chart {
-            let svg = self.disks1.graph();
-            let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
-            let content = self.core.applet.icon_button_from_handle(handle);
-
-            elements.push(content.into());
-        }
-
-        // Network
-        if self.config.disks2.label && !disks_combined {
-            let mut disks_labels: Vec<Element<Message>> = Vec::new();
-
-            let rd_label = match horizontal {
-                true => self.figure_label(format!(
-                    "R {}",
-                    &self
-                        .disks2
-                        .read_label(sample_rate_ms, disks::UnitVariant::Long)
-                )),
-                false => self.figure_label(
-                    self.disks2
-                        .read_label(sample_rate_ms, disks::UnitVariant::Short),
-                ),
-            };
-            disks_labels.push(rd_label.into());
-
-            elements.push(Column::from_vec(disks_labels).into());
-        }
-
-        if self.config.disks2.chart && !disks_combined {
-            let svg = self.disks2.graph();
-            let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
-            let content = self.core.applet.icon_button_from_handle(handle);
-
-            elements.push(content.into());
-        }
-
+        // Layout horizontally or vertically
         let wrapper: Element<Message> = match horizontal {
             true => Row::from_vec(elements)
                 .align_y(Alignment::Center)
@@ -1079,6 +883,221 @@ impl Minimon {
         );
 
         column!(refresh_row, label_row, mono_row).spacing(10).into()
+    }
+
+    fn cpu_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
+        let mut elements: Vec<Element<Message>> = Vec::new();
+        // If we are below 10% and horizontal layout we can show another decimal
+        let formated_cpu = if self.cpu.latest_sample() < 10.0 && horizontal {
+            format!("{:.2}%", self.cpu.latest_sample())
+        } else {
+            format!("{:.1}%", self.cpu.latest_sample())
+        };
+
+        if self.config.cpu.label {
+            elements.push(self.figure_label(formated_cpu).into());
+        }
+
+        if self.config.cpu.chart {
+            let content = self
+                .core
+                .applet
+                .icon_button_from_handle(Minimon::make_icon_handle(&self.cpu));
+
+            elements.push(content.into());
+        }
+
+        elements
+    }
+
+    fn memory_panel_ui(&self, _horizontal: bool) -> Vec<Element<crate::app::Message>> {
+        let mut elements: Vec<Element<Message>> = Vec::new();
+
+        let formated_mem = format!("{:.1} GB", self.memory.latest_sample());
+        if self.config.memory.label {
+            elements.push(self.figure_label(formated_mem).into());
+        }
+
+        if self.config.memory.chart {
+            let content = self
+                .core
+                .applet
+                .icon_button_from_handle(Minimon::make_icon_handle(&self.memory));
+
+            elements.push(content.into());
+        }
+
+        elements
+    }
+
+    fn network_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
+        let nw_combined = self.config.network1.variant == NetworkVariant::Combined;
+        let sample_rate_ms = self.config.refresh_rate;
+        let mut elements: Vec<Element<Message>> = Vec::new();
+
+        if self.config.network1.label {
+            let mut network_labels: Vec<Element<Message>> = Vec::new();
+
+            // DL
+            let dl_label = match horizontal {
+                true => self.figure_label(format!(
+                    "↓ {}",
+                    &self
+                        .network1
+                        .download_label(sample_rate_ms, network::UnitVariant::Long)
+                )),
+                false => self.figure_label(
+                    self.network1
+                        .download_label(sample_rate_ms, network::UnitVariant::Short),
+                ),
+            };
+            if nw_combined {
+                network_labels.push(widget::vertical_space().into());
+            }
+            network_labels.push(dl_label.into());
+
+            if nw_combined {
+                // UL
+                let ul_label = match horizontal {
+                    true => self.figure_label(format!(
+                        "↑ {}",
+                        &self
+                            .network1
+                            .upload_label(sample_rate_ms, network::UnitVariant::Long)
+                    )),
+                    false => self.figure_label(
+                        self.network1
+                            .upload_label(sample_rate_ms, network::UnitVariant::Short),
+                    ),
+                };
+                network_labels.push(ul_label.into());
+                network_labels.push(widget::vertical_space().into());
+            }
+            elements.push(Column::from_vec(network_labels).into());
+        }
+
+        if self.config.network1.chart {
+            let svg = self.network1.graph();
+            let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+            let content = self.core.applet.icon_button_from_handle(handle);
+
+            elements.push(content.into());
+        }
+
+        if self.config.network2.label && !nw_combined {
+            let mut network_labels: Vec<Element<Message>> = Vec::new();
+
+            let ul_label = match horizontal {
+                true => self.figure_label(format!(
+                    "↑ {}",
+                    &self
+                        .network2
+                        .upload_label(sample_rate_ms, network::UnitVariant::Long)
+                )),
+                false => self.figure_label(
+                    self.network2
+                        .upload_label(sample_rate_ms, network::UnitVariant::Short),
+                ),
+            };
+            network_labels.push(ul_label.into());
+
+            elements.push(Column::from_vec(network_labels).into());
+        }
+
+        if self.config.network2.chart && !nw_combined {
+            let svg = self.network2.graph();
+            let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+            let content = self.core.applet.icon_button_from_handle(handle);
+
+            elements.push(content.into());
+        }
+
+        elements
+    }
+
+    fn disks_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
+        let disks_combined = self.config.disks1.variant == DisksVariant::Combined;
+        let sample_rate_ms = self.config.refresh_rate;
+        let mut elements: Vec<Element<Message>> = Vec::new();
+
+        if self.config.disks1.label {
+            let mut disks_labels: Vec<Element<Message>> = Vec::new();
+
+            // Write
+            let wr_label = match horizontal {
+                true => self.figure_label(format!(
+                    "W {}",
+                    &self
+                        .disks1
+                        .write_label(sample_rate_ms, disks::UnitVariant::Long)
+                )),
+                false => self.figure_label(
+                    self.disks1
+                        .write_label(sample_rate_ms, disks::UnitVariant::Short),
+                ),
+            };
+            if disks_combined {
+                disks_labels.push(widget::vertical_space().into());
+            }
+            disks_labels.push(wr_label.into());
+
+            if disks_combined {
+                // Read
+                let rd_label = match horizontal {
+                    true => self.figure_label(format!(
+                        "R {}",
+                        &self
+                            .disks1
+                            .read_label(sample_rate_ms, disks::UnitVariant::Long)
+                    )),
+                    false => self.figure_label(
+                        self.disks1
+                            .read_label(sample_rate_ms, disks::UnitVariant::Short),
+                    ),
+                };
+                disks_labels.push(rd_label.into());
+                disks_labels.push(widget::vertical_space().into());
+            }
+            elements.push(Column::from_vec(disks_labels).into());
+        }
+
+        if self.config.disks1.chart {
+            let svg = self.disks1.graph();
+            let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+            let content = self.core.applet.icon_button_from_handle(handle);
+
+            elements.push(content.into());
+        }
+
+        if self.config.disks2.label && !disks_combined {
+            let mut disks_labels: Vec<Element<Message>> = Vec::new();
+
+            let rd_label = match horizontal {
+                true => self.figure_label(format!(
+                    "R {}",
+                    &self
+                        .disks2
+                        .read_label(sample_rate_ms, disks::UnitVariant::Long)
+                )),
+                false => self.figure_label(
+                    self.disks2
+                        .read_label(sample_rate_ms, disks::UnitVariant::Short),
+                ),
+            };
+            disks_labels.push(rd_label.into());
+
+            elements.push(Column::from_vec(disks_labels).into());
+        }
+
+        if self.config.disks2.chart && !disks_combined {
+            let svg = self.disks2.graph();
+            let handle = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+            let content = self.core.applet.icon_button_from_handle(handle);
+
+            elements.push(content.into());
+        }
+
+        elements
     }
 
     fn make_icon_handle<T: Sensor>(sensor: &T) -> cosmic::widget::icon::Handle {
