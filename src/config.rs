@@ -4,10 +4,7 @@ use cosmic::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    fl,
-    sensors::{disks::DisksVariant},
-};
+use crate::fl;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum ColorVariant {
@@ -89,45 +86,19 @@ impl GraphColors {
                 color4: Srgba::from_components((187, 41, 187, 255)),
                 ..Default::default()
             },
-            DeviceKind::Network(k) => match k {
-                NetworkVariant::Combined => GraphColors {
-                    color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                    color2: Srgba::from_components((47, 141, 255, 255)),
-                    color3: Srgba::from_components((255, 0, 0, 255)),
-                    color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                },
-                NetworkVariant::Download => GraphColors {
-                    color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                    color2: Srgba::from_components((47, 141, 255, 255)),
-                    color3: Srgba::from_components((255, 0, 0, 0)),
-                    color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                },
-                NetworkVariant::Upload => GraphColors {
-                    color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                    color2: Srgba::from_components((47, 141, 255, 0)),
-                    color3: Srgba::from_components((255, 0, 0, 255)),
-                    color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                },
+
+            DeviceKind::Network(_) => GraphColors {
+                color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                color2: Srgba::from_components((47, 141, 255, 255)),
+                color3: Srgba::from_components((0, 255, 0, 255)),
+                color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
             },
-            DeviceKind::Disks(k) => match k {
-                DisksVariant::Combined => GraphColors {
-                    color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                    color2: Srgba::from_components((47, 141, 255, 255)),
-                    color3: Srgba::from_components((255, 0, 0, 255)),
-                    color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                },
-                DisksVariant::Write => GraphColors {
-                    color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                    color2: Srgba::from_components((47, 141, 255, 255)),
-                    color3: Srgba::from_components((255, 0, 0, 0)),
-                    color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                },
-                DisksVariant::Read => GraphColors {
-                    color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                    color2: Srgba::from_components((47, 141, 255, 0)),
-                    color3: Srgba::from_components((255, 0, 0, 255)),
-                    color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                },
+
+            DeviceKind::Disks(_) => GraphColors {
+                color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                color2: Srgba::from_components((255, 102, 0, 255)),
+                color3: Srgba::from_components((255, 255, 0, 255)),
+                color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
             },
         }
     }
@@ -224,14 +195,20 @@ impl Default for NetworkConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum DisksVariant {
+    Write,
+    Read,
+    Combined,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq)]
 #[version = 1]
 pub struct DisksConfig {
     pub chart: bool,
     pub label: bool,
-    pub colors_combined: GraphColors,
-    pub colors_write: GraphColors,
-    pub colors_read: GraphColors,
+    pub colors: GraphColors,
+    pub variant: DisksVariant,
 }
 
 impl Default for DisksConfig {
@@ -239,9 +216,8 @@ impl Default for DisksConfig {
         Self {
             chart: false,
             label: false,
-            colors_combined: GraphColors::new(DeviceKind::Disks(DisksVariant::Combined)),
-            colors_write: GraphColors::new(DeviceKind::Disks(DisksVariant::Write)),
-            colors_read: GraphColors::new(DeviceKind::Disks(DisksVariant::Read)),
+            colors: GraphColors::new(DeviceKind::Disks(DisksVariant::Write)),
+            variant: DisksVariant::Write,
         }
     }
 }
@@ -259,7 +235,8 @@ pub struct MinimonConfig {
     pub network1: NetworkConfig,
     pub network2: NetworkConfig,
 
-    pub disks: DisksConfig,
+    pub disks1: DisksConfig,
+    pub disks2: DisksConfig,
 }
 
 impl Default for MinimonConfig {
@@ -272,7 +249,8 @@ impl Default for MinimonConfig {
             memory: MemoryConfig::default(),
             network1: NetworkConfig::default(),
             network2: NetworkConfig::default(),
-            disks: DisksConfig::default(),
+            disks1: DisksConfig::default(),
+            disks2: DisksConfig::default(),
         }
     }
 }
