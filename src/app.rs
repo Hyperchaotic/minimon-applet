@@ -51,12 +51,17 @@ lazy_static! {
     /// into `'static str` because:
     /// - These strings are only initialized once at program startup.
     /// - They are never deallocated since they are used globally.
-    static ref SETTINGS_GENERAL: &'static str = fl!("settings-subpage-general").leak();
+    static ref SETTINGS_CPU_CHOICE: &'static str = fl!("settings-cpu").leak();
+    static ref SETTINGS_MEMORY_CHOICE: &'static str = fl!("settings-memory").leak();
+    static ref SETTINGS_NETWORK_CHOICE: &'static str = fl!("settings-network").leak();
+    static ref SETTINGS_DISKS_CHOICE: &'static str = fl!("settings-disks").leak();
+
+    static ref SETTINGS_GENERAL_HEADING: &'static str = fl!("settings-subpage-general").leak();
     static ref SETTINGS_BACK: &'static str = fl!("settings-subpage-back").leak();
-    static ref SETTINGS_CPU: &'static str = fl!("cpu-title").leak();
-    static ref SETTINGS_MEMORY: &'static str = fl!("memory-title").leak();
-    static ref SETTINGS_NETWORK: &'static str = fl!("net-title").leak();
-    static ref SETTINGS_DISKS: &'static str = fl!("disks-title").leak();
+    static ref SETTINGS_CPU_HEADING: &'static str = fl!("cpu-title").leak();
+    static ref SETTINGS_MEMORY_HEADING: &'static str = fl!("memory-title").leak();
+    static ref SETTINGS_NETWORK_HEADING: &'static str = fl!("net-title").leak();
+    static ref SETTINGS_DISKS_HEADING: &'static str = fl!("disks-title").leak();
 
     // The UI require static lifetime of dropdown items
     static ref SYSMON_LIST: Vec<(String, String)> = Minimon::get_sysmon_list();
@@ -358,7 +363,7 @@ impl cosmic::Application for Minimon {
                 match variant {
                     SettingsVariant::Cpu => {
                         content = content.push(Minimon::sub_page_header(
-                            &SETTINGS_CPU,
+                            &SETTINGS_CPU_HEADING,
                             &SETTINGS_BACK,
                             Message::SettingsBack,
                         ));
@@ -366,7 +371,7 @@ impl cosmic::Application for Minimon {
                     }
                     SettingsVariant::Memory => {
                         content = content.push(Minimon::sub_page_header(
-                            &SETTINGS_MEMORY,
+                            &SETTINGS_MEMORY_HEADING,
                             &SETTINGS_BACK,
                             Message::SettingsBack,
                         ));
@@ -374,7 +379,7 @@ impl cosmic::Application for Minimon {
                     }
                     SettingsVariant::Network => {
                         content = content.push(Minimon::sub_page_header(
-                            &SETTINGS_NETWORK,
+                            &SETTINGS_NETWORK_HEADING,
                             &SETTINGS_BACK,
                             Message::SettingsBack,
                         ));
@@ -392,7 +397,7 @@ impl cosmic::Application for Minimon {
                     }
                     SettingsVariant::Disks => {
                         content = content.push(Minimon::sub_page_header(
-                            &SETTINGS_DISKS,
+                            &SETTINGS_DISKS_HEADING,
                             &SETTINGS_BACK,
                             Message::SettingsBack,
                         ));
@@ -408,7 +413,7 @@ impl cosmic::Application for Minimon {
                     }
                     SettingsVariant::General => {
                         content = content.push(Minimon::sub_page_header(
-                            &SETTINGS_GENERAL,
+                            &SETTINGS_GENERAL_HEADING,
                             &SETTINGS_BACK,
                             Message::SettingsBack,
                         ));
@@ -460,23 +465,23 @@ impl cosmic::Application for Minimon {
 
                 let sensor_settings = list::ListColumn::new()
                     .add(Minimon::go_next_with_item(
-                        "General settings",
+                        &SETTINGS_GENERAL_HEADING,
                         text::body(""),
                         Message::SettingsGeneral,
                     ))
-                    .add(Minimon::go_next_with_item("CPU", cpu, Message::SettingsCpu))
+                    .add(Minimon::go_next_with_item(&SETTINGS_CPU_CHOICE, cpu, Message::SettingsCpu))
                     .add(Minimon::go_next_with_item(
-                        "Memory",
+                        &SETTINGS_MEMORY_CHOICE,
                         memory,
                         Message::SettingsMemory,
                     ))
                     .add(Minimon::go_next_with_item(
-                        "Network",
+                        &SETTINGS_NETWORK_CHOICE,
                         network,
                         Message::SettingsNetwork,
                     ))
                     .add(Minimon::go_next_with_item(
-                        "Disks",
+                        &SETTINGS_DISKS_CHOICE,
                         disks,
                         Message::SettingsDisks,
                     ))

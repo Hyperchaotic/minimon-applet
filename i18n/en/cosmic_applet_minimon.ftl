@@ -54,3 +54,7 @@ enable-disks-label = Show disk label
 enable-disks-combined = Combine disk Write and Read
 choose-sysmon = System Monitor
 memory-as-percentage = As percentage
+settings-cpu = CPU
+settings-memory = Memory
+settings-network = Network
+settings-disks = Disk
