@@ -4,12 +4,8 @@ A little applet for displaying total CPU load and/or memory usage. Can sit in th
 
 ![screenshot-2024-09-12-16-52-36](https://raw.githubusercontent.com/Hyperchaotic/minimon-applet/main/cosmic-applet-minimon.png)
 
-![panel](https://github.com/user-attachments/assets/c2fcf71a-2a80-40bc-9067-3c12c4e506d6)
 
-
-![Image](https://github.com/user-attachments/assets/f6bc965f-755f-4796-a407-e3ed3410a5e1)
-
-
+![Image](https://github.com/user-attachments/assets/5d697c74-f7dc-4213-8516-465c32e5567b)
 Thanks to [@edfloreshz](https://github.com/edfloreshz) for the applet template :)
 
 ## Installing
