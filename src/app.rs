@@ -953,8 +953,11 @@ impl Minimon {
     fn memory_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
         let mut elements: Vec<Element<Message>> = Vec::new();
 
-        let formated_mem = self.memory.to_string(!horizontal);
-        elements.push(self.figure_label(formated_mem).into());
+     
+        if self.config.memory.label {
+            let formated_mem = self.memory.to_string(!horizontal);
+            elements.push(self.figure_label(formated_mem).into());
+        }
 
         if self.config.memory.chart {
             let content = self
