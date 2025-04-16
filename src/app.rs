@@ -3,7 +3,6 @@ use cosmic::applet::{PanelType, Size};
 use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::cosmic_theme::palette::bool_mask::BoolMask;
 use cosmic::cosmic_theme::palette::{FromColor, WithAlpha};
-use cosmic::widget::divider::horizontal;
 use std::time;
 
 use cosmic::app::{Core, Task};

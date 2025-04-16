@@ -156,7 +156,6 @@ impl Sensor for Memory {
             } else {
                 write!(self.value, "{}", current_val).unwrap();
             }
-
         }
     }
 
@@ -210,10 +209,8 @@ impl Sensor for Memory {
                 ),
                 settings::item(
                     fl!("memory-as-percentage"),
-                    toggler(config.memory.percentage)
-                        .on_toggle(Message::ToggleMemoryPercentage),
+                    toggler(config.memory.percentage).on_toggle(Message::ToggleMemoryPercentage),
                 ),
-
                 row!(
                     widget::dropdown(&self.graph_options, selected, move |m| {
                         Message::SelectGraphType(DeviceKind::Memory(m.into()))
@@ -272,19 +269,17 @@ impl Memory {
         *self.samples.back().unwrap_or(&0f64)
     }
 
-    pub fn to_string(&self, tight: bool) -> String {
+    pub fn to_string(&self, vertical_panel: bool) -> String {
         let mut current_val = self.latest_sample();
         let unit: &str;
 
         if self.show_percentage {
             current_val = (current_val * 100.0) / self.max_val as f64;
             unit = "%";
-        } else {
-            if !tight {
+        } else if !vertical_panel {
             unit = " GB";
-            } else {
-                unit = "GB";
-            }
+        } else {
+            unit = "GB";
         }
 
         if current_val < 10.0 {
