@@ -323,48 +323,57 @@ impl Network {
     }
 
     fn makestr(val: u64, format: UnitVariant) -> String {
-        let mut formatted = String::with_capacity(20);
-
         let mut value = val as f64;
         let mut unit_index = 0;
-        let units = if format == UnitVariant::Short {
-            UNITS_SHORT
-        } else {
-            UNITS_LONG
+
+        let units = match format {
+            UnitVariant::Short => UNITS_SHORT,
+            UnitVariant::Long => UNITS_LONG,
         };
 
-        // Find the appropriate unit
+        // Scale the value to the appropriate unit
         while value >= 999.0 && unit_index < units.len() - 1 {
             value /= 1024.0;
             unit_index += 1;
         }
 
-        let s = if value < 10.0 {
-            &format!("{:.2}", value)
+        // Format the number with varying precision
+        let value_str = if value < 10.0 {
+            format!("{:.2}", value)
         } else if value < 99.0 {
-            &format!("{:.1}", value)
+            format!("{:.1}", value)
         } else {
-            &format!("{:.0}", value)
+            format!("{:.0}", value)
         };
 
-        formatted.push_str(s);
+        let unit_str = units[unit_index];
+        let mut result = String::with_capacity(20);
+
         if format == UnitVariant::Long {
-            formatted.push(' ');
-            if s.len() == 3 {
-                formatted.push(' ');
+            if value_str.len() == 3 {
+                result.push(' ');
+            }
+            if unit_index == 0 {
+                result.push(' ');
             }
         }
 
-        if unit_index == 0 && format == UnitVariant::Long {
-            formatted.push(' ');
-        }
-        formatted.push_str(units[unit_index]);
+        result.push_str(&value_str);
 
-        if formatted.len() < 9 && format == UnitVariant::Long {
-            formatted.insert(0, ' ');
+        if format == UnitVariant::Long {
+            result.push(' ');
         }
 
-        formatted
+        result.push_str(unit_str);
+
+        if format == UnitVariant::Long {
+            let padding = 9usize.saturating_sub(result.len());
+            if padding > 0 {
+                result = " ".repeat(padding) + &result;
+            }
+        }
+
+        result
     }
 
     // If the sample rate doesn't match exactly one second (more or less),

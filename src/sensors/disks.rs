@@ -308,11 +308,20 @@ impl Disks {
             &format!("{:.0} ", value)
         };
 
-        if s.len() == 3 {
+        if format == UnitVariant::Long {
+            if s.len() == 3 {
+                formatted.push(' ');
+            }
+            if unit_index == 0 {
+                formatted.push(' ');
+            }
+        }
+        formatted.push_str(s);
+
+        if format == UnitVariant::Long {
             formatted.push(' ');
         }
 
-        formatted.push_str(s);
         formatted.push_str(units[unit_index]);
 
         if format == UnitVariant::Long {
