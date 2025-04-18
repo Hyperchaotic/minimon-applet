@@ -1,5 +1,5 @@
 use cosmic::Element;
-use sysinfo::System;
+use sysinfo::{System, MemoryRefreshKind};
 
 use crate::{
     colorpicker::DemoGraph,
@@ -128,7 +128,9 @@ impl Sensor for Memory {
     }
 
     fn update(&mut self) {
-        self.system.refresh_memory();
+        let r = MemoryRefreshKind::nothing().with_ram();
+
+        self.system.refresh_memory_specifics(r);
         let new_val: f64 = self.system.used_memory() as f64 / 1_073_741_824.0;
 
         if self.samples.len() >= MAX_SAMPLES {

@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use sysinfo::Disks as DisksInfo;
+use sysinfo::{DiskRefreshKind, Disks as DisksInfo};
 
 use crate::{
     colorpicker::DemoGraph,
@@ -134,7 +134,8 @@ impl Sensor for Disks {
 
     /// Retrieve the amount of data transmitted since last update.
     fn update(&mut self) {
-        self.disks.refresh(true);
+        let r = DiskRefreshKind::nothing().with_io_usage();
+        self.disks.refresh_specifics(true, r);
         let mut wr = 0;
         let mut rd = 0;
 
