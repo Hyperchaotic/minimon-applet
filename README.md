@@ -6,7 +6,10 @@ A little applet for displaying total CPU load and/or memory usage. Can sit in th
 
 
 ![Image](https://github.com/user-attachments/assets/5d697c74-f7dc-4213-8516-465c32e5567b)
-Thanks to [@edfloreshz](https://github.com/edfloreshz) for the applet template :)
+
+
+![Image](https://github.com/user-attachments/assets/b6fa25a0-2945-4a40-bdf4-38ef946b8d26)
+
 
 ## Installing
 If on a .deb based distibution download [latest version](https://github.com/Hyperchaotic/minimon-applet/releases) and install with the following commands:
