@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use cosmic::{
     cosmic_config::{self, cosmic_config_derive::CosmicConfigEntry, CosmicConfigEntry},
     cosmic_theme::palette::Srgba,
@@ -45,6 +47,8 @@ pub enum DeviceKind {
     Memory(GraphKind),
     Network(NetworkVariant),
     Disks(DisksVariant),
+    Gpu(GraphKind),
+    Vram(GraphKind),
 }
 
 impl std::fmt::Display for DeviceKind {
@@ -54,6 +58,8 @@ impl std::fmt::Display for DeviceKind {
             DeviceKind::Memory(_) => write!(f, "{}", fl!("sensor-memory")),
             DeviceKind::Network(_) => write!(f, "{}", fl!("sensor-network")),
             DeviceKind::Disks(_) => write!(f, "{}", fl!("sensor-disks")),
+            DeviceKind::Gpu(_) => write!(f, "{}", fl!("sensor-gpu")),
+            &DeviceKind::Vram(_) => write!(f, "{}", fl!("sensor-vram")),
         }
     }
 }
@@ -100,6 +106,8 @@ impl GraphColors {
                 color3: Srgba::from_components((255, 255, 0, 255)),
                 color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
             },
+            DeviceKind::Gpu(_) => GraphColors::default(),
+            DeviceKind::Vram(_) => GraphColors::default(),
         }
     }
 
@@ -224,6 +232,36 @@ impl Default for DisksConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
+#[version = 1]
+pub struct GpuConfig {
+    pub gpu_chart: bool,
+    pub gpu_label: bool,
+    pub gpu_kind: GraphKind,
+    pub gpu_colors: GraphColors,
+    pub vram_chart: bool,
+    pub vram_label: bool,
+    pub vram_kind: GraphKind,
+    pub vram_colors: GraphColors,
+    pub pause_on_battery: bool,
+}
+
+impl Default for GpuConfig {
+    fn default() -> Self {
+        Self {
+            gpu_chart: true,
+            gpu_label: false,
+            gpu_kind: GraphKind::Ring,
+            gpu_colors: GraphColors::new(DeviceKind::Gpu(GraphKind::Ring)),
+            vram_chart: true,
+            vram_label: false,
+            vram_kind: GraphKind::Ring,
+            vram_colors: GraphColors::new(DeviceKind::Vram(GraphKind::Line)),
+            pause_on_battery: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq)]
 #[version = 1]
 pub struct MinimonConfig {
@@ -240,7 +278,10 @@ pub struct MinimonConfig {
     pub disks1: DisksConfig,
     pub disks2: DisksConfig,
 
+    pub gpus: HashMap<String, GpuConfig>,
+    
     pub sysmon: usize,
+
 }
 
 impl Default for MinimonConfig {
@@ -255,6 +296,7 @@ impl Default for MinimonConfig {
             network2: NetworkConfig::default(),
             disks1: DisksConfig::default(),
             disks2: DisksConfig::default(),
+            gpus: HashMap::new(),
             sysmon: 0,
         }
     }

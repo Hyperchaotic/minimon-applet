@@ -14,6 +14,8 @@ pub trait Sensor {
     fn settings_ui(&self, config: &MinimonConfig) -> Element<crate::app::Message>;
 }
 
+pub mod gpus;
+pub mod gpu;
 pub mod cpu;
 pub mod disks;
 pub mod memory;

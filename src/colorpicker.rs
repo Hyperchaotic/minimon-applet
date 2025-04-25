@@ -23,6 +23,7 @@ use theme::iced::Slider;
 use crate::app::Message;
 use crate::config::{ColorVariant, DeviceKind, GraphColors, GraphKind};
 use crate::fl;
+use log::info;
 
 const RED_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"red\" /></svg>";
 const GREEN_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"50\" height=\"50\" x=\"0\" y=\"0\" rx=\"15\" ry=\"15\" fill=\"green\" /></svg>";
@@ -108,6 +109,7 @@ pub trait DemoGraph {
     fn colors(&self) -> GraphColors;
     fn set_colors(&mut self, colors: GraphColors);
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)>;
+    fn unique_id(&self) -> Option<String>;
 }
 
 /// Data for managing the `ColorPicker` dialog
@@ -145,6 +147,7 @@ impl ColorPicker {
     }
 
     pub fn activate(&mut self, kind: DeviceKind, demo_svg: Box<dyn DemoGraph>) {
+        info!("colorpicker::activate({})", kind);
         self.kind = kind;
         self.color_variant = ColorVariant::Color1;
         self.demo_svg = Some(demo_svg);
@@ -248,7 +251,8 @@ impl ColorPicker {
 
     pub fn demo(&self) -> String {
         if let Some(d) = self.demo_svg.as_ref() {
-            return d.demo();
+            let demo = d.demo();
+            return demo;
         }
         ERROR.to_string()
     }
@@ -431,9 +435,9 @@ impl ColorPicker {
                     row!(
                         widget::horizontal_space(),
                         widget::button::destructive(fl!("colorpicker-cancel"))
-                            .on_press(Message::ColorPickerClose(false)),
+                            .on_press(Message::ColorPickerClose(false, dmo.unique_id())),
                         widget::button::suggested(fl!("colorpicker-save"))
-                            .on_press(Message::ColorPickerClose(true))
+                            .on_press(Message::ColorPickerClose(true, dmo.unique_id()))
                     )
                     .width(Length::Fill)
                     .spacing(5)

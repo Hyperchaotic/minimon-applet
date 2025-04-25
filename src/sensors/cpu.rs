@@ -114,6 +114,11 @@ impl DemoGraph for Cpu {
             (*COLOR_CHOICES_RING).into()
         }
     }
+
+    fn unique_id(&self) -> Option<String> {
+        None
+    }
+
 }
 
 impl Sensor for Cpu {
@@ -212,7 +217,7 @@ impl Sensor for Cpu {
                     .width(70),
                     widget::horizontal_space(),
                     widget::button::standard(fl!("change-colors"))
-                        .on_press(Message::ColorPickerOpen(DeviceKind::Cpu(cpu_kind))),
+                        .on_press(Message::ColorPickerOpen(DeviceKind::Cpu(cpu_kind), None)),
                 )
             )
             .spacing(cosmic.space_xs()),

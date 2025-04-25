@@ -124,6 +124,11 @@ impl DemoGraph for Network {
             NetworkVariant::Upload => (*COLOR_CHOICES_UL).into(),
         }
     }
+
+    fn unique_id(&self) -> Option<String> {
+        None
+    }
+
 }
 
 impl Sensor for Network {
@@ -285,7 +290,7 @@ impl Sensor for Network {
             row!(
                 widget::horizontal_space(),
                 widget::button::standard(fl!("change-colors"))
-                    .on_press(Message::ColorPickerOpen(DeviceKind::Network(self.kind))),
+                    .on_press(Message::ColorPickerOpen(DeviceKind::Network(self.kind), None)),
                 widget::horizontal_space()
             )
             .into(),

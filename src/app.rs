@@ -3,7 +3,8 @@ use cosmic::applet::{PanelType, Size};
 use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::cosmic_theme::palette::bool_mask::BoolMask;
 use cosmic::cosmic_theme::palette::{FromColor, WithAlpha};
-use std::time;
+use std::collections::HashMap;
+use std::{fs, time};
 
 use cosmic::app::{Core, Task};
 use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
@@ -24,12 +25,18 @@ use cosmic::{
     iced_widget::{Column, Row},
 };
 
+use zbus::blocking::Connection;
+use zvariant::OwnedObjectPath;
+
+use log::{debug, error, info};
+
 use crate::colorpicker::{ColorPicker, DemoGraph};
 use crate::config::{
-    ColorVariant, DeviceKind, DisksVariant, GraphColors, GraphKind, NetworkVariant,
+    ColorVariant, DeviceKind, DisksVariant, GpuConfig, GraphColors, GraphKind, NetworkVariant,
 };
 use crate::sensors::cpu::Cpu;
 use crate::sensors::disks::{self, Disks};
+use crate::sensors::gpus::{list_gpus, Gpu};
 use crate::sensors::memory::Memory;
 use crate::sensors::network::{self, Network};
 use crate::sensors::Sensor;
@@ -55,6 +62,7 @@ lazy_static! {
     static ref SETTINGS_MEMORY_CHOICE: &'static str = fl!("settings-memory").leak();
     static ref SETTINGS_NETWORK_CHOICE: &'static str = fl!("settings-network").leak();
     static ref SETTINGS_DISKS_CHOICE: &'static str = fl!("settings-disks").leak();
+    static ref SETTINGS_GPU_CHOICE: &'static str = fl!("settings-gpu").leak();
 
     static ref SETTINGS_GENERAL_HEADING: &'static str = fl!("settings-subpage-general").leak();
     static ref SETTINGS_BACK: &'static str = fl!("settings-subpage-back").leak();
@@ -62,6 +70,7 @@ lazy_static! {
     static ref SETTINGS_MEMORY_HEADING: &'static str = fl!("memory-title").leak();
     static ref SETTINGS_NETWORK_HEADING: &'static str = fl!("net-title").leak();
     static ref SETTINGS_DISKS_HEADING: &'static str = fl!("disks-title").leak();
+    static ref SETTINGS_GPU_HEADING: &'static str = fl!("gpu-title").leak();
 
     // The UI require static lifetime of dropdown items
     static ref SYSMON_LIST: Vec<(String, String)> = Minimon::get_sysmon_list();
@@ -94,14 +103,31 @@ macro_rules! disks_select {
         }
     };
 }
+/*
+// Macro to get a GPU config by UUID, with a default if not found
+macro_rules! gpu_config {
+    ($config:expr, $uuid:expr) => {
+        $config
+            .gpus
+            .entry($uuid.to_string())
+            .or_insert_with(GpuConfig::default)
+    };
+}*/
+
+macro_rules! settings_sub_page_heading {
+    ($heading:ident) => {
+        Minimon::sub_page_header(Some(&$heading), &SETTINGS_BACK, Message::Settings(None))
+    };
+}
 
 #[derive(Debug, Clone, Copy)]
-enum SettingsVariant {
+pub enum SettingsVariant {
     General,
     Cpu,
     Memory,
     Network,
     Disks,
+    Gpu,
 }
 
 pub struct Minimon {
@@ -120,6 +146,9 @@ pub struct Minimon {
     disks1: Disks,
     disks2: Disks,
 
+    //GPUs
+    gpus: HashMap<String, Gpu>,
+
     /// The popup id.
     popup: Option<Id>,
 
@@ -137,14 +166,18 @@ pub struct Minimon {
     tick_timer: i64,
     /// tick can be 250, 500 or 1000, depending on refresh rate modolu tick
     tick: Arc<AtomicI64>,
+
+    // On AC or battery?
+    is_laptop: bool,
+    on_ac: bool,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
     TogglePopup,
 
-    ColorPickerOpen(DeviceKind),
-    ColorPickerClose(bool),
+    ColorPickerOpen(DeviceKind, Option<String>),
+    ColorPickerClose(bool, Option<String>),
     ColorPickerDefaults,
     ColorPickerAccent,
 
@@ -179,18 +212,18 @@ pub enum Message {
     ToggleMemoryChart(bool),
     ToggleMemoryLabel(bool),
     ToggleMemoryPercentage(bool),
-    ConfigChanged(MinimonConfig),
+    ConfigChanged(Box<MinimonConfig>),
     LaunchSystemMonitor(),
     RefreshRateChanged(f64),
     LabelSizeChanged(u16),
     ToggleMonospaceLabels(bool),
 
-    SettingsBack,
-    SettingsGeneral,
-    SettingsCpu,
-    SettingsMemory,
-    SettingsNetwork,
-    SettingsDisks,
+    Settings(Option<SettingsVariant>),
+
+    GpuToggleChart(String, DeviceKind, bool),
+    GpuToggleLabel(String, DeviceKind, bool),
+    GpuSelectGraphType(String, DeviceKind),
+    ToggleDisableOnBattery(String, bool),
 
     SysmonSelect(usize),
 }
@@ -209,6 +242,19 @@ impl cosmic::Application for Minimon {
     const APP_ID: &'static str = "com.github.hyperchaotic.cosmic-applet-minimon";
 
     fn init(core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
+        // Find GPUs
+        let gpus: HashMap<String, Gpu> = list_gpus()
+            .into_iter()
+            .map(|gpu| {
+                info!("Found GPU. Name: {}. UUID: {}", gpu.name(), gpu.id());
+                (gpu.id().to_string(), gpu)
+            })
+            .collect();
+
+        let is_laptop = Minimon::is_laptop();
+        if is_laptop {
+            info!("Is laptop")
+        }
         let app = Minimon {
             core,
             cpu: Cpu::new(GraphKind::Ring),
@@ -217,12 +263,15 @@ impl cosmic::Application for Minimon {
             network2: Network::new(NetworkVariant::Upload),
             disks1: Disks::new(DisksVariant::Combined),
             disks2: Disks::new(DisksVariant::Read),
+            gpus,
             popup: None,
             settings_page: None,
             colorpicker: ColorPicker::new(),
             config: MinimonConfig::default(),
             tick_timer: TICK,
             tick: Arc::new(AtomicI64::new(TICK)),
+            is_laptop,
+            on_ac: true,
         };
 
         (app, Task::none())
@@ -255,7 +304,7 @@ impl cosmic::Application for Minimon {
                     PanelType::Dock => APP_ID_DOCK,
                     PanelType::Other(_) => APP_ID_OTHER,
                 })
-                .map(|u| Message::ConfigChanged(u.config)),
+                .map(|u| Message::ConfigChanged(Box::new(u.config))),
         ])
     }
 
@@ -308,6 +357,10 @@ impl cosmic::Application for Minimon {
         elements.extend(self.memory_panel_ui(horizontal));
         elements.extend(self.network_panel_ui(horizontal));
         elements.extend(self.disks_panel_ui(horizontal));
+
+        for gpu in self.gpus.values() {
+            elements.extend(self.gpu_panel_ui(gpu, horizontal));
+        }
 
         // Layout horizontally or vertically
         let wrapper: Element<Message> = match horizontal {
@@ -362,27 +415,20 @@ impl cosmic::Application for Minimon {
             if let Some(variant) = self.settings_page {
                 match variant {
                     SettingsVariant::Cpu => {
-                        content = content.push(Minimon::sub_page_header(
-                            &SETTINGS_CPU_HEADING,
-                            &SETTINGS_BACK,
-                            Message::SettingsBack,
-                        ));
+                        content = content.push(settings_sub_page_heading!(SETTINGS_CPU_HEADING));
                         content = content.push(self.cpu.settings_ui(&self.config));
                     }
                     SettingsVariant::Memory => {
                         content = content.push(Minimon::sub_page_header(
-                            &SETTINGS_MEMORY_HEADING,
+                            Some(&SETTINGS_MEMORY_HEADING),
                             &SETTINGS_BACK,
-                            Message::SettingsBack,
+                            Message::Settings(None),
                         ));
                         content = content.push(self.memory.settings_ui(&self.config));
                     }
                     SettingsVariant::Network => {
-                        content = content.push(Minimon::sub_page_header(
-                            &SETTINGS_NETWORK_HEADING,
-                            &SETTINGS_BACK,
-                            Message::SettingsBack,
-                        ));
+                        content =
+                            content.push(settings_sub_page_heading!(SETTINGS_NETWORK_HEADING));
                         content = content.push(settings::item(
                             fl!("enable-net-combined"),
                             widget::toggler(
@@ -396,11 +442,7 @@ impl cosmic::Application for Minimon {
                         }
                     }
                     SettingsVariant::Disks => {
-                        content = content.push(Minimon::sub_page_header(
-                            &SETTINGS_DISKS_HEADING,
-                            &SETTINGS_BACK,
-                            Message::SettingsBack,
-                        ));
+                        content = content.push(settings_sub_page_heading!(SETTINGS_DISKS_HEADING));
                         content = content.push(settings::item(
                             fl!("enable-disks-combined"),
                             widget::toggler(self.config.disks1.variant == DisksVariant::Combined)
@@ -411,12 +453,40 @@ impl cosmic::Application for Minimon {
                             content = content.push(self.disks2.settings_ui(&self.config));
                         }
                     }
-                    SettingsVariant::General => {
+                    SettingsVariant::Gpu => {
                         content = content.push(Minimon::sub_page_header(
-                            &SETTINGS_GENERAL_HEADING,
+                            None,
                             &SETTINGS_BACK,
-                            Message::SettingsBack,
+                            Message::Settings(None),
                         ));
+                        for (id, gpu) in &self.gpus {
+                            if let Some(config) = self.config.gpus.get(id) {
+                                content = content.push(
+                                    widget::row::with_capacity(2).push(text::heading(gpu.name())),
+                                );
+                                if self.is_laptop {
+                                    let disable_row = settings::item(
+                                        fl!("settings-disable-on-battery"),
+                                        row!(widget::toggler(config.pause_on_battery).on_toggle(
+                                            move |value| {
+                                                Message::ToggleDisableOnBattery(id.clone(), value)
+                                            }
+                                        )),
+                                    );
+                                    content = content.push(disable_row.width(345));
+                                }
+                                content = content.push(gpu.settings_ui(config));
+                            } else {
+                                error!(
+                                    "SettingsVariant::Gpu: no config for selected GPU {}",
+                                    gpu.id()
+                                );
+                            }
+                        }
+                    }
+                    SettingsVariant::General => {
+                        content =
+                            content.push(settings_sub_page_heading!(SETTINGS_GENERAL_HEADING));
                         content = content.push(self.general_settings_ui());
                     }
                 }
@@ -463,29 +533,41 @@ impl cosmic::Application for Minimon {
                         .read_label(sample_rate_ms, disks::UnitVariant::Long)
                 ));
 
-                let sensor_settings = list::ListColumn::new()
+                let mut sensor_settings = list::ListColumn::new()
                     .add(Minimon::go_next_with_item(
                         &SETTINGS_GENERAL_HEADING,
                         text::body(""),
-                        Message::SettingsGeneral,
+                        Message::Settings(Some(SettingsVariant::General)),
                     ))
-                    .add(Minimon::go_next_with_item(&SETTINGS_CPU_CHOICE, cpu, Message::SettingsCpu))
+                    .add(Minimon::go_next_with_item(
+                        &SETTINGS_CPU_CHOICE,
+                        cpu,
+                        Message::Settings(Some(SettingsVariant::Cpu)),
+                    ))
                     .add(Minimon::go_next_with_item(
                         &SETTINGS_MEMORY_CHOICE,
                         memory,
-                        Message::SettingsMemory,
+                        Message::Settings(Some(SettingsVariant::Memory)),
                     ))
                     .add(Minimon::go_next_with_item(
                         &SETTINGS_NETWORK_CHOICE,
                         network,
-                        Message::SettingsNetwork,
+                        Message::Settings(Some(SettingsVariant::Network)),
                     ))
                     .add(Minimon::go_next_with_item(
                         &SETTINGS_DISKS_CHOICE,
                         disks,
-                        Message::SettingsDisks,
+                        Message::Settings(Some(SettingsVariant::Disks)),
                     ))
                     .padding(0);
+
+                if self.has_gpus() {
+                    sensor_settings = sensor_settings.add(Minimon::go_next_with_item(
+                        &SETTINGS_GPU_CHOICE,
+                        "",
+                        Message::Settings(Some(SettingsVariant::Gpu)),
+                    ));
+                }
 
                 content = content.push(sensor_settings);
             }
@@ -536,9 +618,11 @@ impl cosmic::Application for Minimon {
                     self.popup = None;
                 }
             }
-            Message::ColorPickerOpen(kind) => {
+            Message::ColorPickerOpen(kind, id) => {
+                info!("Message::ColorPickerOpen({:?}, {:?})", kind, id);
                 match kind {
                     DeviceKind::Cpu(_) => {
+                        debug!("Cpu");
                         self.colorpicker
                             .activate(kind, self.cpu.demo_graph(self.config.cpu.colors));
                     }
@@ -556,6 +640,36 @@ impl cosmic::Application for Minimon {
                         self.colorpicker
                             .activate(kind, disks.demo_graph(disks.colors()));
                     }
+                    DeviceKind::Gpu(_) => {
+                        if let Some(id) = id {
+                            if let (Some(config), Some(gpu)) =
+                                (self.config.gpus.get(&id), self.gpus.get(&id))
+                            {
+                                self.colorpicker
+                                    .activate(kind, gpu.demo_gpu_graph(config.gpu_colors));
+                            } else {
+                                error!("no config for selected GPU {}", id);
+                            }
+                        } else {
+                            error!("Id is None");
+                        }
+                    }
+                    DeviceKind::Vram(_) => {
+                        debug!("Vram 1");
+                        if let Some(id) = id {
+                            if let (Some(config), Some(gpu)) =
+                                (self.config.gpus.get(&id), self.gpus.get(&id))
+                            {
+                                debug!("Vram 2");
+                                self.colorpicker
+                                    .activate(kind, gpu.demo_vram_graph(config.vram_colors));
+                            } else {
+                                error!("no config for selected GPU {}", id);
+                            }
+                        } else {
+                            error!("Id is None");
+                        }
+                    }
                 }
                 self.colorpicker.set_variant(ColorVariant::Color1);
                 let col = self
@@ -565,19 +679,22 @@ impl cosmic::Application for Minimon {
                 self.colorpicker.set_sliders(col);
             }
 
-            Message::ColorPickerClose(save) => {
+            Message::ColorPickerClose(save, id) => {
+                info!("Message::ColorPickerClose({})", save);
                 if save {
-                    self.set_colors(self.colorpicker.colors(), self.colorpicker.kind());
+                    self.set_colors(self.colorpicker.colors(), self.colorpicker.kind(), id);
                     self.save_config();
                 }
                 self.colorpicker.deactivate();
             }
 
             Message::ColorPickerDefaults => {
+                info!("Message::ColorPickerDefaults()");
                 self.colorpicker.default_colors();
             }
 
             Message::ColorPickerAccent => {
+                info!("Message::ColorPickerAccent()");
                 if let Some(theme) = self.core.applet.theme() {
                     let accent = theme.cosmic().accent_color().color;
                     let srgba = cosmic::cosmic_theme::palette::Srgba::from_color(accent);
@@ -614,6 +731,7 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ToggleNetCombined(toggle) => {
+                info!("Message::ToggleNetCombined({})", toggle);
                 if toggle.is_true() {
                     self.network1.kind = NetworkVariant::Combined;
                     self.config.network1.variant = NetworkVariant::Combined;
@@ -627,6 +745,7 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ToggleDisksCombined(toggle) => {
+                info!("Message::ToggleDisksCombined({})", toggle);
                 if toggle.is_true() {
                     self.disks1.kind = DisksVariant::Combined;
                     self.config.disks1.variant = DisksVariant::Combined;
@@ -640,18 +759,21 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ToggleDisksChart(variant, toggled) => {
+                info!("Message::ToggleDiskChart({:?})", variant);
                 let (_, config) = disks_select!(self, variant);
                 config.chart = toggled;
                 self.save_config();
             }
 
             Message::ToggleDisksLabel(variant, toggled) => {
+                info!("Message::ToggleDiskLabel({:?})", variant);
                 let (_, config) = disks_select!(self, variant);
                 config.label = toggled;
                 self.save_config();
             }
 
             Message::ToggleAdaptiveNet(variant, toggle) => {
+                info!("Message::ToggleAdaptiveNet({:?}, {:?})", variant, toggle);
                 let (network, config) = network_select!(self, variant);
                 config.adaptive = toggle;
                 if toggle {
@@ -668,6 +790,7 @@ impl cosmic::Application for Minimon {
             }
 
             Message::SelectGraphType(dev) => {
+                info!("Message::SelectGraphType({:?})", dev);
                 match dev {
                     DeviceKind::Cpu(kind) => {
                         self.cpu.set_graph_kind(kind);
@@ -677,7 +800,7 @@ impl cosmic::Application for Minimon {
                         self.memory.set_graph_kind(kind);
                         self.config.memory.kind = kind;
                     }
-                    _ => (), // Disks and Network don't have graph selection
+                    _ => error!("Message::SelectGraphType unsupported kind/device combination."), // Disks and Network don't have graph selection
                 }
                 self.save_config();
             }
@@ -711,30 +834,56 @@ impl cosmic::Application for Minimon {
                 } else {
                     self.tick_timer = 0;
                 };
+
+                if self.is_laptop {
+                    let current_on_ac = self.is_on_ac().unwrap_or(true);
+                    if self.on_ac != current_on_ac {
+                        self.on_ac = current_on_ac;
+
+                        for (id, gpu) in self.gpus.iter_mut() {
+                            if let Some(c) = self.config.gpus.get(id) {
+                                if c.pause_on_battery {
+                                    if current_on_ac {
+                                        info!("Changed to AC, restart polling");
+                                        gpu.restart(); // on AC, start polling
+                                    } else {
+                                        info!("Changed to DC, stop polling");
+                                        gpu.stop(); // on battery, stop polling
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             Message::ToggleCpuChart(toggled) => {
+                info!("Message::ToggleCpuChart({:?})", toggled);
                 self.config.cpu.chart = toggled;
                 self.save_config();
             }
 
             Message::ToggleMemoryChart(toggled) => {
+                info!("Message::ToggleMemoryChart({:?})", toggled);
                 self.config.memory.chart = toggled;
                 self.save_config();
             }
 
             Message::ToggleNetChart(variant, toggled) => {
+                info!("Message::ToggleNetChart({:?})", toggled);
                 let (_, config) = network_select!(self, variant);
                 config.chart = toggled;
                 self.save_config();
             }
 
             Message::ToggleCpuLabel(toggled) => {
+                info!("Message::ToggleCpuLabel({:?})", toggled);
                 self.config.cpu.label = toggled;
                 self.save_config();
             }
 
             Message::ToggleMemoryLabel(toggled) => {
+                info!("Message::ToggleMemoryLabel({:?})", toggled);
                 self.config.memory.label = toggled;
                 self.save_config();
             }
@@ -746,13 +895,15 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ToggleNetLabel(variant, toggled) => {
+                info!("Message::ToggleNetLabel({:?})", toggled);
                 let (_, config) = network_select!(self, variant);
                 config.label = toggled;
                 self.save_config();
             }
 
             Message::ConfigChanged(config) => {
-                self.config = config;
+                self.config = *config;
+                self.sync_gpu_configs();
                 self.tick_timer = self.config.refresh_rate as i64;
                 self.cpu.set_colors(self.config.cpu.colors);
                 self.cpu.set_graph_kind(self.config.cpu.kind);
@@ -799,33 +950,90 @@ impl cosmic::Application for Minimon {
             }
 
             Message::LaunchSystemMonitor() => {
+                info!("Message::LaunchSystemMonitor()");
                 Minimon::spawn_sysmon_by_index(self.config.sysmon);
             }
 
             Message::RefreshRateChanged(rate) => {
+                info!("Message::RefreshRateChanged({:?})", rate);
                 self.config.refresh_rate = (rate * 1000.0) as u64;
                 self.set_tick();
                 self.save_config();
             }
 
             Message::LabelSizeChanged(size) => {
+                info!("Message::LabelSizeChanged({:?})", size);
                 self.config.label_size_default = size;
                 self.save_config();
             }
 
             Message::ToggleMonospaceLabels(toggle) => {
+                info!("Message::Monospacelabels({:?})", toggle);
                 self.config.monospace_labels = toggle;
                 self.save_config();
             }
-            Message::SettingsBack => self.settings_page = None,
-            Message::SettingsGeneral => self.settings_page = Some(SettingsVariant::General),
-            Message::SettingsCpu => self.settings_page = Some(SettingsVariant::Cpu),
-            Message::SettingsMemory => self.settings_page = Some(SettingsVariant::Memory),
-            Message::SettingsNetwork => self.settings_page = Some(SettingsVariant::Network),
-            Message::SettingsDisks => self.settings_page = Some(SettingsVariant::Disks),
+            Message::Settings(setting) => {
+                info!("Message::Settings({:?})", setting);
+                self.settings_page = setting;
+            }
             Message::SysmonSelect(sysmon) => {
+                info!("Message::SysmonSelect({:?})", sysmon);
                 self.config.sysmon = sysmon;
                 self.save_config();
+            }
+            Message::GpuToggleChart(id, device, toggled) => {
+                self.update_gpu_config(
+                    id,
+                    "GpuToggleChart",
+                    device,
+                    |config, device| match device {
+                        DeviceKind::Gpu(_) => config.gpu_chart = toggled,
+                        DeviceKind::Vram(_) => config.vram_chart = toggled,
+                        _ => error!("GpuToggleChart: wrong kind {:?}", device),
+                    },
+                );
+            }
+
+            Message::GpuToggleLabel(id, device, toggled) => {
+                self.update_gpu_config(
+                    id,
+                    "GpuToggleLabel",
+                    device,
+                    |config, device| match device {
+                        DeviceKind::Gpu(_) => config.gpu_label = toggled,
+                        DeviceKind::Vram(_) => config.vram_label = toggled,
+                        _ => error!("GpuToggleLabel: wrong kind {:?}", device),
+                    },
+                );
+            }
+
+            Message::GpuSelectGraphType(id, device) => {
+                info!("Message::GpuSelectGraphType({:?}, {:?})", id, device);
+                self.update_gpu_config(
+                    id.clone(),
+                    "GpuSelectGraphType",
+                    device,
+                    |config, device| match device {
+                        DeviceKind::Gpu(kind) => config.gpu_kind = kind,
+                        DeviceKind::Vram(kind) => config.vram_kind = kind,
+                        _ => error!("GpuSelectGraphType: wrong kind {:?}", device),
+                    },
+                );
+                if let Some(gpu) = self.gpus.get_mut(&id) {
+                    match device {
+                        DeviceKind::Gpu(kind) => gpu.gpu.set_graph_kind(kind),
+                        DeviceKind::Vram(kind) => gpu.vram.set_graph_kind(kind),
+                        _ => error!("GpuSelectGraphType: wrong kind {:?}", device),
+                    }
+                }
+            }
+            Message::ToggleDisableOnBattery(id, toggled) => {
+                info!("Message::ToggleDisableOnBattery({:?}, {:?})", id, toggled);
+                if let Some(c) = self.config.gpus.get_mut(&id) {
+                    c.pause_on_battery = toggled;
+                } else {
+                    error!("ToggleDisableOnBattery: wrong id {:?}", id);
+                }
             }
         }
         Task::none()
@@ -834,7 +1042,7 @@ impl cosmic::Application for Minimon {
 
 impl Minimon {
     pub fn sub_page_header<'a, Message: 'static + Clone>(
-        sub_page: &'a str,
+        sub_page: Option<&'a str>,
         parent_page: &'a str,
         on_press: Message,
     ) -> Element<'a, Message> {
@@ -846,14 +1054,22 @@ impl Minimon {
             .class(widget::button::ButtonClass::Link)
             .on_press(on_press);
 
-        let sub_page_header = widget::row::with_capacity(2).push(text::title3(sub_page));
+        if let Some(p) = sub_page {
+            let sub_page_header = widget::row::with_capacity(2).push(text::title3(p));
 
-        widget::column::with_capacity(2)
-            .push(previous_button)
-            .push(sub_page_header)
-            .spacing(6)
-            .width(iced::Length::Shrink)
-            .into()
+            widget::column::with_capacity(2)
+                .push(previous_button)
+                .push(sub_page_header)
+                .spacing(6)
+                .width(iced::Length::Shrink)
+                .into()
+        } else {
+            widget::column::with_capacity(2)
+                .push(previous_button)
+                .spacing(6)
+                .width(iced::Length::Shrink)
+                .into()
+        }
     }
 
     pub fn go_next_with_item<'a, Msg: Clone + 'static>(
@@ -958,7 +1174,6 @@ impl Minimon {
     fn memory_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
         let mut elements: Vec<Element<Message>> = Vec::new();
 
-     
         if self.config.memory.label {
             let formated_mem = self.memory.to_string(!horizontal);
             elements.push(self.figure_label(formated_mem).into());
@@ -1146,6 +1361,52 @@ impl Minimon {
         elements
     }
 
+    fn gpu_panel_ui(&self, gpu: &Gpu, horizontal: bool) -> Vec<Element<crate::app::Message>> {
+        let mut elements: Vec<Element<Message>> = Vec::new();
+
+        if let Some(config) = self.config.gpus.get(&gpu.id()) {
+            if config.gpu_label {
+                // If we are below 10% and horizontal layout we can show another decimal
+                let formated_gpu = if !gpu.is_active() {
+                    "----%".to_string()
+                } else if gpu.gpu.latest_sample() < 10.0 && horizontal {
+                    format!("{:.2}%", gpu.gpu.latest_sample())
+                } else {
+                    format!("{:.1}%", gpu.gpu.latest_sample())
+                };
+                elements.push(self.figure_label(formated_gpu).into());
+            }
+
+            if config.gpu_chart {
+                let g = cosmic::widget::icon::from_svg_bytes(gpu.gpu.graph().into_bytes());
+                let content = self.core.applet.icon_button_from_handle(g);
+
+                elements.push(content.into());
+            }
+
+            if config.vram_label {
+                let formated_mem = if !gpu.is_active() {
+                    if horizontal {
+                        "---- GB".to_string()
+                    } else {
+                        "----GB".to_string()
+                    }
+                } else {
+                    gpu.vram.string(!horizontal)
+                };
+                elements.push(self.figure_label(formated_mem).into());
+            }
+
+            if config.vram_chart {
+                let g = cosmic::widget::icon::from_svg_bytes(gpu.vram.graph().into_bytes());
+                let content = self.core.applet.icon_button_from_handle(g);
+
+                elements.push(content.into());
+            }
+        }
+        elements
+    }
+
     fn make_icon_handle<T: Sensor>(sensor: &T) -> cosmic::widget::icon::Handle {
         cosmic::widget::icon::from_svg_bytes(sensor.graph().into_bytes())
     }
@@ -1174,7 +1435,7 @@ impl Minimon {
         }
     }
 
-    fn set_colors(&mut self, colors: GraphColors, kind: DeviceKind) {
+    fn set_colors(&mut self, colors: GraphColors, kind: DeviceKind, id: Option<String>) {
         match kind {
             DeviceKind::Cpu(_) => {
                 self.config.cpu.colors = colors;
@@ -1193,6 +1454,32 @@ impl Minimon {
                 let (disks, config) = disks_select!(self, variant);
                 config.colors = colors;
                 disks.set_colors(colors);
+            }
+            DeviceKind::Gpu(_) => {
+                if let Some(id) = id {
+                    if let (Some(config), Some(gpu)) =
+                        (self.config.gpus.get_mut(&id), self.gpus.get_mut(&id))
+                    {
+                        config.gpu_colors = colors;
+                        gpu.gpu.set_colors(colors);
+                    } else {
+                        error!("No config for selected GPU {}", id);
+                    }
+                }
+            }
+            DeviceKind::Vram(_) => {
+                debug!("Vram set colors a {:?}", colors);
+                if let Some(id) = id {
+                    if let (Some(config), Some(gpu)) =
+                        (self.config.gpus.get_mut(&id), self.gpus.get_mut(&id))
+                    {
+                        debug!("Vram set colors b");
+                        config.vram_colors = colors;
+                        gpu.vram.set_colors(colors);
+                    } else {
+                        error!("No config for selected GPU {}", id);
+                    }
+                }
             }
         }
     }
@@ -1230,6 +1517,9 @@ impl Minimon {
         self.network2.update();
         self.disks1.update();
         self.disks2.update();
+        for gpu in &mut self.gpus.values_mut() {
+            gpu.update();
+        }
     }
 
     fn spawn_sysmon_by_index(index: usize) {
@@ -1301,6 +1591,95 @@ impl Minimon {
             widget::text(text).size(size).font(cosmic::font::mono())
         } else {
             widget::text(text).size(size)
+        }
+    }
+
+    // make sure our liust of detected GPUs and the config list are equal
+    fn sync_gpu_configs(&mut self) {
+        let config_gpus = &mut self.config.gpus;
+
+        // Remove entries not present in detected GPUs
+        config_gpus.retain(|id, _| self.gpus.contains_key(id));
+
+        // Add missing GPU configs
+        for id in self.gpus.keys() {
+            config_gpus.entry(id.clone()).or_default();
+        }
+
+        for (id, gpu) in self.gpus.iter_mut() {
+            if let Some(config) = config_gpus.get(id) {
+                gpu.gpu.set_graph_kind(config.gpu_kind);
+                gpu.vram.set_graph_kind(config.vram_kind);
+                gpu.gpu.set_colors(config.gpu_colors);
+                gpu.vram.set_colors(config.vram_colors);
+            }
+        }
+    }
+
+    fn update_gpu_config<F>(&mut self, id: String, action: &str, device: DeviceKind, update_fn: F)
+    where
+        F: FnOnce(&mut GpuConfig, DeviceKind),
+    {
+        info!("{}({:?})", action, (id.clone(), &device));
+        if let Some(config) = self.config.gpus.get_mut(&id) {
+            update_fn(config, device);
+            self.save_config();
+        } else {
+            error!("{}: no config for selected GPU {}", action, id);
+        }
+    }
+
+    fn has_gpus(&self) -> bool {
+        !self.gpus.is_empty()
+    }
+
+    fn is_on_ac(&self) -> Result<bool, Box<dyn std::error::Error>> {
+        if self.is_laptop {
+            // Connect to the system bus
+            let connection = Connection::system()?;
+
+            // Create a proxy to UPower service
+            let proxy = zbus::blocking::Proxy::new(
+                &connection,
+                "org.freedesktop.UPower",
+                "/org/freedesktop/UPower",
+                "org.freedesktop.UPower",
+            )?;
+
+            // Get the list of power-related devices
+            let devices: Vec<OwnedObjectPath> = proxy.call("EnumerateDevices", &())?;
+
+            for device_path in devices {
+                let device_proxy = zbus::blocking::Proxy::new(
+                    &connection,
+                    "org.freedesktop.UPower",
+                    device_path.as_str(),
+                    "org.freedesktop.UPower.Device",
+                )?;
+
+                // Get the Type property (1 = line power / AC)
+                let kind: u32 = device_proxy.get_property("Type")?;
+                if kind == 1 {
+                    // Get the Online property
+                    let online: bool = device_proxy.get_property("Online")?;
+                    return Ok(if online { true } else { false });
+                }
+            }
+        }
+
+        Ok(true)
+    }
+
+    fn is_laptop() -> bool {
+        let power_supply_path = "/sys/class/power_supply";
+        match fs::read_dir(power_supply_path) {
+            Ok(entries) => entries
+                .filter_map(Result::ok)
+                .any(|entry| entry.file_name().to_string_lossy().starts_with("BAT")),
+            Err(e) => {
+                eprintln!("Could not read power supply info: {}", e);
+                false
+            }
         }
     }
 }

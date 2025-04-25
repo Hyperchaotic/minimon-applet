@@ -121,6 +121,11 @@ impl DemoGraph for Disks {
             DisksVariant::Read => (*COLOR_CHOICES_READ).into(),
         }
     }
+
+    fn unique_id(&self) -> Option<String> {
+        None
+    }
+
 }
 
 impl Sensor for Disks {
@@ -252,7 +257,7 @@ impl Sensor for Disks {
             row!(
                 widget::horizontal_space(),
                 widget::button::standard(fl!("change-colors"))
-                    .on_press(Message::ColorPickerOpen(DeviceKind::Disks(self.kind))),
+                    .on_press(Message::ColorPickerOpen(DeviceKind::Disks(self.kind), None)),
                 widget::horizontal_space()
             )
             .into(),

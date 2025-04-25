@@ -17,6 +17,14 @@ tokio = { version = "1.36.0", features = ["time"] }
 sysinfo = "0.34"
 serde = "1.0.197"
 lazy_static = "1.5"
+nvml-wrapper = "0.10.0"
+log = "0.4.27"
+env_logger = "0.10"
+anyhow = { version = "1.0.97", features = ["backtrace"] }
+zbus = { version = "3"}
+zvariant = "3"
+fern = "0.7"
+chrono = "0.4"
 
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"

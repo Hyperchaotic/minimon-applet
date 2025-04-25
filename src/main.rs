@@ -5,15 +5,51 @@ use app::Minimon;
 mod app;
 mod colorpicker;
 mod config;
+mod i18n;
 mod sensors;
 mod svg_graph;
-mod i18n;
 
-/// The `cosmic::app::run()` function is the starting point of your application.
-/// It takes two arguments:
-/// - `settings` is a structure that contains everything relevant with your app's configuration, such as antialiasing, themes, icons, etc...
-/// - `()` is the flags that your app needs to use before it starts.
+use log::info;
+
+use std::io;
+use chrono::Local;
+
+/// Controls whether logging goes to stdout or a file.
+const LOG_TO_FILE: bool = false; 
+
+fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
+    let base_config = fern::Dispatch::new()
+        //.level(log::LevelFilter::Debug)
+        .level(log::LevelFilter::Off)
+        .level_for("cosmic_applet_minimon", log::LevelFilter::Debug)
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{} [{}] {}",
+                Local::now().format("%H:%M:%S"),
+                record.level(),
+                message
+            ))
+        });
+
+    if LOG_TO_FILE {
+        base_config
+            .chain(fern::log_file("/tmp/minimon.log")?)
+            .apply()?;
+    } else {
+        base_config
+            .chain(io::stdout())
+            .apply()?;
+    }
+
+    Ok(())
+}
+
 fn main() -> cosmic::iced::Result {
+
+    setup_logger().expect("Failed to initialize logger");
+
+    info!("Application started");
+
     let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();
     i18n::init(&requested_languages);
     cosmic::applet::run::<Minimon>(())

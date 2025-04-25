@@ -115,6 +115,11 @@ impl DemoGraph for Memory {
             (*COLOR_CHOICES_RING).into()
         }
     }
+
+    fn unique_id(&self) -> Option<String> {
+        None
+    }
+
 }
 
 impl Sensor for Memory {
@@ -220,7 +225,7 @@ impl Sensor for Memory {
                     .width(70),
                     widget::horizontal_space(),
                     widget::button::standard(fl!("change-colors"))
-                        .on_press(Message::ColorPickerOpen(DeviceKind::Memory(mem_kind))),
+                        .on_press(Message::ColorPickerOpen(DeviceKind::Memory(mem_kind), None)),
                 )
             )
             .spacing(cosmic.space_xs()),
