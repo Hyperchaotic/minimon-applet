@@ -80,8 +80,8 @@ install:
     install -Dm0755 {{bin-src}} {{bin-dst}}
     install -Dm0644 {{desktop-src}} {{desktop-dst}}
     install -Dm0644 {{metainfo-src}} {{metainfo-dst}}
-    for size in `ls {{icons-src}}`; do \
-        install -Dm0644 "{{icons-src}}/apps/{{APPID}}.svg" "{{icons-dst}}/apps/{{APPID}}.svg"; \
+    for svg in {{icons-src}}/apps/*.svg; do \
+        install -D "$svg" "{{icons-dst}}/apps/$(basename $svg)"; \
     done
 
 # Uninstalls installed files
@@ -121,7 +121,9 @@ vendor-extract:
 deb:
     install -D {{bin-src}} {{debname}}{{bin-dst}}
     install -D {{desktop-src}} {{debname}}{{desktop-dst}}
-    install -D {{icons-src}}/apps/{{APPID}}.svg {{debname}}{{icons-dst}}/apps/{{APPID}}.svg
+    for svg in {{icons-src}}/apps/*.svg; do \
+        install -D "$svg" "{{debname}}{{icons-dst}}/apps/$(basename $svg)"; \
+    done
     mkdir -p {{debdir}}
     echo "Package: {{name}}" > {{debcontrol}}
     echo "Version: {{version}}" >> {{debcontrol}}

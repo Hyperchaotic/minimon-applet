@@ -66,3 +66,4 @@ enable-vram-label = Show VRAM label
 sensor-gpu = GPU
 sensor-vram = VRAM
 settings-disable-on-battery = Disable monitoring while on battery to allow the GPU to sleep if possible
+enable-symbols = Enable symbols

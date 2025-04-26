@@ -48,6 +48,10 @@ static AUTOSIZE_MAIN_ID: Lazy<WId> = Lazy::new(|| WId::new("autosize-main"));
 const TICK: i64 = 250;
 
 const ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon";
+const RAM_ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon-ram";
+const GPU_ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon-gpu";
+const NETWORK_ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon-network";
+const DISK_ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon-harddisk";
 
 use lazy_static::lazy_static;
 
@@ -213,7 +217,7 @@ pub enum Message {
     GpuToggleLabel(String, DeviceKind, bool),
     GpuSelectGraphType(String, DeviceKind),
     ToggleDisableOnBattery(String, bool),
-
+    ToggleSymbols(bool),
     SysmonSelect(usize),
 }
 
@@ -342,11 +346,11 @@ impl cosmic::Application for Minimon {
 
         // Build the full list of panel elements
         let mut elements: Vec<Element<Message>> = Vec::new();
+
         elements.extend(self.cpu_panel_ui(horizontal));
         elements.extend(self.memory_panel_ui(horizontal));
         elements.extend(self.network_panel_ui(horizontal));
         elements.extend(self.disks_panel_ui(horizontal));
-
         for gpu in self.gpus.values() {
             elements.extend(self.gpu_panel_ui(gpu, horizontal));
         }
@@ -961,6 +965,13 @@ impl cosmic::Application for Minimon {
                 self.config.monospace_labels = toggle;
                 self.save_config();
             }
+
+            Message::ToggleSymbols(toggle) => {
+                info!("Message::ToggleSymbols({:?})", toggle);
+                self.config.symbols = toggle;
+                self.save_config();
+            }
+
             Message::Settings(setting) => {
                 info!("Message::Settings({:?})", setting);
                 self.settings_page = setting;
@@ -1120,6 +1131,11 @@ impl Minimon {
                 .on_toggle(Message::ToggleMonospaceLabels)),
         );
 
+        let symbol_row = settings::item(
+            fl!("enable-symbols"),
+            widget::toggler(self.config.symbols).on_toggle(Message::ToggleSymbols),
+        );
+
         let sysmon_row = settings::item(
             fl!("choose-sysmon"),
             row!(widget::dropdown(
@@ -1130,13 +1146,19 @@ impl Minimon {
             .width(220)),
         );
 
-        column!(refresh_row, label_row, mono_row, sysmon_row)
+        column!(refresh_row, label_row, mono_row, symbol_row, sysmon_row)
             .spacing(10)
             .into()
     }
 
     fn cpu_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
         let mut elements: Vec<Element<Message>> = Vec::new();
+
+        if self.config.symbols && (self.config.cpu.label || self.config.cpu.chart) {
+            let btn = self.core.applet.icon_button(ICON);
+            elements.push(btn.into());
+        }
+
         // If we are below 10% and horizontal layout we can show another decimal
         let formated_cpu = if self.cpu.latest_sample() < 10.0 && horizontal {
             format!("{:.2}%", self.cpu.latest_sample())
@@ -1162,6 +1184,11 @@ impl Minimon {
 
     fn memory_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
         let mut elements: Vec<Element<Message>> = Vec::new();
+
+        if self.config.symbols && (self.config.memory.label || self.config.memory.chart) {
+            let btn = self.core.applet.icon_button(RAM_ICON);
+            elements.push(btn.into());
+        }
 
         if self.config.memory.label {
             let formated_mem = self.memory.to_string(!horizontal);
@@ -1262,6 +1289,11 @@ impl Minimon {
             elements.push(content.into());
         }
 
+        if self.config.symbols && !elements.is_empty() {
+            let btn = self.core.applet.icon_button(NETWORK_ICON);
+            elements.insert(0, btn.into());
+        }
+
         elements
     }
 
@@ -1347,6 +1379,11 @@ impl Minimon {
             elements.push(content.into());
         }
 
+        if self.config.symbols && !elements.is_empty() {
+            let btn = self.core.applet.icon_button(DISK_ICON);
+            elements.insert(0, btn.into());
+        }
+
         elements
     }
 
@@ -1393,6 +1430,12 @@ impl Minimon {
                 elements.push(content.into());
             }
         }
+
+        if self.config.symbols && !elements.is_empty() {
+            let btn = self.core.applet.icon_button(GPU_ICON);
+            elements.insert(0, btn.into());
+        }
+
         elements
     }
 

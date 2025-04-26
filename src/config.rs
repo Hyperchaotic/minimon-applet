@@ -282,6 +282,8 @@ pub struct MinimonConfig {
     
     pub sysmon: usize,
 
+    pub symbols: bool,
+
 }
 
 impl Default for MinimonConfig {
@@ -298,6 +300,7 @@ impl Default for MinimonConfig {
             disks2: DisksConfig::default(),
             gpus: HashMap::new(),
             sysmon: 0,
+            symbols: false,
         }
     }
 }
