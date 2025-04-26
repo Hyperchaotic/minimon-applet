@@ -602,7 +602,18 @@ impl Gpu {
             .align_y(Alignment::Center)
             .spacing(0);
 
-        column!(gpu, vram).spacing(10).into()
+        if config.vram_label && config.gpu_label {
+            let id = self.id();
+            let disable_row = settings::item(
+                fl!("settings-gpu-stack-labels"),
+                row!(widget::toggler(config.stack_labels)
+                    .on_toggle(move |value| { Message::GpuToggleStackLabels(id.clone(), value) })),
+            );
+            column!(gpu, vram, disable_row).spacing(10).into()
+        } else {
+            column!(gpu, vram).spacing(10).into()
+        }
+
     }
 }
 

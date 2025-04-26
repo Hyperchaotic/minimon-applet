@@ -4,6 +4,7 @@ use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::cosmic_theme::palette::bool_mask::BoolMask;
 use cosmic::cosmic_theme::palette::{FromColor, WithAlpha};
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::{fs, time};
 
 use cosmic::app::{Core, Task};
@@ -215,6 +216,7 @@ pub enum Message {
 
     GpuToggleChart(String, DeviceKind, bool),
     GpuToggleLabel(String, DeviceKind, bool),
+    GpuToggleStackLabels(String, bool),
     GpuSelectGraphType(String, DeviceKind),
     ToggleDisableOnBattery(String, bool),
     ToggleSymbols(bool),
@@ -1007,6 +1009,15 @@ impl cosmic::Application for Minimon {
                 );
             }
 
+            Message::GpuToggleStackLabels(id, toggled) => {
+                info!("Message::GpuToggleStackLabels({:?}, {:?})", id, toggled);
+                if let Some(c) = self.config.gpus.get_mut(&id) {
+                    c.stack_labels = toggled;
+                } else {
+                    error!("GpuToggleStackLabels: wrong id {:?}", id);
+                }
+            }
+
             Message::GpuSelectGraphType(id, device) => {
                 info!("Message::GpuSelectGraphType({:?}, {:?})", id, device);
                 self.update_gpu_config(
@@ -1318,6 +1329,7 @@ impl Minimon {
                         .write_label(sample_rate_ms, disks::UnitVariant::Short),
                 ),
             };
+
             if disks_combined {
                 disks_labels.push(widget::vertical_space().into());
             }
@@ -1391,15 +1403,41 @@ impl Minimon {
         let mut elements: Vec<Element<Message>> = Vec::new();
 
         if let Some(config) = self.config.gpus.get(&gpu.id()) {
+            let mut formated_gpu = String::with_capacity(10);
+            let mut formated_vram = String::with_capacity(10);
+            let stacked_labels = config.stack_labels && config.gpu_label && config.vram_label;
+
             if config.gpu_label {
                 // If we are below 10% and horizontal layout we can show another decimal
-                let formated_gpu = if !gpu.is_active() {
-                    "----%".to_string()
+                if !gpu.is_active() {
+                    _ = write!(&mut formated_gpu, "----%");
                 } else if gpu.gpu.latest_sample() < 10.0 && horizontal {
-                    format!("{:.2}%", gpu.gpu.latest_sample())
+                    _ = write!(&mut formated_gpu, "{:.2}%", gpu.gpu.latest_sample());
                 } else {
-                    format!("{:.1}%", gpu.gpu.latest_sample())
+                    _ = write!(&mut formated_gpu, "{:.1}%", gpu.gpu.latest_sample());
                 };
+            }
+
+            if config.vram_label {
+                if !gpu.is_active() {
+                    if horizontal {
+                        _ = write!(&mut formated_vram, "---- GB");
+                    } else {
+                        _ = write!(&mut formated_vram, "----GB");
+                    }
+                } else {
+                    formated_vram = gpu.vram.string(!horizontal);
+                };
+            }
+
+            if stacked_labels {
+                let mut gpu_labels: Vec<Element<Message>> = Vec::new();
+                gpu_labels.push(widget::vertical_space().into());
+                gpu_labels.push(self.figure_label(formated_gpu).into());
+                gpu_labels.push(self.figure_label(formated_vram.clone()).into());
+                gpu_labels.push(widget::vertical_space().into());
+                elements.push(Column::from_vec(gpu_labels).into());
+            } else {
                 elements.push(self.figure_label(formated_gpu).into());
             }
 
@@ -1410,17 +1448,8 @@ impl Minimon {
                 elements.push(content.into());
             }
 
-            if config.vram_label {
-                let formated_mem = if !gpu.is_active() {
-                    if horizontal {
-                        "---- GB".to_string()
-                    } else {
-                        "----GB".to_string()
-                    }
-                } else {
-                    gpu.vram.string(!horizontal)
-                };
-                elements.push(self.figure_label(formated_mem).into());
+            if config.vram_label && !stacked_labels {
+                elements.push(self.figure_label(formated_vram).into());
             }
 
             if config.vram_chart {

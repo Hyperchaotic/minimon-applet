@@ -244,6 +244,7 @@ pub struct GpuConfig {
     pub vram_kind: GraphKind,
     pub vram_colors: GraphColors,
     pub pause_on_battery: bool,
+    pub stack_labels: bool,
 }
 
 impl Default for GpuConfig {
@@ -258,6 +259,7 @@ impl Default for GpuConfig {
             vram_kind: GraphKind::Ring,
             vram_colors: GraphColors::new(DeviceKind::Vram(GraphKind::Line)),
             pause_on_battery: true,
+            stack_labels: true,
         }
     }
 }
