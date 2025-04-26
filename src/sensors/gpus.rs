@@ -297,7 +297,7 @@ impl VramGraph {
         } else {
             crate::svg_graph::line(
                 &self.samples,
-                 (self.max_val as f64 / 1_073_741_824.0) as u64,
+                (self.max_val as f64 / 1_073_741_824.0) as u64,
                 if self.disabled {
                     &self.disabled_colors
                 } else {
@@ -564,7 +564,6 @@ impl Gpu {
         let id = self.id();
         vram_elements.push(Element::from(
             column!(
-                widget::text::title4(fl!("vram-title")),
                 settings::item(
                     fl!("enable-vram-chart"),
                     toggler(config.vram_chart).on_toggle(|value| {
@@ -603,7 +602,7 @@ impl Gpu {
             .align_y(Alignment::Center)
             .spacing(0);
 
-        column!(gpu, vram).into()
+        column!(gpu, vram).spacing(10).into()
     }
 }
 

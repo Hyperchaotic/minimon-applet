@@ -58,13 +58,9 @@ settings-cpu = CPU
 settings-memory = Memory
 settings-network = Network
 settings-disks = Disk
-
-gpu-title = GPU Load
 settings-gpu = GPU
 enable-gpu-chart = Show GPU chart
 enable-gpu-label = Show GPU label
-vram-title = VRAM Load
-settings-vram = VRAM
 enable-vram-chart = Show VRAM chart
 enable-vram-label = Show VRAM label
 sensor-gpu = GPU

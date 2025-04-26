@@ -70,7 +70,6 @@ lazy_static! {
     static ref SETTINGS_MEMORY_HEADING: &'static str = fl!("memory-title").leak();
     static ref SETTINGS_NETWORK_HEADING: &'static str = fl!("net-title").leak();
     static ref SETTINGS_DISKS_HEADING: &'static str = fl!("disks-title").leak();
-    static ref SETTINGS_GPU_HEADING: &'static str = fl!("gpu-title").leak();
 
     // The UI require static lifetime of dropdown items
     static ref SYSMON_LIST: Vec<(String, String)> = Minimon::get_sysmon_list();
@@ -103,16 +102,6 @@ macro_rules! disks_select {
         }
     };
 }
-/*
-// Macro to get a GPU config by UUID, with a default if not found
-macro_rules! gpu_config {
-    ($config:expr, $uuid:expr) => {
-        $config
-            .gpus
-            .entry($uuid.to_string())
-            .or_insert_with(GpuConfig::default)
-    };
-}*/
 
 macro_rules! settings_sub_page_heading {
     ($heading:ident) => {
@@ -473,7 +462,7 @@ impl cosmic::Application for Minimon {
                                             }
                                         )),
                                     );
-                                    content = content.push(disable_row.width(345));
+                                    content = content.push(disable_row.width(350));
                                 }
                                 content = content.push(gpu.settings_ui(config));
                             } else {
