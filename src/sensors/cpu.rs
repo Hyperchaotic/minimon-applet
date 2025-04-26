@@ -115,7 +115,7 @@ impl DemoGraph for Cpu {
         }
     }
 
-    fn unique_id(&self) -> Option<String> {
+    fn id(&self) -> Option<String> {
         None
     }
 

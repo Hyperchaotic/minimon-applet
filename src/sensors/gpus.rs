@@ -60,7 +60,7 @@ const GRAPH_OPTIONS: [&str; 2] = ["Ring", "Line"];
 const MAX_SAMPLES: usize = 21;
 
 pub struct GpuGraph {
-    unique_id: String,
+    id: String,
     samples: VecDeque<f64>,
     graph_options: Vec<&'static str>,
     kind: GraphKind,
@@ -75,14 +75,14 @@ pub struct GpuGraph {
 }
 
 impl GpuGraph {
-    fn new(unique_id: &str) -> Self {
+    fn new(id: &str) -> Self {
         let mut percentage = String::with_capacity(6);
         write!(percentage, "0").unwrap();
 
         let mut value = String::with_capacity(6);
         write!(value, "0").unwrap();
         GpuGraph {
-            unique_id: unique_id.to_owned(),
+            id: id.to_owned(),
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
             graph_options: GRAPH_OPTIONS.to_vec(),
             kind: GraphKind::Ring,
@@ -163,6 +163,27 @@ impl GpuGraph {
             format!("{}{}", current_val, unit)
         }
     }
+
+    pub fn update(&mut self, sample: u32) {
+        if self.samples.len() >= MAX_SAMPLES {
+            self.samples.pop_front();
+        }
+        self.samples.push_back(sample as f64);
+
+        if self.kind == GraphKind::Ring {
+            self.value.clear();
+            if sample < 10 {
+                write!(self.value, "{:.2}", sample).unwrap();
+            } else if sample < 100 {
+                write!(self.value, "{:.1}", sample).unwrap();
+            } else {
+                write!(self.value, "{}", sample).unwrap();
+            }
+
+            self.percentage.clear();
+            write!(self.percentage, "{sample}").unwrap();
+        }
+    }
 }
 
 impl DemoGraph for GpuGraph {
@@ -201,13 +222,13 @@ impl DemoGraph for GpuGraph {
         }
     }
 
-    fn unique_id(&self) -> Option<String> {
-        Some(self.unique_id.clone())
+    fn id(&self) -> Option<String> {
+        Some(self.id.clone())
     }
 }
 
 pub struct VramGraph {
-    unique_id: String,
+    id: String,
     samples: VecDeque<f64>,
     graph_options: Vec<&'static str>,
     kind: GraphKind,
@@ -225,7 +246,7 @@ pub struct VramGraph {
 }
 
 impl VramGraph {
-    fn new(unique_id: &str, total: u64) -> Self {
+    fn new(id: &str, total: u64) -> Self {
         let mut percentage = String::with_capacity(6);
         write!(percentage, "0").unwrap();
 
@@ -233,11 +254,11 @@ impl VramGraph {
         write!(value, "0").unwrap();
 
         VramGraph {
-            unique_id: unique_id.to_owned(),
+            id: id.to_owned(),
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
             graph_options: GRAPH_OPTIONS.to_vec(),
             kind: GraphKind::Ring,
-            max_val: (total as f64 / 1_073_741_824.0) as u64,
+            max_val: total,
             value,
             percentage,
             colors: GraphColors::default(),
@@ -276,7 +297,7 @@ impl VramGraph {
         } else {
             crate::svg_graph::line(
                 &self.samples,
-                self.max_val,
+                 (self.max_val as f64 / 1_073_741_824.0) as u64,
                 if self.disabled {
                     &self.disabled_colors
                 } else {
@@ -315,6 +336,32 @@ impl VramGraph {
             format!("{}{}", current_val, unit)
         }
     }
+
+    pub fn update(&mut self, sample: u64) {
+        let new_val: f64 = sample as f64 / 1_073_741_824.0;
+
+        if self.samples.len() >= MAX_SAMPLES {
+            self.samples.pop_front();
+        }
+        self.samples.push_back(new_val);
+
+        if self.kind == GraphKind::Ring {
+            self.value.clear();
+
+            let percentage: u64 =
+                ((new_val / (self.max_val as f64 / 1_073_741_824.0)) * 100.0) as u64;
+            self.percentage.clear();
+            write!(self.percentage, "{percentage}").unwrap();
+
+            if new_val < 10.0 {
+                write!(self.value, "{:.2}", new_val).unwrap();
+            } else if new_val < 100.0 {
+                write!(self.value, "{:.1}", new_val).unwrap();
+            } else {
+                write!(self.value, "{}", new_val).unwrap();
+            }
+        }
+    }
 }
 
 impl DemoGraph for VramGraph {
@@ -330,11 +377,9 @@ impl DemoGraph for VramGraph {
                     &self.svg_colors,
                 )
             }
-            GraphKind::Line => crate::svg_graph::line(
-                &VecDeque::from(DEMO_SAMPLES),
-                32,
-                &self.svg_colors,
-            ),
+            GraphKind::Line => {
+                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 32, &self.svg_colors)
+            }
         }
     }
 
@@ -355,8 +400,8 @@ impl DemoGraph for VramGraph {
         }
     }
 
-    fn unique_id(&self) -> Option<String> {
-        Some(self.unique_id.clone())
+    fn id(&self) -> Option<String> {
+        Some(self.id.clone())
     }
 }
 
@@ -369,12 +414,12 @@ pub struct Gpu {
 impl Gpu {
     pub fn new(gpu_if: Box<dyn GpuIf>) -> Self {
         let total = gpu_if.vram_total();
-        let unique_id = gpu_if.id();
+        let id = gpu_if.id();
 
         Gpu {
             gpu_if,
-            gpu: GpuGraph::new(&unique_id),
-            vram: VramGraph::new(&unique_id, total),
+            gpu: GpuGraph::new(&id),
+            vram: VramGraph::new(&id, total),
         }
     }
 
@@ -402,8 +447,12 @@ impl Gpu {
 
     pub fn update(&mut self) {
         if self.gpu_if.is_active() {
-            self.gpu_update();
-            self.vram_update();
+            if let Ok(sample) = self.gpu_if.usage() {
+                self.gpu.update(sample);
+            }
+            if let Ok(sample) = self.gpu_if.vram_used() {
+                self.vram.update(sample);
+            }
         }
     }
 
@@ -555,57 +604,6 @@ impl Gpu {
             .spacing(0);
 
         column!(gpu, vram).into()
-    }
-
-    fn gpu_update(&mut self) {
-        if let Ok(sample) = self.gpu_if.usage() {
-            if self.gpu.samples.len() >= MAX_SAMPLES {
-                self.gpu.samples.pop_front();
-            }
-            self.gpu.samples.push_back(sample as f64);
-
-            if self.gpu.kind == GraphKind::Ring {
-                self.gpu.value.clear();
-                if sample < 10 {
-                    write!(self.gpu.value, "{:.2}", sample).unwrap();
-                } else if sample < 100 {
-                    write!(self.gpu.value, "{:.1}", sample).unwrap();
-                } else {
-                    write!(self.gpu.value, "{}", sample).unwrap();
-                }
-
-                self.gpu.percentage.clear();
-                write!(self.gpu.percentage, "{sample}").unwrap();
-            }
-        }
-    }
-
-    fn vram_update(&mut self) {
-        if let Ok(sample) = self.gpu_if.vram_used() {
-            let new_val: f64 = sample as f64 / 1_073_741_824.0;
-
-            if self.vram.samples.len() >= MAX_SAMPLES {
-                self.vram.samples.pop_front();
-            }
-            self.vram.samples.push_back(new_val);
-
-            if self.vram.kind == GraphKind::Ring {
-                self.vram.value.clear();
-
-                let percentage: u64 =
-                    ((new_val / (self.vram.max_val as f64 / 1_073_741_824.0)) * 100.0) as u64;
-                self.vram.percentage.clear();
-                write!(self.vram.percentage, "{percentage}").unwrap();
-
-                if new_val < 10.0 {
-                    write!(self.vram.value, "{:.2}", new_val).unwrap();
-                } else if new_val < 100.0 {
-                    write!(self.vram.value, "{:.1}", new_val).unwrap();
-                } else {
-                    write!(self.vram.value, "{}", new_val).unwrap();
-                }
-            }
-        }
     }
 }
 

@@ -109,7 +109,7 @@ pub trait DemoGraph {
     fn colors(&self) -> GraphColors;
     fn set_colors(&mut self, colors: GraphColors);
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)>;
-    fn unique_id(&self) -> Option<String>;
+    fn id(&self) -> Option<String>;
 }
 
 /// Data for managing the `ColorPicker` dialog
@@ -435,9 +435,9 @@ impl ColorPicker {
                     row!(
                         widget::horizontal_space(),
                         widget::button::destructive(fl!("colorpicker-cancel"))
-                            .on_press(Message::ColorPickerClose(false, dmo.unique_id())),
+                            .on_press(Message::ColorPickerClose(false, dmo.id())),
                         widget::button::suggested(fl!("colorpicker-save"))
-                            .on_press(Message::ColorPickerClose(true, dmo.unique_id()))
+                            .on_press(Message::ColorPickerClose(true, dmo.id()))
                     )
                     .width(Length::Fill)
                     .spacing(5)
