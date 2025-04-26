@@ -237,7 +237,7 @@ impl VramGraph {
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
             graph_options: GRAPH_OPTIONS.to_vec(),
             kind: GraphKind::Ring,
-            max_val: total,
+            max_val: (total as f64 / 1_073_741_824.0) as u64,
             value,
             percentage,
             colors: GraphColors::default(),
@@ -332,7 +332,7 @@ impl DemoGraph for VramGraph {
             }
             GraphKind::Line => crate::svg_graph::line(
                 &VecDeque::from(DEMO_SAMPLES),
-                self.max_val,
+                32,
                 &self.svg_colors,
             ),
         }
