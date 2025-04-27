@@ -1112,6 +1112,7 @@ impl Minimon {
     fn general_settings_ui(&self) -> Element<crate::app::Message> {
         let refresh_rate = self.config.refresh_rate as f64 / 1000.0;
 
+        // Create settings rows
         let refresh_row = settings::item(
             fl!("refresh-rate"),
             spin_button(
@@ -1157,6 +1158,7 @@ impl Minimon {
             .width(220)),
         );
 
+        // Combine rows into a column with spacing
         column!(refresh_row, label_row, mono_row, symbol_row, sysmon_row)
             .spacing(10)
             .into()
@@ -1165,28 +1167,30 @@ impl Minimon {
     fn cpu_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
         let mut elements: Vec<Element<Message>> = Vec::new();
 
+        // Handle the symbols button if needed
         if self.config.symbols && (self.config.cpu.label || self.config.cpu.chart) {
             let btn = self.core.applet.icon_button(ICON);
             elements.push(btn.into());
         }
 
-        // If we are below 10% and horizontal layout we can show another decimal
-        let formated_cpu = if self.cpu.latest_sample() < 10.0 && horizontal {
+        // Format CPU usage based on horizontal layout and sample value
+        let formatted_cpu = if self.cpu.latest_sample() < 10.0 && horizontal {
             format!("{:.2}%", self.cpu.latest_sample())
         } else {
             format!("{:.1}%", self.cpu.latest_sample())
         };
 
+        // Add the CPU label if needed
         if self.config.cpu.label {
-            elements.push(self.figure_label(formated_cpu).into());
+            elements.push(self.figure_label(formatted_cpu).into());
         }
 
+        // Add the CPU chart if needed
         if self.config.cpu.chart {
             let content = self
                 .core
                 .applet
                 .icon_button_from_handle(Minimon::make_icon_handle(&self.cpu));
-
             elements.push(content.into());
         }
 
@@ -1196,22 +1200,24 @@ impl Minimon {
     fn memory_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
         let mut elements: Vec<Element<Message>> = Vec::new();
 
+        // Handle the symbols button if needed
         if self.config.symbols && (self.config.memory.label || self.config.memory.chart) {
             let btn = self.core.applet.icon_button(RAM_ICON);
             elements.push(btn.into());
         }
 
+        // Label section
         if self.config.memory.label {
-            let formated_mem = self.memory.to_string(!horizontal);
-            elements.push(self.figure_label(formated_mem).into());
+            let formatted_mem = self.memory.to_string(!horizontal);
+            elements.push(self.figure_label(formatted_mem).into());
         }
 
+        // Chart section
         if self.config.memory.chart {
             let content = self
                 .core
                 .applet
                 .icon_button_from_handle(Minimon::make_icon_handle(&self.memory));
-
             elements.push(content.into());
         }
 
@@ -1223,44 +1229,43 @@ impl Minimon {
         let sample_rate_ms = self.config.refresh_rate;
         let mut elements: Vec<Element<Message>> = Vec::new();
 
-        if self.config.network1.label {
-            let mut network_labels: Vec<Element<Message>> = Vec::new();
+        let format_label = |text: String| self.figure_label(text);
 
-            // DL
-            let dl_label = match horizontal {
-                true => self.figure_label(format!(
+        if self.config.network1.label {
+            let mut network_labels = Vec::new();
+
+            // Download label
+            let dl_text = if horizontal {
+                format!(
                     "↓ {}",
-                    &self
-                        .network1
-                        .download_label(sample_rate_ms, network::UnitVariant::Long)
-                )),
-                false => self.figure_label(
                     self.network1
-                        .download_label(sample_rate_ms, network::UnitVariant::Short),
-                ),
+                        .download_label(sample_rate_ms, network::UnitVariant::Long)
+                )
+            } else {
+                self.network1
+                    .download_label(sample_rate_ms, network::UnitVariant::Short)
             };
             if nw_combined {
                 network_labels.push(widget::vertical_space().into());
             }
-            network_labels.push(dl_label.into());
+            network_labels.push(format_label(dl_text).into());
 
             if nw_combined {
-                // UL
-                let ul_label = match horizontal {
-                    true => self.figure_label(format!(
+                // Upload label
+                let ul_text = if horizontal {
+                    format!(
                         "↑ {}",
-                        &self
-                            .network1
-                            .upload_label(sample_rate_ms, network::UnitVariant::Long)
-                    )),
-                    false => self.figure_label(
                         self.network1
-                            .upload_label(sample_rate_ms, network::UnitVariant::Short),
-                    ),
+                            .upload_label(sample_rate_ms, network::UnitVariant::Long)
+                    )
+                } else {
+                    self.network1
+                        .upload_label(sample_rate_ms, network::UnitVariant::Short)
                 };
-                network_labels.push(ul_label.into());
+                network_labels.push(format_label(ul_text).into());
                 network_labels.push(widget::vertical_space().into());
             }
+
             elements.push(Column::from_vec(network_labels).into());
         }
 
@@ -1273,21 +1278,19 @@ impl Minimon {
         }
 
         if self.config.network2.label && !nw_combined {
-            let mut network_labels: Vec<Element<Message>> = Vec::new();
+            let mut network_labels = Vec::new();
 
-            let ul_label = match horizontal {
-                true => self.figure_label(format!(
+            let ul_text = if horizontal {
+                format!(
                     "↑ {}",
-                    &self
-                        .network2
-                        .upload_label(sample_rate_ms, network::UnitVariant::Long)
-                )),
-                false => self.figure_label(
                     self.network2
-                        .upload_label(sample_rate_ms, network::UnitVariant::Short),
-                ),
+                        .upload_label(sample_rate_ms, network::UnitVariant::Long)
+                )
+            } else {
+                self.network2
+                    .upload_label(sample_rate_ms, network::UnitVariant::Short)
             };
-            network_labels.push(ul_label.into());
+            network_labels.push(format_label(ul_text).into());
 
             elements.push(Column::from_vec(network_labels).into());
         }
@@ -1313,45 +1316,43 @@ impl Minimon {
         let sample_rate_ms = self.config.refresh_rate;
         let mut elements: Vec<Element<Message>> = Vec::new();
 
+        let format_label = |text: String| self.figure_label(text);
+
         if self.config.disks1.label {
-            let mut disks_labels: Vec<Element<Message>> = Vec::new();
+            let mut disks_labels = Vec::new();
 
-            // Write
-            let wr_label = match horizontal {
-                true => self.figure_label(format!(
+            // Write label
+            let write_text = if horizontal {
+                format!(
                     "W {}",
-                    &self
-                        .disks1
-                        .write_label(sample_rate_ms, disks::UnitVariant::Long)
-                )),
-                false => self.figure_label(
                     self.disks1
-                        .write_label(sample_rate_ms, disks::UnitVariant::Short),
-                ),
+                        .write_label(sample_rate_ms, disks::UnitVariant::Long)
+                )
+            } else {
+                self.disks1
+                    .write_label(sample_rate_ms, disks::UnitVariant::Short)
             };
-
             if disks_combined {
                 disks_labels.push(widget::vertical_space().into());
             }
-            disks_labels.push(wr_label.into());
+            disks_labels.push(format_label(write_text).into());
 
             if disks_combined {
-                // Read
-                let rd_label = match horizontal {
-                    true => self.figure_label(format!(
+                // Read label
+                let read_text = if horizontal {
+                    format!(
                         "R {}",
-                        &self
-                            .disks1
-                            .read_label(sample_rate_ms, disks::UnitVariant::Long)
-                    )),
-                    false => self.figure_label(
                         self.disks1
-                            .read_label(sample_rate_ms, disks::UnitVariant::Short),
-                    ),
+                            .read_label(sample_rate_ms, disks::UnitVariant::Long)
+                    )
+                } else {
+                    self.disks1
+                        .read_label(sample_rate_ms, disks::UnitVariant::Short)
                 };
-                disks_labels.push(rd_label.into());
+                disks_labels.push(format_label(read_text).into());
                 disks_labels.push(widget::vertical_space().into());
             }
+
             elements.push(Column::from_vec(disks_labels).into());
         }
 
@@ -1364,21 +1365,19 @@ impl Minimon {
         }
 
         if self.config.disks2.label && !disks_combined {
-            let mut disks_labels: Vec<Element<Message>> = Vec::new();
+            let mut disks_labels = Vec::new();
 
-            let rd_label = match horizontal {
-                true => self.figure_label(format!(
+            let read_text = if horizontal {
+                format!(
                     "R {}",
-                    &self
-                        .disks2
-                        .read_label(sample_rate_ms, disks::UnitVariant::Long)
-                )),
-                false => self.figure_label(
                     self.disks2
-                        .read_label(sample_rate_ms, disks::UnitVariant::Short),
-                ),
+                        .read_label(sample_rate_ms, disks::UnitVariant::Long)
+                )
+            } else {
+                self.disks2
+                    .read_label(sample_rate_ms, disks::UnitVariant::Short)
             };
-            disks_labels.push(rd_label.into());
+            disks_labels.push(format_label(read_text).into());
 
             elements.push(Column::from_vec(disks_labels).into());
         }
@@ -1403,59 +1402,57 @@ impl Minimon {
         let mut elements: Vec<Element<Message>> = Vec::new();
 
         if let Some(config) = self.config.gpus.get(&gpu.id()) {
-            let mut formated_gpu = String::with_capacity(10);
-            let mut formated_vram = String::with_capacity(10);
+            let mut formatted_gpu = String::with_capacity(10);
+            let mut formatted_vram = String::with_capacity(10);
             let stacked_labels = config.stack_labels && config.gpu_label && config.vram_label;
 
             if config.gpu_label {
-                // If we are below 10% and horizontal layout we can show another decimal
                 if !gpu.is_active() {
-                    _ = write!(&mut formated_gpu, "----%");
-                } else if gpu.gpu.latest_sample() < 10.0 && horizontal {
-                    _ = write!(&mut formated_gpu, "{:.2}%", gpu.gpu.latest_sample());
+                    formatted_gpu.push_str("----%");
                 } else {
-                    _ = write!(&mut formated_gpu, "{:.1}%", gpu.gpu.latest_sample());
-                };
+                    let value = gpu.gpu.latest_sample();
+                    if value < 10.0 && horizontal {
+                        write!(&mut formatted_gpu, "{:.2}%", value).ok();
+                    } else {
+                        write!(&mut formatted_gpu, "{:.1}%", value).ok();
+                    }
+                }
             }
 
             if config.vram_label {
                 if !gpu.is_active() {
-                    if horizontal {
-                        _ = write!(&mut formated_vram, "---- GB");
-                    } else {
-                        _ = write!(&mut formated_vram, "----GB");
-                    }
+                    let placeholder = if horizontal { "---- GB" } else { "----GB" };
+                    formatted_vram.push_str(placeholder);
                 } else {
-                    formated_vram = gpu.vram.string(!horizontal);
-                };
+                    formatted_vram = gpu.vram.string(!horizontal);
+                }
             }
 
             if stacked_labels {
-                let mut gpu_labels: Vec<Element<Message>> = Vec::new();
-                gpu_labels.push(widget::vertical_space().into());
-                gpu_labels.push(self.figure_label(formated_gpu).into());
-                gpu_labels.push(self.figure_label(formated_vram.clone()).into());
-                gpu_labels.push(widget::vertical_space().into());
+                let gpu_labels = vec![
+                    widget::vertical_space().into(),
+                    self.figure_label(formatted_gpu).into(),
+                    self.figure_label(formatted_vram.clone()).into(),
+                    widget::vertical_space().into(),
+                ];
                 elements.push(Column::from_vec(gpu_labels).into());
             } else {
-                elements.push(self.figure_label(formated_gpu).into());
+                elements.push(self.figure_label(formatted_gpu).into());
             }
 
             if config.gpu_chart {
                 let g = cosmic::widget::icon::from_svg_bytes(gpu.gpu.graph().into_bytes());
                 let content = self.core.applet.icon_button_from_handle(g);
-
                 elements.push(content.into());
             }
 
             if config.vram_label && !stacked_labels {
-                elements.push(self.figure_label(formated_vram).into());
+                elements.push(self.figure_label(formatted_vram).into());
             }
 
             if config.vram_chart {
                 let g = cosmic::widget::icon::from_svg_bytes(gpu.vram.graph().into_bytes());
                 let content = self.core.applet.icon_button_from_handle(g);
-
                 elements.push(content.into());
             }
         }

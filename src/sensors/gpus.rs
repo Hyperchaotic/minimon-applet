@@ -22,6 +22,8 @@ use crate::{
     svg_graph::SvgColors,
 };
 
+use super::gpu::amd::AmdGpu;
+use super::gpu::intel::IntelGpu;
 use super::gpu::{nvidia::NvidiaGpu, GpuIf};
 
 use lazy_static::lazy_static;
@@ -613,33 +615,15 @@ impl Gpu {
         } else {
             column!(gpu, vram).spacing(10).into()
         }
-
     }
 }
 
 pub fn list_gpus() -> Vec<Gpu> {
     let mut v: Vec<Gpu> = Vec::new();
 
-    // Nvidia GPUs
-    if let Ok(count) = NvidiaGpu::gpus() {
-        let nvidia_gpus = (0..count)
-            .filter_map(|i| {
-                // Try to get both name and UUID, skip this GPU if either fails
-                let name = NvidiaGpu::name(i).ok()?;
-                let uuid = NvidiaGpu::uuid(i).ok()?;
-
-                Some(Gpu::new(Box::new(NvidiaGpu::new(i, name, uuid))))
-            })
-            .collect::<Vec<_>>();
-
-        v.extend(nvidia_gpus);
-    } else {
-        info!("No Nvidia GPUs found");
-    }
-
-    // AMD
-    //INTEL
-
+    v.extend(IntelGpu::get_gpus());
+    v.extend(NvidiaGpu::get_gpus());
+    v.extend(AmdGpu::get_gpus());
     v
 }
 

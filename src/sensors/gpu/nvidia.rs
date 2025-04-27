@@ -1,8 +1,10 @@
 use anyhow::{anyhow, Context, Result};
-use log::{debug, warn};
+use log::{debug, info, warn};
 use nvml_wrapper::{error::NvmlError, Device, Nvml};
 
 use std::sync::LazyLock;
+
+use crate::sensors::gpus::Gpu;
 
 pub static NVML: LazyLock<Result<Nvml, NvmlError>> = LazyLock::new(|| {
     let nvml = Nvml::init();
@@ -98,6 +100,28 @@ impl super::GpuIf for NvidiaGpu<'_> {
 }
 
 impl NvidiaGpu<'_> {
+    pub fn get_gpus() -> Vec<Gpu> {
+        let mut v: Vec<Gpu> = Vec::new();
+
+        // Nvidia GPUs
+        if let Ok(count) = NvidiaGpu::gpus() {
+            let nvidia_gpus = (0..count)
+                .filter_map(|i| {
+                    // Try to get both name and UUID, skip this GPU if either fails
+                    let name = NvidiaGpu::name(i).ok()?;
+                    let uuid = NvidiaGpu::uuid(i).ok()?;
+
+                    Some(Gpu::new(Box::new(NvidiaGpu::new(i, name, uuid))))
+                })
+                .collect::<Vec<_>>();
+
+            v.extend(nvidia_gpus);
+        } else {
+            info!("No Nvidia GPUs found");
+        }
+        v
+    }
+
     pub fn uuid(idx: u32) -> Result<String> {
         NVML.as_ref()
             .context("unable to establish NVML connection")
@@ -116,7 +140,7 @@ impl NvidiaGpu<'_> {
             })
     }
 
-    pub fn gpus() -> Result<u32> {
+    fn gpus() -> Result<u32> {
         NVML.as_ref()
             .context("unable to establish NVML connection")
             .and_then(|nvml| nvml.device_count().context("failed to get GPU count"))

@@ -1,6 +1,10 @@
 use anyhow::Result;
 
+use super::gpus::Gpu;
+
 pub mod nvidia;
+pub mod amd;
+pub mod intel;
 
 pub trait GpuIf {
     fn name(&self) -> String;
