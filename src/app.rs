@@ -211,6 +211,7 @@ pub enum Message {
     RefreshRateChanged(f64),
     LabelSizeChanged(u16),
     ToggleMonospaceLabels(bool),
+    ToggleTightSpacing(bool),
 
     Settings(Option<SettingsVariant>),
 
@@ -357,15 +358,21 @@ impl cosmic::Application for Minimon {
             elements.extend(self.gpu_panel_ui(gpu, horizontal));
         }
 
+        let spacing = if self.config.tight_spacing {
+            0
+        } else {
+            cosmic.space_xxs()
+        };
+
         // Layout horizontally or vertically
         let wrapper: Element<Message> = match horizontal {
             true => Row::from_vec(elements)
                 .align_y(Alignment::Center)
-                .spacing(cosmic.space_xxs())
+                .spacing(spacing)
                 .into(),
             false => Column::from_vec(elements)
                 .align_x(Alignment::Center)
-                .spacing(cosmic.space_xxs())
+                .spacing(spacing)
                 .into(),
         };
 
@@ -968,6 +975,12 @@ impl cosmic::Application for Minimon {
                 self.save_config();
             }
 
+            Message::ToggleTightSpacing(toggle) => {
+                info!("Message::ToggleTightSpacing({:?})", toggle);
+                self.config.tight_spacing = toggle;
+                self.save_config();
+            }
+
             Message::ToggleSymbols(toggle) => {
                 info!("Message::ToggleSymbols({:?})", toggle);
                 self.config.symbols = toggle;
@@ -1148,6 +1161,11 @@ impl Minimon {
             widget::toggler(self.config.symbols).on_toggle(Message::ToggleSymbols),
         );
 
+        let spacing_row = settings::item(
+            fl!("settings-tight-spacing"),
+            widget::toggler(self.config.tight_spacing).on_toggle(Message::ToggleTightSpacing),
+        );
+
         let sysmon_row = settings::item(
             fl!("choose-sysmon"),
             row!(widget::dropdown(
@@ -1159,9 +1177,16 @@ impl Minimon {
         );
 
         // Combine rows into a column with spacing
-        column!(refresh_row, label_row, mono_row, symbol_row, sysmon_row)
-            .spacing(10)
-            .into()
+        column!(
+            refresh_row,
+            label_row,
+            mono_row,
+            symbol_row,
+            spacing_row,
+            sysmon_row
+        )
+        .spacing(10)
+        .into()
     }
 
     fn cpu_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {

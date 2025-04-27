@@ -285,7 +285,7 @@ pub struct MinimonConfig {
     pub sysmon: usize,
 
     pub symbols: bool,
-
+    pub tight_spacing: bool,
 }
 
 impl Default for MinimonConfig {
@@ -303,6 +303,7 @@ impl Default for MinimonConfig {
             gpus: HashMap::new(),
             sysmon: 0,
             symbols: false,
+            tight_spacing: false,
         }
     }
 }
