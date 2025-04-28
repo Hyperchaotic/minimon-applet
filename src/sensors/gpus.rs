@@ -66,10 +66,6 @@ pub struct GpuGraph {
     samples: VecDeque<f64>,
     graph_options: Vec<&'static str>,
     kind: GraphKind,
-    // Current GPU load shown as string
-    value: String,
-    // Current GPU load as a percentage to draw in the SVG
-    percentage: String,
     colors: GraphColors,
     svg_colors: SvgColors,
     disabled: bool,
@@ -88,8 +84,6 @@ impl GpuGraph {
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
             graph_options: GRAPH_OPTIONS.to_vec(),
             kind: GraphKind::Ring,
-            value,
-            percentage,
             colors: GraphColors::default(),
             svg_colors: SvgColors::new(&GraphColors::default()),
             disabled: false,
@@ -106,17 +100,31 @@ impl GpuGraph {
         for sample in self.samples.iter_mut() {
             *sample = 0.0;
         }
-        self.percentage.clear();
-        self.value.clear();
-        _ = write!(self.percentage, "0");
-        _ = write!(self.value, "-");
     }
 
     pub fn graph(&self) -> String {
         if self.kind == GraphKind::Ring {
+            let latest = self.latest_sample();
+            let mut value = String::with_capacity(10);
+            let mut percentage = String::with_capacity(10);
+    
+            if self.disabled {
+                _ = write!(percentage, "0");
+                _ = write!(value, "-");
+            } else {
+                if latest < 10.0 {
+                    write!(value, "{:.2}", latest).unwrap();
+                } else if latest < 100.0 {
+                    write!(value, "{:.1}", latest).unwrap();
+                } else {
+                    write!(value, "{}", latest).unwrap();
+                }
+                write!(percentage, "{latest}").unwrap();
+            }
+    
             crate::svg_graph::ring(
-                &self.value,
-                &self.percentage,
+                &value,
+                &percentage,
                 if self.disabled {
                     &self.disabled_colors
                 } else {
@@ -171,20 +179,6 @@ impl GpuGraph {
             self.samples.pop_front();
         }
         self.samples.push_back(sample as f64);
-
-        if self.kind == GraphKind::Ring {
-            self.value.clear();
-            if sample < 10 {
-                write!(self.value, "{:.2}", sample).unwrap();
-            } else if sample < 100 {
-                write!(self.value, "{:.1}", sample).unwrap();
-            } else {
-                write!(self.value, "{}", sample).unwrap();
-            }
-
-            self.percentage.clear();
-            write!(self.percentage, "{sample}").unwrap();
-        }
     }
 }
 
@@ -235,10 +229,6 @@ pub struct VramGraph {
     graph_options: Vec<&'static str>,
     kind: GraphKind,
     max_val: u64,
-    // Current VRAM load shown as string
-    value: String,
-    // Current VRAM load as a percentage to draw in the SVG
-    percentage: String,
 
     //colors
     colors: GraphColors,
@@ -249,21 +239,13 @@ pub struct VramGraph {
 
 impl VramGraph {
     fn new(id: &str, total: u64) -> Self {
-        let mut percentage = String::with_capacity(6);
-        write!(percentage, "0").unwrap();
-
-        let mut value = String::with_capacity(6);
-        write!(value, "0").unwrap();
-
         VramGraph {
             id: id.to_owned(),
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
             graph_options: GRAPH_OPTIONS.to_vec(),
             kind: GraphKind::Ring,
             max_val: total,
-            value,
-            percentage,
-            colors: GraphColors::default(),
+             colors: GraphColors::default(),
             svg_colors: SvgColors::new(&GraphColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
@@ -279,17 +261,33 @@ impl VramGraph {
         for sample in self.samples.iter_mut() {
             *sample = 0.0;
         }
-        self.percentage.clear();
-        self.value.clear();
-        _ = write!(self.percentage, "0");
-        _ = write!(self.value, "-");
     }
 
     pub fn graph(&self) -> String {
         if self.kind == GraphKind::Ring {
+            let latest = self.latest_sample();
+            let mut value = String::with_capacity(10);
+            let mut percentage = String::with_capacity(10);
+
+            if self.disabled {
+                _ = write!(percentage, "0");
+                _ = write!(value, "-");
+            } else {
+                let pct: u64 = ((latest / (self.max_val as f64 / 1_073_741_824.0)) * 100.0) as u64;
+
+                write!(percentage, "{pct}").unwrap();
+
+                if latest < 10.0 {
+                    write!(value, "{:.2}", latest).unwrap();
+                } else if latest < 100.0 {
+                    write!(value, "{:.1}", latest).unwrap();
+                } else {
+                    write!(value, "{}", latest).unwrap();
+                }
+            }
             crate::svg_graph::ring(
-                &self.value,
-                &self.percentage,
+                &value,
+                &percentage,
                 if self.disabled {
                     &self.disabled_colors
                 } else {
@@ -346,23 +344,6 @@ impl VramGraph {
             self.samples.pop_front();
         }
         self.samples.push_back(new_val);
-
-        if self.kind == GraphKind::Ring {
-            self.value.clear();
-
-            let percentage: u64 =
-                ((new_val / (self.max_val as f64 / 1_073_741_824.0)) * 100.0) as u64;
-            self.percentage.clear();
-            write!(self.percentage, "{percentage}").unwrap();
-
-            if new_val < 10.0 {
-                write!(self.value, "{:.2}", new_val).unwrap();
-            } else if new_val < 100.0 {
-                write!(self.value, "{:.1}", new_val).unwrap();
-            } else {
-                write!(self.value, "{}", new_val).unwrap();
-            }
-        }
     }
 }
 

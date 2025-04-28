@@ -67,12 +67,6 @@ pub struct Cpu {
     system: System,
     kind: GraphKind,
     graph_options: Vec<&'static str>,
-
-    /// current value cpu load shown.
-    value: String,
-    /// the percentage of the ring to be filled
-    percentage: String,
-
     /// colors cached so we don't need to convert to string every time
     svg_colors: SvgColors,
 }
@@ -118,7 +112,6 @@ impl DemoGraph for Cpu {
     fn id(&self) -> Option<String> {
         None
     }
-
 }
 
 impl Sensor for Cpu {
@@ -145,22 +138,6 @@ impl Sensor for Cpu {
             self.samples.pop_front();
         }
         self.samples.push_back(new_val);
-
-        if self.kind == GraphKind::Ring {
-            self.value.clear();
-            let current_val = self.latest_sample();
-            if current_val < 10.0 {
-                write!(self.value, "{:.2}", current_val).unwrap();
-            } else if current_val < 100.0 {
-                write!(self.value, "{:.1}", current_val).unwrap();
-            } else {
-                write!(self.value, "{}", current_val).unwrap();
-            }
-
-            let percentage: u64 = ((current_val / self.max_val as f64) * 100.0) as u64;
-            self.percentage.clear();
-            write!(self.percentage, "{percentage}").unwrap();
-        }
     }
 
     fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
@@ -171,7 +148,20 @@ impl Sensor for Cpu {
 
     fn graph(&self) -> String {
         if self.kind == GraphKind::Ring {
-            crate::svg_graph::ring(&self.value, &self.percentage, &self.svg_colors)
+            let latest = self.latest_sample();
+            let mut value = String::with_capacity(10);
+            let mut percentage = String::with_capacity(10);
+
+            if latest < 10.0 {
+                write!(value, "{:.2}", latest).unwrap();
+            } else if latest < 100.0 {
+                write!(value, "{:.1}", latest).unwrap();
+            } else {
+                write!(value, "{}", latest).unwrap();
+            }
+            write!(percentage, "{latest}").unwrap();
+
+            crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
         } else {
             crate::svg_graph::line(&self.samples, self.max_val, &self.svg_colors)
         }
@@ -251,8 +241,6 @@ impl Cpu {
             system,
             kind,
             graph_options: GRAPH_OPTIONS.to_vec(),
-            value,
-            percentage,
             svg_colors: SvgColors::new(&GraphColors::default()),
         };
         cpu.set_colors(GraphColors::default());
