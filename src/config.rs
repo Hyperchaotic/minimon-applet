@@ -106,8 +106,14 @@ impl GraphColors {
                 color3: Srgba::from_components((255, 255, 0, 255)),
                 color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
             },
-            DeviceKind::Gpu(_) => GraphColors::default(),
-            DeviceKind::Vram(_) => GraphColors::default(),
+            DeviceKind::Gpu(_) => GraphColors {
+                color4: Srgba::from_components((0, 255, 0, 255)),
+                ..Default::default()
+            },
+            DeviceKind::Vram(_) => GraphColors {
+                color4: Srgba::from_components((0, 255, 0, 255)),
+                ..Default::default()
+            },
         }
     }
 
