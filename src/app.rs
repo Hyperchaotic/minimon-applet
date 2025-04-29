@@ -325,8 +325,19 @@ impl cosmic::Application for Minimon {
             }
         }
 
+        let mut gpu_visible = false;
+        for gpu in self.gpus.values() {
+            if let Some(g) = self.config.gpus.get(&gpu.id()) {
+                if g.gpu_label || g.gpu_chart || g.vram_chart || g.vram_label {
+                    gpu_visible = true;
+                    break;
+                }
+            }
+        }
+
         // If nothing is showing, use symbolic icon
-        if !self.config.cpu.chart
+        if !gpu_visible
+            && !self.config.cpu.chart
             && !self.config.cpu.label
             && !self.config.memory.chart
             && !self.config.memory.label
@@ -1594,14 +1605,45 @@ impl Minimon {
     }
 
     fn refresh_stats(&mut self) {
+        // Update everything if popup open
+        let all = self.popup.is_some();
+
         self.cpu.update();
-        self.memory.update();
-        self.network1.update();
-        self.network2.update();
-        self.disks1.update();
-        self.disks2.update();
+
+        if all || self.config.memory.label || self.config.memory.chart {
+            self.memory.update();
+        }
+
+        let combined_network = self.config.network1.variant == NetworkVariant::Combined;
+        let network1_active = self.config.network1.label || self.config.network1.chart;
+        let network2_active = self.config.network2.label || self.config.network2.chart;
+
+        if all
+            || (combined_network && network1_active)
+            || (!combined_network && (network1_active || network2_active))
+        {
+            self.network1.update();
+            self.network2.update();
+        }
+
+        let combined_disks = self.config.disks1.variant == DisksVariant::Combined;
+        let disks1_active = self.config.disks1.label || self.config.disks1.chart;
+        let disks2_active = self.config.disks2.label || self.config.disks2.chart;
+
+        if all
+            || (combined_disks && disks1_active)
+            || (!combined_disks && (disks1_active || disks2_active))
+        {
+            self.disks1.update();
+            self.disks2.update();
+        }
+
         for gpu in &mut self.gpus.values_mut() {
-            gpu.update();
+            if let Some(g) = self.config.gpus.get(&gpu.id()) {
+                if all || g.gpu_label || g.gpu_chart || g.vram_chart || g.vram_label {
+                    gpu.update();
+                }
+            }
         }
     }
 
