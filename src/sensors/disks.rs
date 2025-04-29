@@ -307,11 +307,11 @@ impl Disks {
         }
 
         let s = if value < 10.0 {
-            &format!("{:.2} ", value)
+            &format!("{:.2}", value)
         } else if value < 99.0 {
-            &format!("{:.1} ", value)
+            &format!("{:.1}", value)
         } else {
-            &format!("{:.0} ", value)
+            &format!("{:.0}", value)
         };
 
         if format == UnitVariant::Long {

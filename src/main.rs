@@ -21,6 +21,7 @@ fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
     let base_config = fern::Dispatch::new()
         //.level(log::LevelFilter::Debug)
         .level(log::LevelFilter::Off)
+        .level_for("libcosmic", log::LevelFilter::Debug)
         .level_for("cosmic_applet_minimon", log::LevelFilter::Debug)
         .format(|out, message, record| {
             out.finish(format_args!(
