@@ -1,7 +1,7 @@
 [package]
 name = "cosmic-applet-minimon"
 version = "0.4.2"
-edition = "2021"
+edition = "2024"
 license = "GPL-3.0"
 
 [profile.release]
@@ -19,7 +19,6 @@ serde = "1.0.197"
 lazy_static = "1.5"
 nvml-wrapper = "0.10.0"
 log = "0.4.27"
-env_logger = "0.10"
 anyhow = { version = "1.0.97", features = ["backtrace"] }
 zbus = { version = "3"}
 zvariant = "3"
@@ -29,7 +28,7 @@ chrono = "0.4"
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"
 default-features = false
-features = ["applet", "tokio", "wayland", "applet-token"]
+features = ["applet", "applet-token"]
 
 [dependencies.i18n-embed]
 version = "0.14"
