@@ -7,8 +7,8 @@ use cosmic::widget::{settings, toggler};
 
 use cosmic::{
     iced::{
-        widget::{column, row},
         Alignment,
+        widget::{column, row},
     },
     iced_widget::Row,
 };
@@ -24,7 +24,7 @@ use crate::{
 
 use super::gpu::amd::AmdGpu;
 use super::gpu::intel::IntelGpu;
-use super::gpu::{nvidia::NvidiaGpu, GpuIf};
+use super::gpu::{GpuIf, nvidia::NvidiaGpu};
 
 use lazy_static::lazy_static;
 
@@ -107,7 +107,7 @@ impl GpuGraph {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
-    
+
             if self.disabled {
                 _ = write!(percentage, "0");
                 _ = write!(value, "-");
@@ -121,7 +121,7 @@ impl GpuGraph {
                 }
                 write!(percentage, "{latest}").unwrap();
             }
-    
+
             crate::svg_graph::ring(
                 &value,
                 &percentage,
@@ -245,7 +245,7 @@ impl VramGraph {
             graph_options: GRAPH_OPTIONS.to_vec(),
             kind: GraphKind::Ring,
             max_val: total,
-             colors: GraphColors::default(),
+            colors: GraphColors::default(),
             svg_colors: SvgColors::new(&GraphColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
@@ -486,45 +486,36 @@ impl Gpu {
         let gpu_kind = self.gpu.graph_kind();
         let selected: Option<usize> = Some(gpu_kind.into());
         let id = self.id();
-        gpu_elements.push(Element::from(
-            column!(
-                settings::item(
-                    fl!("enable-gpu-chart"),
-                    toggler(config.gpu_chart).on_toggle(move |value| {
-                        Message::GpuToggleChart(
-                            self.id(),
-                            DeviceKind::Gpu,
-                            value,
-                        )
-                    }),
-                ),
-                settings::item(
-                    fl!("enable-gpu-label"),
-                    toggler(config.gpu_label).on_toggle(move |value| {
-                        Message::GpuToggleLabel(
-                            self.id(),
-                            DeviceKind::Gpu,
-                            value,
-                        )
-                    }),
-                ),
-                row!(
-                    widget::dropdown(&self.gpu.graph_options, selected, move |m| {
-                        Message::GpuSelectGraphType(id.clone(), DeviceKind::Gpu, m.into())
-                    },)
-                    .width(70),
-                    widget::horizontal_space(),
-                    widget::button::standard(fl!("change-colors")).on_press(
-                        Message::ColorPickerOpen(DeviceKind::Gpu, gpu_kind, Some(self.id())
-                    ),
-                )
-            )
-            .spacing(cosmic.space_xs()),
-        )));
+        gpu_elements.push(Element::from(column!(
+            settings::item(
+                fl!("enable-gpu-chart"),
+                toggler(config.gpu_chart).on_toggle(move |value| {
+                    Message::GpuToggleChart(self.id(), DeviceKind::Gpu, value)
+                }),
+            ),
+            settings::item(
+                fl!("enable-gpu-label"),
+                toggler(config.gpu_label).on_toggle(move |value| {
+                    Message::GpuToggleLabel(self.id(), DeviceKind::Gpu, value)
+                }),
+            ),
+            row!(
+                widget::dropdown(&self.gpu.graph_options, selected, move |m| {
+                    Message::GpuSelectGraphType(id.clone(), DeviceKind::Gpu, m.into())
+                },)
+                .width(70),
+                widget::horizontal_space(),
+                widget::button::standard(fl!("change-colors")).on_press(Message::ColorPickerOpen(
+                    DeviceKind::Gpu,
+                    gpu_kind,
+                    Some(self.id())
+                ),)
+            ),
+        ).spacing(cosmic.space_xs())));
 
         let gpu = Row::with_children(gpu_elements)
             .align_y(Alignment::Center)
-            .spacing(0);
+            .spacing(cosmic.space_xs());
 
         // VRAM load
         let mut vram_elements = Vec::new();
@@ -545,52 +536,47 @@ impl Gpu {
         let selected: Option<usize> = Some(self.vram.graph_kind().into());
         let mem_kind = self.vram.graph_kind();
         let id = self.id();
-        vram_elements.push(Element::from(
-            column!(
-                settings::item(
-                    fl!("enable-vram-chart"),
-                    toggler(config.vram_chart).on_toggle(|value| {
-                        Message::GpuToggleChart(
-                            self.id(),
-                            DeviceKind::Vram,
-                            value,
-                        )
-                    }),
-                ),
-                settings::item(
-                    fl!("enable-vram-label"),
-                    toggler(config.vram_label).on_toggle(|value| {
-                        Message::GpuToggleLabel(
-                            self.id(),
-                            DeviceKind::Vram,
-                            value,
-                        )
-                    }),
-                ),
-                row!(
-                    widget::dropdown(&self.vram.graph_options, selected, move |m| {
-                        Message::GpuSelectGraphType(id.clone(), DeviceKind::Vram, m.into())
-                    },)
-                    .width(70),
-                    widget::horizontal_space(),
-                    widget::button::standard(fl!("change-colors")).on_press(
-                        Message::ColorPickerOpen(DeviceKind::Vram, mem_kind, Some(self.id())
-                    ),
-                )
+        vram_elements.push(Element::from(column!(
+            settings::item(
+                fl!("enable-vram-chart"),
+                toggler(config.vram_chart).on_toggle(|value| {
+                    Message::GpuToggleChart(self.id(), DeviceKind::Vram, value)
+                }),
+            ),
+            settings::item(
+                fl!("enable-vram-label"),
+                toggler(config.vram_label).on_toggle(|value| {
+                    Message::GpuToggleLabel(self.id(), DeviceKind::Vram, value)
+                }),
+            ),
+            row!(
+                widget::dropdown(&self.vram.graph_options, selected, move |m| {
+                    Message::GpuSelectGraphType(id.clone(), DeviceKind::Vram, m.into())
+                },)
+                .width(70),
+                widget::horizontal_space(),
+                widget::button::standard(fl!("change-colors")).on_press(Message::ColorPickerOpen(
+                    DeviceKind::Vram,
+                    mem_kind,
+                    Some(self.id())
+                ),)
             )
-            .spacing(cosmic.space_xs()),
-        )));
+            ,
+        ).spacing(cosmic.space_xs())));
 
         let vram = Row::with_children(vram_elements)
             .align_y(Alignment::Center)
-            .spacing(0);
+            .spacing(cosmic.space_xs());
 
         if config.vram_label && config.gpu_label {
             let id = self.id();
             let disable_row = settings::item(
                 fl!("settings-gpu-stack-labels"),
-                row!(widget::toggler(config.stack_labels)
-                    .on_toggle(move |value| { Message::GpuToggleStackLabels(id.clone(), value) })),
+                row!(
+                    widget::toggler(config.stack_labels).on_toggle(move |value| {
+                        Message::GpuToggleStackLabels(id.clone(), value)
+                    })
+                ),
             );
             column!(gpu, vram, disable_row).spacing(10).into()
         } else {
