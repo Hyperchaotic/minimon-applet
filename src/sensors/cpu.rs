@@ -231,12 +231,12 @@ impl Sensor for Cpu {
                 ),
                 row!(
                     widget::dropdown(&self.graph_options, selected, move |m| {
-                        Message::SelectGraphType(DeviceKind::Cpu(m.into()))
+                        Message::SelectGraphType(DeviceKind::Cpu, m.into())
                     },)
                     .width(70),
                     widget::horizontal_space(),
                     widget::button::standard(fl!("change-colors"))
-                        .on_press(Message::ColorPickerOpen(DeviceKind::Cpu(cpu_kind), None)),
+                        .on_press(Message::ColorPickerOpen(DeviceKind::Cpu, cpu_kind, None)),
                 )
             )
             .spacing(cosmic.space_xs()),

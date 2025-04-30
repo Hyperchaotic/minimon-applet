@@ -115,7 +115,8 @@ pub trait DemoGraph {
 /// Data for managing the `ColorPicker` dialog
 pub struct ColorPicker {
     demo_svg: Option<Box<dyn DemoGraph>>,
-    kind: DeviceKind,
+    device: DeviceKind,
+    kind: GraphKind,
     // Current field being adjusted background/text/etc.
     color_variant: ColorVariant,
     ///Current slider values
@@ -129,7 +130,8 @@ impl ColorPicker {
     pub fn new() -> Self {
         ColorPicker {
             demo_svg: None,
-            kind: DeviceKind::Cpu(GraphKind::Ring),
+            device: DeviceKind::Cpu,
+            kind: GraphKind::Ring,
             color_variant: ColorVariant::Color1,
             slider_red_val: 0,
             slider_green_val: 0,
@@ -138,16 +140,17 @@ impl ColorPicker {
         }
     }
 
-    pub fn kind(&self) -> DeviceKind {
-        self.kind
+    pub fn kind(&self) -> (DeviceKind, GraphKind) {
+        (self.device, self.kind)
     }
 
     pub fn active(&self) -> bool {
         self.demo_svg.is_some()
     }
 
-    pub fn activate(&mut self, kind: DeviceKind, demo_svg: Box<dyn DemoGraph>) {
-        info!("colorpicker::activate({})", kind);
+    pub fn activate(&mut self, device: DeviceKind, kind: GraphKind, demo_svg: Box<dyn DemoGraph>) {
+        info!("colorpicker::activate({:?}, {:?})", device, kind);
+        self.device=device;
         self.kind = kind;
         self.color_variant = ColorVariant::Color1;
         self.demo_svg = Some(demo_svg);
@@ -286,7 +289,7 @@ impl ColorPicker {
     }
 
     pub fn default_colors(&mut self) {
-        let colors = GraphColors::new(self.kind());
+        let colors = GraphColors::new(self.device);
         let dmo = self.demo_svg.as_mut().expect("ERROR: No demo svg!");
         dmo.set_colors(colors);
         self.set_sliders(colors.get_color(self.color_variant));
@@ -310,7 +313,7 @@ impl ColorPicker {
 
     pub fn view_colorpicker(&self) -> Element<crate::app::Message> {
         let color = self.sliders();
-        let title = format!("{} {}", self.kind, fl!("colorpicker-colors"));
+        let title = format!("{} {}", self.device, fl!("colorpicker-colors"));
 
         let mut children = Vec::new();
 

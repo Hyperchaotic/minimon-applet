@@ -212,12 +212,12 @@ impl Sensor for Memory {
                 ),
                 row!(
                     widget::dropdown(&self.graph_options, selected, move |m| {
-                        Message::SelectGraphType(DeviceKind::Memory(m.into()))
+                        Message::SelectGraphType(DeviceKind::Memory, m.into())
                     },)
                     .width(70),
                     widget::horizontal_space(),
                     widget::button::standard(fl!("change-colors"))
-                        .on_press(Message::ColorPickerOpen(DeviceKind::Memory(mem_kind), None)),
+                        .on_press(Message::ColorPickerOpen(DeviceKind::Memory, mem_kind, None)),
                 )
             )
             .spacing(cosmic.space_xs()),

@@ -43,23 +43,23 @@ impl From<GraphKind> for usize {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeviceKind {
-    Cpu(GraphKind),
-    Memory(GraphKind),
+    Cpu,
+    Memory,
     Network(NetworkVariant),
     Disks(DisksVariant),
-    Gpu(GraphKind),
-    Vram(GraphKind),
+    Gpu,
+    Vram,
 }
 
 impl std::fmt::Display for DeviceKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            DeviceKind::Cpu(_) => write!(f, "{}", fl!("sensor-cpu")),
-            DeviceKind::Memory(_) => write!(f, "{}", fl!("sensor-memory")),
+            DeviceKind::Cpu => write!(f, "{}", fl!("sensor-cpu")),
+            DeviceKind::Memory => write!(f, "{}", fl!("sensor-memory")),
             DeviceKind::Network(_) => write!(f, "{}", fl!("sensor-network")),
             DeviceKind::Disks(_) => write!(f, "{}", fl!("sensor-disks")),
-            DeviceKind::Gpu(_) => write!(f, "{}", fl!("sensor-gpu")),
-            &DeviceKind::Vram(_) => write!(f, "{}", fl!("sensor-vram")),
+            DeviceKind::Gpu => write!(f, "{}", fl!("sensor-gpu")),
+            &DeviceKind::Vram => write!(f, "{}", fl!("sensor-vram")),
         }
     }
 }
@@ -87,8 +87,8 @@ impl Default for GraphColors {
 impl GraphColors {
     pub fn new(kind: DeviceKind) -> Self {
         match kind {
-            DeviceKind::Cpu(_) => GraphColors::default(),
-            DeviceKind::Memory(_) => GraphColors {
+            DeviceKind::Cpu => GraphColors::default(),
+            DeviceKind::Memory => GraphColors {
                 color4: Srgba::from_components((187, 41, 187, 255)),
                 ..Default::default()
             },
@@ -106,11 +106,11 @@ impl GraphColors {
                 color3: Srgba::from_components((255, 255, 0, 255)),
                 color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
             },
-            DeviceKind::Gpu(_) => GraphColors {
+            DeviceKind::Gpu => GraphColors {
                 color4: Srgba::from_components((0, 255, 0, 255)),
                 ..Default::default()
             },
-            DeviceKind::Vram(_) => GraphColors {
+            DeviceKind::Vram => GraphColors {
                 color4: Srgba::from_components((0, 255, 0, 255)),
                 ..Default::default()
             },
@@ -151,7 +151,7 @@ impl Default for CpuConfig {
             chart: true,
             label: false,
             kind: GraphKind::Ring,
-            colors: GraphColors::new(DeviceKind::Cpu(GraphKind::Ring)),
+            colors: GraphColors::new(DeviceKind::Cpu),
         }
     }
 }
@@ -172,7 +172,7 @@ impl Default for MemoryConfig {
             chart: true,
             label: false,
             kind: GraphKind::Ring,
-            colors: GraphColors::new(DeviceKind::Memory(GraphKind::Line)),
+            colors: GraphColors::new(DeviceKind::Memory),
             percentage: false,
         }
     }
@@ -283,11 +283,11 @@ impl Default for GpuConfig {
             gpu_chart: true,
             gpu_label: false,
             gpu_kind: GraphKind::Ring,
-            gpu_colors: GraphColors::new(DeviceKind::Gpu(GraphKind::Ring)),
+            gpu_colors: GraphColors::new(DeviceKind::Gpu),
             vram_chart: true,
             vram_label: false,
             vram_kind: GraphKind::Ring,
-            vram_colors: GraphColors::new(DeviceKind::Vram(GraphKind::Line)),
+            vram_colors: GraphColors::new(DeviceKind::Vram),
             pause_on_battery: true,
             stack_labels: true,
         }

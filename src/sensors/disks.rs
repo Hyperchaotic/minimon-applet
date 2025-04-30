@@ -82,7 +82,8 @@ pub struct Disks {
     max_y: Option<u64>,
     colors: GraphColors,
     svg_colors: SvgColors,
-    pub kind: DisksVariant,
+    pub variant: DisksVariant,
+    kind: GraphKind
 }
 
 impl DemoGraph for Disks {
@@ -90,7 +91,7 @@ impl DemoGraph for Disks {
         let write = VecDeque::from(DL_DEMO);
         let read = VecDeque::from(UL_DEMO);
 
-        match self.kind {
+        match self.variant {
             DisksVariant::Combined => {
                 crate::svg_graph::double_line(&write, &read, GRAPH_SAMPLES, &self.svg_colors, None)
             }
@@ -115,7 +116,7 @@ impl DemoGraph for Disks {
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        match self.kind {
+        match self.variant {
             DisksVariant::Combined => (*COLOR_CHOICES_COMBINED).into(),
             DisksVariant::Write => (*COLOR_CHOICES_WRITE).into(),
             DisksVariant::Read => (*COLOR_CHOICES_READ).into(),
@@ -162,13 +163,13 @@ impl Sensor for Disks {
     }
 
     fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
-        let mut dmo = Disks::new(self.kind);
+        let mut dmo = Disks::new(self.variant, self.kind);
         dmo.set_colors(colors);
         Box::new(dmo)
     }
 
     fn graph(&self) -> String {
-        match self.kind {
+        match self.variant {
             DisksVariant::Combined => crate::svg_graph::double_line(
                 &self.write,
                 &self.read,
@@ -201,8 +202,8 @@ impl Sensor for Disks {
 
         let rdrate = format!("R {}", &self.read_label(sample_rate_ms, UnitVariant::Long));
 
-        let config = disks_select!(mmconfig, self.kind);
-        let k = self.kind;
+        let config = disks_select!(mmconfig, self.variant);
+        let k = self.variant;
 
         let mut rate = column!(Element::from(
             widget::svg(widget::svg::Handle::from_memory(
@@ -214,7 +215,7 @@ impl Sensor for Disks {
 
         rate = rate.push(Element::from(cosmic::widget::text::body("")));
 
-        match self.kind {
+        match self.variant {
             DisksVariant::Combined => {
                 rate = rate.push(cosmic::widget::text::body(wrrate));
                 rate = rate.push(cosmic::widget::text::body(rdrate));
@@ -230,7 +231,7 @@ impl Sensor for Disks {
 
         let mut disk_bandwidth_items = Vec::new();
 
-        let title = match self.kind {
+        let title = match self.variant {
             DisksVariant::Combined => fl!("disks-title-combined"),
             DisksVariant::Write => fl!("disks-title-write"),
             DisksVariant::Read => fl!("disks-title-read"),
@@ -257,7 +258,7 @@ impl Sensor for Disks {
             row!(
                 widget::horizontal_space(),
                 widget::button::standard(fl!("change-colors"))
-                    .on_press(Message::ColorPickerOpen(DeviceKind::Disks(self.kind), None)),
+                    .on_press(Message::ColorPickerOpen(DeviceKind::Disks(self.variant), self.kind, None)),
                 widget::horizontal_space()
             )
             .into(),
@@ -275,15 +276,16 @@ impl Sensor for Disks {
 }
 
 impl Disks {
-    pub fn new(kind: DisksVariant) -> Self {
+    pub fn new(variant: DisksVariant, kind: GraphKind) -> Self {
         let disks = DisksInfo::new_with_refreshed_list();
-        let colors = GraphColors::new(DeviceKind::Disks(kind));
+        let colors = GraphColors::new(DeviceKind::Disks(variant));
         Disks {
             disks,
             write: VecDeque::from(vec![0; MAX_SAMPLES]),
             read: VecDeque::from(vec![0; MAX_SAMPLES]),
             max_y: None,
             colors,
+            variant,
             kind,
             svg_colors: SvgColors::new(&colors),
         }

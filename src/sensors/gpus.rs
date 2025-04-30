@@ -493,7 +493,7 @@ impl Gpu {
                     toggler(config.gpu_chart).on_toggle(move |value| {
                         Message::GpuToggleChart(
                             self.id(),
-                            DeviceKind::Gpu(self.gpu.graph_kind()),
+                            DeviceKind::Gpu,
                             value,
                         )
                     }),
@@ -503,24 +503,24 @@ impl Gpu {
                     toggler(config.gpu_label).on_toggle(move |value| {
                         Message::GpuToggleLabel(
                             self.id(),
-                            DeviceKind::Gpu(self.gpu.graph_kind()),
+                            DeviceKind::Gpu,
                             value,
                         )
                     }),
                 ),
                 row!(
                     widget::dropdown(&self.gpu.graph_options, selected, move |m| {
-                        Message::GpuSelectGraphType(id.clone(), DeviceKind::Gpu(m.into()))
+                        Message::GpuSelectGraphType(id.clone(), DeviceKind::Gpu, m.into())
                     },)
                     .width(70),
                     widget::horizontal_space(),
                     widget::button::standard(fl!("change-colors")).on_press(
-                        Message::ColorPickerOpen(DeviceKind::Gpu(gpu_kind), Some(self.id()))
+                        Message::ColorPickerOpen(DeviceKind::Gpu, gpu_kind, Some(self.id())
                     ),
                 )
             )
             .spacing(cosmic.space_xs()),
-        ));
+        )));
 
         let gpu = Row::with_children(gpu_elements)
             .align_y(Alignment::Center)
@@ -552,7 +552,7 @@ impl Gpu {
                     toggler(config.vram_chart).on_toggle(|value| {
                         Message::GpuToggleChart(
                             self.id(),
-                            DeviceKind::Vram(self.gpu.graph_kind()),
+                            DeviceKind::Vram,
                             value,
                         )
                     }),
@@ -562,24 +562,24 @@ impl Gpu {
                     toggler(config.vram_label).on_toggle(|value| {
                         Message::GpuToggleLabel(
                             self.id(),
-                            DeviceKind::Vram(self.gpu.graph_kind()),
+                            DeviceKind::Vram,
                             value,
                         )
                     }),
                 ),
                 row!(
                     widget::dropdown(&self.vram.graph_options, selected, move |m| {
-                        Message::GpuSelectGraphType(id.clone(), DeviceKind::Vram(m.into()))
+                        Message::GpuSelectGraphType(id.clone(), DeviceKind::Vram, m.into())
                     },)
                     .width(70),
                     widget::horizontal_space(),
                     widget::button::standard(fl!("change-colors")).on_press(
-                        Message::ColorPickerOpen(DeviceKind::Vram(mem_kind), Some(self.id()))
+                        Message::ColorPickerOpen(DeviceKind::Vram, mem_kind, Some(self.id())
                     ),
                 )
             )
             .spacing(cosmic.space_xs()),
-        ));
+        )));
 
         let vram = Row::with_children(vram_elements)
             .align_y(Alignment::Center)

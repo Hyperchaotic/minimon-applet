@@ -170,7 +170,7 @@ pub struct Minimon {
 pub enum Message {
     TogglePopup,
 
-    ColorPickerOpen(DeviceKind, Option<String>),
+    ColorPickerOpen(DeviceKind, GraphKind, Option<String>),
     ColorPickerClose(bool, Option<String>),
     ColorPickerDefaults,
     ColorPickerAccent,
@@ -197,7 +197,7 @@ pub enum Message {
     ToggleDisksChart(DisksVariant, bool),
     ToggleDisksLabel(DisksVariant, bool),
 
-    SelectGraphType(DeviceKind),
+    SelectGraphType(DeviceKind, GraphKind),
     Tick,
     PopupClosed(Id),
 
@@ -218,7 +218,7 @@ pub enum Message {
     GpuToggleChart(String, DeviceKind, bool),
     GpuToggleLabel(String, DeviceKind, bool),
     GpuToggleStackLabels(String, bool),
-    GpuSelectGraphType(String, DeviceKind),
+    GpuSelectGraphType(String, DeviceKind, GraphKind),
     ToggleDisableOnBattery(String, bool),
     ToggleSymbols(bool),
     SysmonSelect(usize),
@@ -255,10 +255,10 @@ impl cosmic::Application for Minimon {
             core,
             cpu: Cpu::new(GraphKind::Ring),
             memory: Memory::new(GraphKind::Line),
-            network1: Network::new(NetworkVariant::Combined),
-            network2: Network::new(NetworkVariant::Upload),
-            disks1: Disks::new(DisksVariant::Combined),
-            disks2: Disks::new(DisksVariant::Read),
+            network1: Network::new(NetworkVariant::Combined, GraphKind::Line),
+            network2: Network::new(NetworkVariant::Upload, GraphKind::Line),
+            disks1: Disks::new(DisksVariant::Combined, GraphKind::Line),
+            disks2: Disks::new(DisksVariant::Read, GraphKind::Line),
             gpus,
             popup: None,
             settings_page: None,
@@ -631,35 +631,35 @@ impl cosmic::Application for Minimon {
                     self.popup = None;
                 }
             }
-            Message::ColorPickerOpen(kind, id) => {
+            Message::ColorPickerOpen(device, kind, id) => {
                 info!("Message::ColorPickerOpen({:?}, {:?})", kind, id);
-                match kind {
-                    DeviceKind::Cpu(_) => {
+                match device {
+                    DeviceKind::Cpu => {
                         debug!("Cpu");
                         self.colorpicker
-                            .activate(kind, self.cpu.demo_graph(self.config.cpu.colors));
+                            .activate(device, kind, self.cpu.demo_graph(self.config.cpu.colors));
                     }
-                    DeviceKind::Memory(_) => {
+                    DeviceKind::Memory => {
                         self.colorpicker
-                            .activate(kind, self.memory.demo_graph(self.config.memory.colors));
+                            .activate(device, kind, self.memory.demo_graph(self.config.memory.colors));
                     }
                     DeviceKind::Network(variant) => {
                         let (network, config) = network_select!(self, variant);
                         self.colorpicker
-                            .activate(kind, network.demo_graph(config.colors));
+                            .activate(device, kind, network.demo_graph(config.colors));
                     }
                     DeviceKind::Disks(variant) => {
                         let (disks, _) = disks_select!(self, variant);
                         self.colorpicker
-                            .activate(kind, disks.demo_graph(disks.colors()));
+                            .activate(device, kind, disks.demo_graph(disks.colors()));
                     }
-                    DeviceKind::Gpu(_) => {
+                    DeviceKind::Gpu => {
                         if let Some(id) = id {
                             if let (Some(config), Some(gpu)) =
                                 (self.config.gpus.get(&id), self.gpus.get(&id))
                             {
                                 self.colorpicker
-                                    .activate(kind, gpu.demo_gpu_graph(config.gpu_colors));
+                                    .activate(device, kind, gpu.demo_gpu_graph(config.gpu_colors));
                             } else {
                                 error!("no config for selected GPU {}", id);
                             }
@@ -667,7 +667,7 @@ impl cosmic::Application for Minimon {
                             error!("Id is None");
                         }
                     }
-                    DeviceKind::Vram(_) => {
+                    DeviceKind::Vram => {
                         debug!("Vram 1");
                         if let Some(id) = id {
                             if let (Some(config), Some(gpu)) =
@@ -675,7 +675,7 @@ impl cosmic::Application for Minimon {
                             {
                                 debug!("Vram 2");
                                 self.colorpicker
-                                    .activate(kind, gpu.demo_vram_graph(config.vram_colors));
+                                    .activate(device, kind, gpu.demo_vram_graph(config.vram_colors));
                             } else {
                                 error!("no config for selected GPU {}", id);
                             }
@@ -695,7 +695,7 @@ impl cosmic::Application for Minimon {
             Message::ColorPickerClose(save, id) => {
                 info!("Message::ColorPickerClose({})", save);
                 if save {
-                    self.set_colors(self.colorpicker.colors(), self.colorpicker.kind(), id);
+                    self.set_colors(self.colorpicker.colors(), self.colorpicker.kind().0, id);
                     self.save_config();
                 }
                 self.colorpicker.deactivate();
@@ -746,13 +746,13 @@ impl cosmic::Application for Minimon {
             Message::ToggleNetCombined(toggle) => {
                 info!("Message::ToggleNetCombined({})", toggle);
                 if toggle.is_true() {
-                    self.network1.kind = NetworkVariant::Combined;
+                    self.network1.variant = NetworkVariant::Combined;
                     self.config.network1.variant = NetworkVariant::Combined;
                 } else {
-                    self.network1.kind = NetworkVariant::Download;
+                    self.network1.variant = NetworkVariant::Download;
                     self.config.network1.variant = NetworkVariant::Download;
                 }
-                self.network2.kind = NetworkVariant::Upload;
+                self.network2.variant = NetworkVariant::Upload;
                 self.config.network2.variant = NetworkVariant::Upload;
                 self.save_config();
             }
@@ -760,13 +760,13 @@ impl cosmic::Application for Minimon {
             Message::ToggleDisksCombined(toggle) => {
                 info!("Message::ToggleDisksCombined({})", toggle);
                 if toggle.is_true() {
-                    self.disks1.kind = DisksVariant::Combined;
+                    self.disks1.variant = DisksVariant::Combined;
                     self.config.disks1.variant = DisksVariant::Combined;
                 } else {
-                    self.disks1.kind = DisksVariant::Write;
+                    self.disks1.variant = DisksVariant::Write;
                     self.config.disks1.variant = DisksVariant::Write;
                 }
-                self.disks2.kind = DisksVariant::Read;
+                self.disks2.variant = DisksVariant::Read;
                 self.config.disks2.variant = DisksVariant::Read;
                 self.save_config();
             }
@@ -802,14 +802,14 @@ impl cosmic::Application for Minimon {
                 self.save_config();
             }
 
-            Message::SelectGraphType(dev) => {
+            Message::SelectGraphType(dev, kind) => {
                 info!("Message::SelectGraphType({:?})", dev);
                 match dev {
-                    DeviceKind::Cpu(kind) => {
+                    DeviceKind::Cpu => {
                         self.cpu.set_graph_kind(kind);
                         self.config.cpu.kind = kind;
                     }
-                    DeviceKind::Memory(kind) => {
+                    DeviceKind::Memory => {
                         self.memory.set_graph_kind(kind);
                         self.config.memory.kind = kind;
                     }
@@ -925,10 +925,10 @@ impl cosmic::Application for Minimon {
                 self.memory.set_percentage(self.config.memory.percentage);
                 self.network1.set_colors(self.config.network1.colors);
                 self.network2.set_colors(self.config.network2.colors);
-                self.network1.kind = self.config.network1.variant;
-                self.network2.kind = self.config.network2.variant;
-                self.disks1.kind = self.config.disks1.variant;
-                self.disks2.kind = self.config.disks2.variant;
+                self.network1.variant = self.config.network1.variant;
+                self.network2.variant = self.config.network2.variant;
+                self.disks1.variant = self.config.disks1.variant;
+                self.disks2.variant = self.config.disks2.variant;
                 self.set_network_max_y(NetworkVariant::Download);
                 self.set_network_max_y(NetworkVariant::Upload);
                 self.set_tick();
@@ -1013,8 +1013,8 @@ impl cosmic::Application for Minimon {
                     "GpuToggleChart",
                     device,
                     |config, device| match device {
-                        DeviceKind::Gpu(_) => config.gpu_chart = toggled,
-                        DeviceKind::Vram(_) => config.vram_chart = toggled,
+                        DeviceKind::Gpu => config.gpu_chart = toggled,
+                        DeviceKind::Vram => config.vram_chart = toggled,
                         _ => error!("GpuToggleChart: wrong kind {:?}", device),
                     },
                 );
@@ -1026,8 +1026,8 @@ impl cosmic::Application for Minimon {
                     "GpuToggleLabel",
                     device,
                     |config, device| match device {
-                        DeviceKind::Gpu(_) => config.gpu_label = toggled,
-                        DeviceKind::Vram(_) => config.vram_label = toggled,
+                        DeviceKind::Gpu => config.gpu_label = toggled,
+                        DeviceKind::Vram => config.vram_label = toggled,
                         _ => error!("GpuToggleLabel: wrong kind {:?}", device),
                     },
                 );
@@ -1042,22 +1042,22 @@ impl cosmic::Application for Minimon {
                 }
             }
 
-            Message::GpuSelectGraphType(id, device) => {
+            Message::GpuSelectGraphType(id, device, kind) => {
                 info!("Message::GpuSelectGraphType({:?}, {:?})", id, device);
                 self.update_gpu_config(
                     id.clone(),
                     "GpuSelectGraphType",
                     device,
                     |config, device| match device {
-                        DeviceKind::Gpu(kind) => config.gpu_kind = kind,
-                        DeviceKind::Vram(kind) => config.vram_kind = kind,
+                        DeviceKind::Gpu => config.gpu_kind = kind,
+                        DeviceKind::Vram => config.vram_kind = kind,
                         _ => error!("GpuSelectGraphType: wrong kind {:?}", device),
                     },
                 );
                 if let Some(gpu) = self.gpus.get_mut(&id) {
                     match device {
-                        DeviceKind::Gpu(kind) => gpu.gpu.set_graph_kind(kind),
-                        DeviceKind::Vram(kind) => gpu.vram.set_graph_kind(kind),
+                        DeviceKind::Gpu => gpu.gpu.set_graph_kind(kind),
+                        DeviceKind::Vram => gpu.vram.set_graph_kind(kind),
                         _ => error!("GpuSelectGraphType: wrong kind {:?}", device),
                     }
                 }
@@ -1535,11 +1535,11 @@ impl Minimon {
 
     fn set_colors(&mut self, colors: GraphColors, kind: DeviceKind, id: Option<String>) {
         match kind {
-            DeviceKind::Cpu(_) => {
+            DeviceKind::Cpu => {
                 self.config.cpu.colors = colors;
                 self.cpu.set_colors(colors);
             }
-            DeviceKind::Memory(_) => {
+            DeviceKind::Memory => {
                 self.config.memory.colors = colors;
                 self.memory.set_colors(colors);
             }
@@ -1553,7 +1553,7 @@ impl Minimon {
                 config.colors = colors;
                 disks.set_colors(colors);
             }
-            DeviceKind::Gpu(_) => {
+            DeviceKind::Gpu => {
                 if let Some(id) = id {
                     if let (Some(config), Some(gpu)) =
                         (self.config.gpus.get_mut(&id), self.gpus.get_mut(&id))
@@ -1565,7 +1565,7 @@ impl Minimon {
                     }
                 }
             }
-            DeviceKind::Vram(_) => {
+            DeviceKind::Vram => {
                 debug!("Vram set colors a {:?}", colors);
                 if let Some(id) = id {
                     if let (Some(config), Some(gpu)) =

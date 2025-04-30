@@ -80,7 +80,8 @@ pub struct Network {
     max_y: Option<u64>,
     colors: GraphColors,
     svg_colors: SvgColors,
-    pub kind: NetworkVariant,
+    pub variant: NetworkVariant,
+    kind: GraphKind,
     dropdown_options: Vec<&'static str>,
 }
 
@@ -89,7 +90,7 @@ impl DemoGraph for Network {
         let download = VecDeque::from(DL_DEMO);
         let upload = VecDeque::from(UL_DEMO);
 
-        match self.kind {
+        match self.variant {
             NetworkVariant::Combined => crate::svg_graph::double_line(
                 &download,
                 &upload,
@@ -118,7 +119,7 @@ impl DemoGraph for Network {
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        match self.kind {
+        match self.variant {
             NetworkVariant::Combined => (*COLOR_CHOICES_COMBINED).into(),
             NetworkVariant::Download => (*COLOR_CHOICES_DL).into(),
             NetworkVariant::Upload => (*COLOR_CHOICES_UL).into(),
@@ -163,13 +164,13 @@ impl Sensor for Network {
     }
 
     fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
-        let mut dmo = Network::new(self.kind);
+        let mut dmo = Network::new(self.variant, self.kind);
         dmo.set_colors(colors);
         Box::new(dmo)
     }
 
     fn graph(&self) -> String {
-        match self.kind {
+        match self.variant {
             NetworkVariant::Combined => crate::svg_graph::double_line(
                 &self.download,
                 &self.upload,
@@ -208,8 +209,8 @@ impl Sensor for Network {
             &self.upload_label(sample_rate_ms, UnitVariant::Long)
         );
 
-        let config = network_select!(mmconfig, self.kind);
-        let k = self.kind;
+        let config = network_select!(mmconfig, self.variant);
+        let k = self.variant;
 
         let mut rate = column!(Element::from(
             widget::svg(widget::svg::Handle::from_memory(
@@ -221,7 +222,7 @@ impl Sensor for Network {
 
         rate = rate.push(Element::from(cosmic::widget::text::body("")));
 
-        match self.kind {
+        match self.variant {
             NetworkVariant::Combined => {
                 rate = rate.push(cosmic::widget::text::body(dlrate));
                 rate = rate.push(cosmic::widget::text::body(ulrate));
@@ -237,7 +238,7 @@ impl Sensor for Network {
 
         let mut net_bandwidth_items = Vec::new();
 
-        let title = match self.kind {
+        let title = match self.variant {
             NetworkVariant::Combined => fl!("net-title-combined"),
             NetworkVariant::Download => fl!("net-title-dl"),
             NetworkVariant::Upload => fl!("net-title-ul"),
@@ -290,7 +291,7 @@ impl Sensor for Network {
             row!(
                 widget::horizontal_space(),
                 widget::button::standard(fl!("change-colors"))
-                    .on_press(Message::ColorPickerOpen(DeviceKind::Network(self.kind), None)),
+                    .on_press(Message::ColorPickerOpen(DeviceKind::Network(self.variant), self.kind, None)),
                 widget::horizontal_space()
             )
             .into(),
@@ -308,15 +309,16 @@ impl Sensor for Network {
 }
 
 impl Network {
-    pub fn new(kind: NetworkVariant) -> Self {
+    pub fn new(variant: NetworkVariant, kind: GraphKind) -> Self {
         let networks = Networks::new_with_refreshed_list();
-        let colors = GraphColors::new(DeviceKind::Network(kind));
+        let colors = GraphColors::new(DeviceKind::Network(variant));
         Network {
             networks,
             download: VecDeque::from(vec![0; MAX_SAMPLES]),
             upload: VecDeque::from(vec![0; MAX_SAMPLES]),
             max_y: None,
             colors,
+            variant,
             kind,
             dropdown_options: ["b", "Kb", "Mb", "Gb", "Tb"].into(),
             svg_colors: SvgColors::new(&colors),
