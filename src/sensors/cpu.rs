@@ -1,5 +1,3 @@
-use sysinfo::System;
-
 use crate::{
     colorpicker::DemoGraph,
     config::{ColorVariant, DeviceKind, GraphColors, GraphKind, MinimonConfig},
@@ -13,8 +11,8 @@ use cosmic::widget::{settings, toggler};
 
 use cosmic::{
     iced::{
-        widget::{column, row},
         Alignment,
+        widget::{column, row},
     },
     iced_widget::Row,
 };
@@ -22,7 +20,13 @@ use cosmic::{
 use crate::app::Message;
 
 use lazy_static::lazy_static;
-use std::{collections::VecDeque, fmt::Write};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt::Write,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::Path,
+};
 
 use super::Sensor;
 
@@ -60,11 +64,37 @@ lazy_static! {
 const GRAPH_OPTIONS: [&str; 2] = ["Ring", "Line"];
 
 #[derive(Debug)]
+struct CpuTimes {
+    user: u64,
+    nice: u64,
+    system: u64,
+    idle: u64,
+    iowait: u64,
+    irq: u64,
+    softirq: u64,
+    steal: u64,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CpuLoad {
+    user_pct: f64,
+    system_pct: f64,
+}
+
+#[derive(Debug)]
 pub struct Cpu {
-    samples: VecDeque<f64>,
+    // Total CPU load since last update split into user and system
+    total_cpu_load: CpuLoad,
+    // Load per core since last update split into user and system
+    core_loads: HashMap<usize, CpuLoad>,
+    // Load per core since last update split into values read from /proc
+    prev_core_times: HashMap<usize, CpuTimes>,
+    // Total CPU load for the last MAX_SAMPLES updates
+    samples_sum: VecDeque<f64>,
+    // CPU load for the last MAX_SAMPLES updates, split into user and system
+    samples_split: VecDeque<CpuLoad>,
     max_val: u64,
     colors: GraphColors,
-    system: System,
     kind: GraphKind,
     graph_options: Vec<&'static str>,
     /// colors cached so we don't need to convert to string every time
@@ -125,19 +155,18 @@ impl Sensor for Cpu {
     }
 
     fn update(&mut self) {
-        self.system.refresh_cpu_usage();
-        let new_val: f64 = self
-            .system
-            .cpus()
-            .iter()
-            .map(|p| f64::from(p.cpu_usage()))
-            .sum::<f64>()
-            / self.system.cpus().len() as f64;
+        self.update_stats();
 
-        if self.samples.len() >= MAX_SAMPLES {
-            self.samples.pop_front();
+        if self.samples_split.len() >= MAX_SAMPLES {
+            self.samples_split.pop_front();
         }
-        self.samples.push_back(new_val);
+        self.samples_split.push_back(self.total_cpu_load);
+
+        let new_sum = self.total_cpu_load.user_pct + self.total_cpu_load.system_pct;
+        if self.samples_sum.len() >= MAX_SAMPLES {
+            self.samples_sum.pop_front();
+        }
+        self.samples_sum.push_back(new_sum);
     }
 
     fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
@@ -163,7 +192,7 @@ impl Sensor for Cpu {
 
             crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
         } else {
-            crate::svg_graph::line(&self.samples, self.max_val, &self.svg_colors)
+            crate::svg_graph::line(&self.samples_sum, self.max_val, &self.svg_colors)
         }
     }
 
@@ -222,9 +251,6 @@ impl Sensor for Cpu {
 
 impl Cpu {
     pub fn new(kind: GraphKind) -> Self {
-        let mut system = System::new();
-        system.refresh_cpu_all();
-
         let max_val = 100;
 
         // value and percentage are pre-allocated and reused as they're changed often.
@@ -235,10 +261,22 @@ impl Cpu {
         write!(value, "0").unwrap();
 
         let mut cpu = Cpu {
-            samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
+            total_cpu_load: CpuLoad {
+                user_pct: 0.,
+                system_pct: 0.,
+            },
+            core_loads: HashMap::new(),
+            prev_core_times: Cpu::read_cpu_stats(),
+            samples_sum: VecDeque::from(vec![0.0; MAX_SAMPLES]),
+            samples_split: VecDeque::from(vec![
+                CpuLoad {
+                    user_pct: 0.,
+                    system_pct: 0.
+                };
+                MAX_SAMPLES
+            ]),
             max_val,
             colors: GraphColors::default(),
-            system,
             kind,
             graph_options: GRAPH_OPTIONS.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
@@ -248,7 +286,136 @@ impl Cpu {
     }
 
     pub fn latest_sample(&self) -> f64 {
-        *self.samples.back().unwrap_or(&0f64)
+        *self.samples_sum.back().unwrap_or(&0f64)
+    }
+
+    // Read CPU statistics from /proc/stat
+    fn read_cpu_stats() -> HashMap<usize, CpuTimes> {
+        let mut cpu_stats = HashMap::new();
+
+        // Open /proc/stat file
+        let file = match File::open(Path::new("/proc/stat")) {
+            Ok(f) => f,
+            Err(_) => return cpu_stats, // Return empty HashMap if file can't be opened
+        };
+
+        let reader = BufReader::new(file);
+
+        // Read each line from the file
+        for line in reader.lines() {
+            let line = match line {
+                Ok(l) => l,
+                Err(_) => continue, // Skip lines that can't be read
+            };
+
+            // Split line into parts
+            let parts: Vec<&str> = line.split_whitespace().collect();
+
+            // Check if line starts with 'cpu' followed by a number
+            if parts.is_empty() || !parts[0].starts_with("cpu") || parts[0] == "cpu" {
+                continue;
+            }
+
+            // Extract CPU number
+            let cpu_num = match parts[0].trim_start_matches("cpu").parse::<usize>() {
+                Ok(num) => num,
+                Err(_) => continue, // Skip if CPU number can't be parsed
+            };
+
+            // Ensure we have enough parts for all fields
+            if parts.len() < 9 {
+                continue;
+            }
+
+            // Parse all CPU time values
+            let user = parts[1].parse::<u64>().unwrap_or(0);
+            let nice = parts[2].parse::<u64>().unwrap_or(0);
+            let system = parts[3].parse::<u64>().unwrap_or(0);
+            let idle = parts[4].parse::<u64>().unwrap_or(0);
+            let iowait = parts[5].parse::<u64>().unwrap_or(0);
+            let irq = parts[6].parse::<u64>().unwrap_or(0);
+            let softirq = parts[7].parse::<u64>().unwrap_or(0);
+            let steal = parts[8].parse::<u64>().unwrap_or(0);
+
+            // Create CpuTimes struct and insert into HashMap
+            let cpu_times = CpuTimes {
+                user,
+                nice,
+                system,
+                idle,
+                iowait,
+                irq,
+                softirq,
+                steal,
+            };
+
+            cpu_stats.insert(cpu_num, cpu_times);
+        }
+
+        cpu_stats
+    }
+
+    // Update current CPU load by comparing to previous samples
+    fn update_stats(&mut self) {
+        // Read current CPU stats
+        let current_cpu_times = Cpu::read_cpu_stats();
+
+        // Temporary storage for new per-core loads
+        let mut new_cpu_loads = HashMap::with_capacity(current_cpu_times.len());
+
+        // Running totals for average computation
+        let mut total_user_pct = 0.0;
+        let mut total_system_pct = 0.0;
+        let mut counted_cores = 0;
+
+        for (&cpu_num, current) in &current_cpu_times {
+            if let Some(prev) = self.prev_core_times.get(&cpu_num) {
+                // Compute time deltas
+                let user = current.user.saturating_sub(prev.user);
+                let nice = current.nice.saturating_sub(prev.nice);
+                let system = current.system.saturating_sub(prev.system);
+                let idle = current.idle.saturating_sub(prev.idle);
+                let iowait = current.iowait.saturating_sub(prev.iowait);
+                let irq = current.irq.saturating_sub(prev.irq);
+                let softirq = current.softirq.saturating_sub(prev.softirq);
+                let steal = current.steal.saturating_sub(prev.steal);
+
+                let total = user + nice + system + idle + iowait + irq + softirq + steal;
+                if total == 0 {
+                    continue;
+                }
+
+                let total_f64 = total as f64;
+                let user_pct = (user + nice) as f64 / total_f64 * 100.0;
+                let system_pct = system as f64 / total_f64 * 100.0;
+
+                println!("user {}  nice {} ", user, nice);
+
+                new_cpu_loads.insert(
+                    cpu_num,
+                    CpuLoad {
+                        user_pct,
+                        system_pct,
+                    },
+                );
+
+                total_user_pct += user_pct;
+                total_system_pct += system_pct;
+                counted_cores += 1;
+            }
+        }
+
+        self.core_loads = new_cpu_loads;
+
+        if counted_cores > 0 {
+            let core_count_f64 = counted_cores as f64;
+            self.total_cpu_load = CpuLoad {
+                user_pct: total_user_pct / core_count_f64,
+                system_pct: total_system_pct / core_count_f64,
+            };
+        }
+
+        self.prev_core_times = current_cpu_times;
     }
 }
 
