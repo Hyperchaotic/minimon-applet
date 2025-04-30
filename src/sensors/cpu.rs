@@ -389,8 +389,6 @@ impl Cpu {
                 let user_pct = (user + nice) as f64 / total_f64 * 100.0;
                 let system_pct = system as f64 / total_f64 * 100.0;
 
-                println!("user {}  nice {} ", user, nice);
-
                 new_cpu_loads.insert(
                     cpu_num,
                     CpuLoad {

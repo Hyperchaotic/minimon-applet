@@ -8,21 +8,21 @@ use std::fmt::Write;
 use std::{fs, time};
 
 use cosmic::app::{Core, Task};
+use cosmic::iced::Limits;
 use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
 use cosmic::iced::window::Id;
-use cosmic::iced::Limits;
 use cosmic::iced::{self, Subscription};
 use cosmic::widget::{container, list, settings, spin_button, text};
-use cosmic::{widget, widget::autosize};
 use cosmic::{Apply, Element};
+use cosmic::{widget, widget::autosize};
 
 use once_cell::sync::Lazy;
-use std::sync::atomic::{self, AtomicI64};
 use std::sync::Arc;
+use std::sync::atomic::{self, AtomicI64};
 
 use cosmic::{
     applet::cosmic_panel_config::PanelAnchor,
-    iced::{widget::column, widget::row, Alignment},
+    iced::{Alignment, widget::column, widget::row},
     iced_widget::{Column, Row},
 };
 
@@ -35,12 +35,12 @@ use crate::colorpicker::{ColorPicker, DemoGraph};
 use crate::config::{
     ColorVariant, DeviceKind, DisksVariant, GpuConfig, GraphColors, GraphKind, NetworkVariant,
 };
+use crate::sensors::Sensor;
 use crate::sensors::cpu::Cpu;
 use crate::sensors::disks::{self, Disks};
-use crate::sensors::gpus::{list_gpus, Gpu};
+use crate::sensors::gpus::{Gpu, list_gpus};
 use crate::sensors::memory::Memory;
 use crate::sensors::network::{self, Network};
-use crate::sensors::Sensor;
 use crate::{config::MinimonConfig, fl};
 use cosmic::widget::Id as WId;
 
@@ -1163,8 +1163,10 @@ impl Minimon {
 
         let mono_row = settings::item(
             fl!("settings-monospace_font"),
-            row!(widget::checkbox("", self.config.monospace_labels)
-                .on_toggle(Message::ToggleMonospaceLabels)),
+            row!(
+                widget::checkbox("", self.config.monospace_labels)
+                    .on_toggle(Message::ToggleMonospaceLabels)
+            ),
         );
 
         let symbol_row = settings::item(
@@ -1179,12 +1181,14 @@ impl Minimon {
 
         let sysmon_row = settings::item(
             fl!("choose-sysmon"),
-            row!(widget::dropdown(
-                &SYSMON_NAMES,
-                Some(self.config.sysmon),
-                Message::SysmonSelect
-            )
-            .width(220)),
+            row!(
+                widget::dropdown(
+                    &SYSMON_NAMES,
+                    Some(self.config.sysmon),
+                    Message::SysmonSelect
+                )
+                .width(220)
+            ),
         );
 
         // Combine rows into a column with spacing
@@ -1610,29 +1614,26 @@ impl Minimon {
 
         self.cpu.update();
 
-        if all || self.config.memory.label || self.config.memory.chart {
+        if all || self.config.memory.is_visible() {
             self.memory.update();
         }
 
         let combined_network = self.config.network1.variant == NetworkVariant::Combined;
-        let network1_active = self.config.network1.label || self.config.network1.chart;
-        let network2_active = self.config.network2.label || self.config.network2.chart;
-
         if all
-            || (combined_network && network1_active)
-            || (!combined_network && (network1_active || network2_active))
+            || (combined_network && self.config.network1.is_visible())
+            || (!combined_network
+                && (self.config.network1.is_visible() || self.config.network1.is_visible()))
         {
             self.network1.update();
             self.network2.update();
         }
 
         let combined_disks = self.config.disks1.variant == DisksVariant::Combined;
-        let disks1_active = self.config.disks1.label || self.config.disks1.chart;
-        let disks2_active = self.config.disks2.label || self.config.disks2.chart;
 
         if all
-            || (combined_disks && disks1_active)
-            || (!combined_disks && (disks1_active || disks2_active))
+            || (combined_disks && self.config.disks1.is_visible())
+            || (!combined_disks
+                && (self.config.disks1.is_visible() || self.config.disks2.is_visible()))
         {
             self.disks1.update();
             self.disks2.update();
@@ -1640,7 +1641,7 @@ impl Minimon {
 
         for gpu in &mut self.gpus.values_mut() {
             if let Some(g) = self.config.gpus.get(&gpu.id()) {
-                if all || g.gpu_label || g.gpu_chart || g.vram_chart || g.vram_label {
+                if all || g.is_visible() {
                     gpu.update();
                 }
             }

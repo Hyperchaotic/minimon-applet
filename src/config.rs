@@ -178,6 +178,12 @@ impl Default for MemoryConfig {
     }
 }
 
+impl MemoryConfig {
+    pub fn is_visible(&self) -> bool {
+        self.chart || self.label
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum NetworkVariant {
     Download,
@@ -195,6 +201,12 @@ pub struct NetworkConfig {
     pub unit: Option<usize>,
     pub colors: GraphColors,
     pub variant: NetworkVariant,
+}
+
+impl NetworkConfig {
+    pub fn is_visible(&self) -> bool {
+        self.chart || self.label
+    }
 }
 
 impl Default for NetworkConfig {
@@ -227,6 +239,12 @@ pub struct DisksConfig {
     pub variant: DisksVariant,
 }
 
+impl DisksConfig {
+    pub fn is_visible(&self) -> bool {
+        self.chart || self.label
+    }
+}
+
 impl Default for DisksConfig {
     fn default() -> Self {
         Self {
@@ -251,6 +269,12 @@ pub struct GpuConfig {
     pub vram_colors: GraphColors,
     pub pause_on_battery: bool,
     pub stack_labels: bool,
+}
+
+impl GpuConfig {
+    pub fn is_visible(&self) -> bool {
+        self.gpu_chart || self.gpu_label || self.vram_chart || self.vram_label
+    }
 }
 
 impl Default for GpuConfig {
