@@ -88,10 +88,10 @@ impl GpuGraph {
             svg_colors: SvgColors::new(&GraphColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
-                color1: String::from("#FFFFFF01"),
-                color2: String::from("#FFFFFF10"),
-                color3: String::from("#FFFFFF30"),
-                color4: String::from("#FFFFFF70"),
+                color1: String::from("#FFFFFF20"),
+                color2: String::from("#727272FF"),
+                color3: String::from("#727272FF"),
+                color4: String::from("#727272FF"),
             },
         }
     }
@@ -249,10 +249,10 @@ impl VramGraph {
             svg_colors: SvgColors::new(&GraphColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
-                color1: String::from("#FFFFFF01"),
-                color2: String::from("#FFFFFF10"),
-                color3: String::from("#FFFFFF30"),
-                color4: String::from("#FFFFFF70"),
+                color1: String::from("#FFFFFF20"),
+                color2: String::from("#727272FF"),
+                color3: String::from("#727272FF"),
+                color4: String::from("#727272FF"),
             },
         }
     }

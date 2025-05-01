@@ -232,7 +232,7 @@ pub fn line_adaptive(
 
 const LINESVG_1: &str =
     "<svg width=\"42\" height=\"42\" viewBox=\"0 0 42 42\" xmlns=\"http://www.w3.org/2000/svg\">\n\
-<rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" opacity=\"1\" fill=\""; // background color
+<rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" fill=\""; // background color
 
 const LINESVG_2: &str = "\" stroke=\""; // frame color
 const LINESVG_3: &str = "\"/>\n";
