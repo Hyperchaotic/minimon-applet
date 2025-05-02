@@ -9,7 +9,7 @@ A configurable applet for displaying the following:
 
 Can sit in the panel or Dock. Configurable refresh rate and many display options.
 
-![screenshot-2024-09-12-16-52-36](https://raw.githubusercontent.com/Hyperchaotic/minimon-applet/main/cosmic-applet-minimon.png)
+![Image](https://github.com/cosmic-utils/minimon-applet/blob/main/cosmic-applet-minimon.png)
 
 
 ![Image](https://github.com/user-attachments/assets/5d697c74-f7dc-4213-8516-465c32e5567b)
