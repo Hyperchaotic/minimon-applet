@@ -21,6 +21,8 @@ Can sit in the panel or Dock. Configurable refresh rate and many display options
 
 ![Image](https://github.com/user-attachments/assets/2787cf05-2121-4c25-b1a2-d0b511c30215)
 
+![Image](https://github.com/user-attachments/assets/97b5b4a6-d46c-4d12-8b75-65375b9eff04)
+
 ## Installing
 If on a .deb based distibution download [latest version](https://github.com/Hyperchaotic/minimon-applet/releases) and install with the following commands:
 
