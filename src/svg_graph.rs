@@ -232,7 +232,13 @@ pub fn line_adaptive(
 
 const LINESVG_1: &str =
     "<svg width=\"42\" height=\"42\" viewBox=\"0 0 42 42\" xmlns=\"http://www.w3.org/2000/svg\">\n\
-<rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" fill=\""; // background color
+<defs>\
+    <clipPath id=\"rounded-clip\">\
+      <rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" rx=\"7\" ry=\"7\"/>\
+    </clipPath>\
+  </defs>\
+  <g clip-path=\"url(#rounded-clip)\">\
+    <rect x=\"0\" y=\"0\" rx=\"7\" ry=\"7\" width=\"42\" height=\"42\" fill=\""; // background color
 
 const LINESVG_2: &str = "\" stroke=\""; // frame color
 const LINESVG_3: &str = "\"/>\n";
@@ -247,7 +253,7 @@ const LINESVG_7: &str = "\" points=\""; // polygonpoints
 const LINESVG_8: &str = "  41,41 1,41\"/>";
 
 // End
-const LINESVG_9: &str = "</svg>";
+const LINESVG_9: &str = "</g></svg>";
 
 const LINE_LEN: usize = 640; // Just for preallocation
 
@@ -293,7 +299,13 @@ const RINGSVG_LEN: usize = 680; // For preallocation
 
 const DBLLINESVG_1: &str = "
 <svg width=\"42\" height=\"42\" viewBox=\"0 0 42 42\" xmlns=\"http://www.w3.org/2000/svg\">\n\
-<rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" opacity=\"1\" fill=\""; // background color
+<defs>\
+    <clipPath id=\"rounded-clip\">\
+      <rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" rx=\"7\" ry=\"7\"/>\
+    </clipPath>\
+  </defs>\
+  <g clip-path=\"url(#rounded-clip)\">\
+<rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" rx=\"7\" ry=\"7\" opacity=\"1\" fill=\""; // background color
 
 const DBLLINESVG_2: &str = "\" stroke=\""; // frame color
 const DBLLINESVG_3: &str = "\"/>\n";
@@ -311,7 +323,7 @@ const DBLLINESVG_7: &str = "\" points=\""; // polygonpoints
 
 const DBLLINESVG_8: &str = "  41,41 1,41\"/>";
 
-const DBLLINESVG_9: &str = "</svg>";
+const DBLLINESVG_9: &str = "</g></svg>";
 
 const DBLLINESVG_LEN: usize = 1000; // For preallocation
                                     /*
