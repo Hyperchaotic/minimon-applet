@@ -217,8 +217,8 @@ impl Default for NetworkConfig {
             adaptive: true,
             bandwidth: 62_500_000, // 500Mbit/s
             unit: Some(0),
-            colors: GraphColors::new(DeviceKind::Network(NetworkVariant::Upload)),
-            variant: NetworkVariant::Download,
+            colors: GraphColors::new(DeviceKind::Network(NetworkVariant::Download)),
+            variant: NetworkVariant::Combined,
         }
     }
 }
@@ -250,8 +250,8 @@ impl Default for DisksConfig {
         Self {
             chart: false,
             label: false,
-            colors: GraphColors::new(DeviceKind::Disks(DisksVariant::Write)),
-            variant: DisksVariant::Write,
+            colors: GraphColors::new(DeviceKind::Disks(DisksVariant::Combined)),
+            variant: DisksVariant::Combined,
         }
     }
 }

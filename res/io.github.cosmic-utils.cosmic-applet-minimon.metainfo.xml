@@ -1,26 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>com.github.hyperchaotic.cosmic-applet-minimon</id>
+  <id>io.github.cosmic-utils.cosmic-applet-minimon</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-only</project_license>
   <project_group>COSMIC</project_group>
   <developer_name>hyperchaotic</developer_name>
   <update_contact>hyperchaotic@gmail.com</update_contact>
-  <url type="homepage"></url>
-  <url type="bugtracker"></url>
   <name>Minimon</name>
   <summary>A System Monitor applet for COSMIC</summary>
   <description>
-    <p>A System Monitor applet for Cosmic</p>
+    <p>A lightweight hardware monitoring applet for the COSMIC desktop environment, supporting GPU, network, memory, and disk usage.</p>
   </description>
-  <launchable type="desktop-id">com.github.hyperchaotic.Minimon.desktop</launchable>
-  <icon height="256" width="256">com.github.hyperchaotic.Minimon.svg</icon>
-  <screenshots>
-  </screenshots>
+  <launchable type="desktop-id">io.github.cosmic-utils.cosmic-applet-minimon.desktop</launchable>
+  <icon type="stock">io.github.cosmic-utils.cosmic-applet-minimon</icon>
   <provides>
-    <mimetypes>
-      <mimetype>text/plain</mimetype>
-    </mimetypes>
     <binaries>
       <binary>cosmic-applet-minimon</binary>
     </binaries>

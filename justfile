@@ -89,8 +89,8 @@ uninstall:
     rm {{bin-dst}}
     rm {{desktop-dst}}
     rm {{metainfo-dst}}
-    for size in `ls {{icons-src}}`; do \
-        rm "{{icons-dst}}/apps/{{APPID}}.svg"; \
+    for svg in {{icons-src}}/apps/*.svg; do \
+        rm "{{icons-dst}}/apps/$(basename $svg)"; \
     done
 
 # Vendor dependencies locally

@@ -48,11 +48,11 @@ static AUTOSIZE_MAIN_ID: Lazy<WId> = Lazy::new(|| WId::new("autosize-main"));
 
 const TICK: i64 = 250;
 
-const ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon";
-const RAM_ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon-ram";
-const GPU_ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon-gpu";
-const NETWORK_ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon-network";
-const DISK_ICON: &str = "com.github.hyperchaotic.cosmic-applet-minimon-harddisk";
+const ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon";
+const RAM_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-ram";
+const GPU_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-gpu";
+const NETWORK_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-network";
+const DISK_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-harddisk";
 
 use lazy_static::lazy_static;
 
@@ -224,9 +224,9 @@ pub enum Message {
     SysmonSelect(usize),
 }
 
-const APP_ID_DOCK: &str = "com.github.hyperchaotic.cosmic-applet-minimon-dock";
-const APP_ID_PANEL: &str = "com.github.hyperchaotic.cosmic-applet-minimon-panel";
-const APP_ID_OTHER: &str = "com.github.hyperchaotic.cosmic-applet-minimon-other";
+const APP_ID_DOCK: &str = "io.github.cosmic-utils.cosmic-applet-minimon-dock";
+const APP_ID_PANEL: &str = "io.github.cosmic-utils.cosmic-applet-minimon-panel";
+const APP_ID_OTHER: &str = "io.github.cosmic-utils.cosmic-applet-minimon-other";
 
 impl cosmic::Application for Minimon {
     type Executor = cosmic::executor::Default;
@@ -235,7 +235,7 @@ impl cosmic::Application for Minimon {
 
     type Message = Message;
 
-    const APP_ID: &'static str = "com.github.hyperchaotic.cosmic-applet-minimon";
+    const APP_ID: &'static str = "io.github.cosmic-utils.cosmic-applet-minimon";
 
     fn init(core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
         // Find GPUs
@@ -926,9 +926,9 @@ impl cosmic::Application for Minimon {
                 self.network1.set_colors(self.config.network1.colors);
                 self.network2.set_colors(self.config.network2.colors);
                 self.network1.variant = self.config.network1.variant;
-                self.network2.variant = self.config.network2.variant;
+                self.network2.variant = NetworkVariant::Upload;
                 self.disks1.variant = self.config.disks1.variant;
-                self.disks2.variant = self.config.disks2.variant;
+                self.disks2.variant = DisksVariant::Read;
                 self.set_network_max_y(NetworkVariant::Download);
                 self.set_network_max_y(NetworkVariant::Upload);
                 self.set_tick();
