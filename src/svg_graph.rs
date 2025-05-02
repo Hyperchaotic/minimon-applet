@@ -230,187 +230,181 @@ pub fn line_adaptive(
     svg
 }
 
-const LINESVG_1: &str =
-    "<svg width=\"42\" height=\"42\" viewBox=\"0 0 42 42\" xmlns=\"http://www.w3.org/2000/svg\">\n\
-<defs>\
-    <clipPath id=\"rounded-clip\">\
-      <rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" rx=\"7\" ry=\"7\"/>\
-    </clipPath>\
-  </defs>\
-  <g clip-path=\"url(#rounded-clip)\">\
-    <rect x=\"0\" y=\"0\" rx=\"7\" ry=\"7\" width=\"42\" height=\"42\" fill=\""; // background color
+const LINESVG_1: &str = r#"<svg width="42" height="42" viewBox="0 0 42 42" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <clipPath id="rounded-clip">
+    <rect x="0" y="0" width="42" height="42" rx="7" ry="7"/>
+  </clipPath>
+</defs>
+<g clip-path="url(#rounded-clip)">
+  <rect x="0" y="0" rx="7" ry="7" width="42" height="42" fill=""#; // background color placeholder
 
-const LINESVG_2: &str = "\" stroke=\""; // frame color
-const LINESVG_3: &str = "\"/>\n";
-
-// polyline part
-const LINESVG_4: &str = "<polyline fill=\"none\" opacity=\"1\" stroke=\""; // line color
-const LINESVG_5: &str = "\" stroke-width=\"1\" points=\"";
-
-// Polygon part
-const LINESVG_6: &str = "\"/>\n<polygon opacity=\"0.3\" fill=\""; // polygon color
-const LINESVG_7: &str = "\" points=\""; // polygonpoints
-const LINESVG_8: &str = "  41,41 1,41\"/>";
-
-// End
-const LINESVG_9: &str = "</g></svg>";
+const LINESVG_2: &str = r#"" stroke=""#; // frame color placeholder
+const LINESVG_3: &str = r#""/>"#;
+const LINESVG_4: &str = r#"<polyline fill="none" opacity="1" stroke=""#; // line color placeholder
+const LINESVG_5: &str = r#"" stroke-width="1" points=""#;
+const LINESVG_6: &str = r#""/><polygon opacity="0.3" fill=""#; // polygon color placeholder
+const LINESVG_7: &str = r#"" points=""#;
+const LINESVG_8: &str = r#"  41,41 1,41"/>"#;
+const LINESVG_9: &str = r#"</g></svg>"#;
 
 const LINE_LEN: usize = 640; // Just for preallocation
-
-const RINGSVG_1: &str = "
-<svg viewBox=\"0 0 34 34\" xmlns=\"http://www.w3.org/2000/svg\">
+// Ring SVG
+const RINGSVG_1: &str = r#"
+<svg viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">
  <path
-    d=\"M17 1.0845
+    d="M17 1.0845
       a 15.9155 15.9155 0 0 1 0 31.831
-      a 15.9155 15.9155 0 0 1 0 -31.831\"
-      fill=\"";
+      a 15.9155 15.9155 0 0 1 0 -31.831"
+      fill=""#;
 
-const RINGSVG_1_1: &str = "\" stroke=\"";
+const RINGSVG_1_1: &str = r#"" stroke=""#;
 
-const RINGSVG_2: &str = "\"\nstroke-width=\"2\"
-  />
-  <path
-    d=\"M17 32.831
-      a 15.9155 15.9155 0 0 1 0 -31.831
-      a 15.9155 15.9155 0 0 1 0 31.831\"
-    fill=\"none\"
-    stroke=\"";
+const RINGSVG_2: &str = r#"" 
+stroke-width="2"
+/>
+<path
+  d="M17 32.831
+    a 15.9155 15.9155 0 0 1 0 -31.831
+    a 15.9155 15.9155 0 0 1 0 31.831"
+  fill="none"
+  stroke=""#;
 
-const RINGSVG_3: &str = "\"
-    stroke-width=\"2\"
-    stroke-dasharray=\"";
+const RINGSVG_3: &str = r#""
+  stroke-width="2"
+  stroke-dasharray=""#;
 
-const RINGSVG_4: &str = ", 100\"
-  />
-  <style>
+const RINGSVG_4: &str = r#", 100"
+/>
+<style>
 .percentage {
- fill: ";
+ fill: "#;
 
-const RINGSVG_5: &str = ";
-  font-family: \"Noto Sans\", sans-serif;
+const RINGSVG_5: &str = r#";
+  font-family: "Noto Sans", sans-serif;
   font-size: 1.2em;
   text-anchor: middle;
 }
 </style>
-  <text x=\"17\" y=\"22.35\" class=\"percentage\">";
+<text x="17" y="22.35" class="percentage">"#;
 
-const RINGSVG_6: &str = "</text></svg>";
+const RINGSVG_6: &str = r#"</text></svg>"#;
 const RINGSVG_LEN: usize = 680; // For preallocation
 
-const DBLLINESVG_1: &str = "
-<svg width=\"42\" height=\"42\" viewBox=\"0 0 42 42\" xmlns=\"http://www.w3.org/2000/svg\">\n\
-<defs>\
-    <clipPath id=\"rounded-clip\">\
-      <rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" rx=\"7\" ry=\"7\"/>\
-    </clipPath>\
-  </defs>\
-  <g clip-path=\"url(#rounded-clip)\">\
-<rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" rx=\"7\" ry=\"7\" opacity=\"1\" fill=\""; // background color
+// Double Line SVG
+const DBLLINESVG_1: &str = r#"
+<svg width="42" height="42" viewBox="0 0 42 42" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <clipPath id="rounded-clip">
+    <rect x="0" y="0" width="42" height="42" rx="7" ry="7"/>
+  </clipPath>
+</defs>
+<g clip-path="url(#rounded-clip)">
+<rect x="0" y="0" width="42" height="42" rx="7" ry="7" opacity="1" fill=""#;
 
-const DBLLINESVG_2: &str = "\" stroke=\""; // frame color
-const DBLLINESVG_3: &str = "\"/>\n";
+const DBLLINESVG_2: &str = r#"" stroke=""#;
+const DBLLINESVG_3: &str = r#""/>
+"#;
 
-// line
-const DBLLINESVG_4: &str = "<polyline fill=\"none\" opacity=\"1\" stroke=\""; // line color
-
-const DBLLINESVG_5: &str = "\" stroke-width=\"1\" points=\"";
+// Line
+const DBLLINESVG_4: &str = r#"<polyline fill="none" opacity="1" stroke=""#;
+const DBLLINESVG_5: &str = r#"" stroke-width="1" points=""#;
 
 // Polygon
-const DBLLINESVG_6: &str = "\"/>\
-<polygon opacity=\"0.3\" fill=\""; // polygon color
+const DBLLINESVG_6: &str = r#""/>
+<polygon opacity="0.3" fill=""#;
+const DBLLINESVG_7: &str = r#"" points=""#;
+const DBLLINESVG_8: &str = r#"  41,41 1,41"/>"#;
 
-const DBLLINESVG_7: &str = "\" points=\""; // polygonpoints
-
-const DBLLINESVG_8: &str = "  41,41 1,41\"/>";
-
-const DBLLINESVG_9: &str = "</g></svg>";
+const DBLLINESVG_9: &str = r#"</g></svg>"#;
 
 const DBLLINESVG_LEN: usize = 1000; // For preallocation
-                                    /*
-                                    pub fn dbl_circle(
-                                        samples: &VecDeque<u64>,
-                                        samples2: &VecDeque<u64>,
-                                        graph_samples: usize,
-                                        colors: &SvgColors,
-                                    ) -> String {
-                                        let mut dl: u64 = 0;
-                                        let mut ul: u64 = 0;
+
+/*
+pub fn dbl_circle(
+    samples: &VecDeque<u64>,
+    samples2: &VecDeque<u64>,
+    graph_samples: usize,
+    colors: &SvgColors,
+) -> String {
+    let mut dl: u64 = 0;
+    let mut ul: u64 = 0;
 
 
-                                        if self.max_val > 0 && !self.download.is_empty() {
-                                            let scaling_dl: f32 = 94.0 / self.max_val as f32;
-                                            let scaling_ul: f32 = 69.0 / self.max_val as f32;
+    if self.max_val > 0 && !self.download.is_empty() {
+        let scaling_dl: f32 = 94.0 / self.max_val as f32;
+        let scaling_ul: f32 = 69.0 / self.max_val as f32;
 
-                                            dl = *self.download.get(self.download.len() - 1).unwrap_or(&0u64);
-                                            ul = *self.upload.get(self.upload.len() - 1).unwrap_or(&0u64);
-                                            dl = (dl as f32 * scaling_dl) as u64;
-                                            ul = (ul as f32 * scaling_ul) as u64;
-                                        }
+        dl = *self.download.get(self.download.len() - 1).unwrap_or(&0u64);
+        ul = *self.upload.get(self.upload.len() - 1).unwrap_or(&0u64);
+        dl = (dl as f32 * scaling_dl) as u64;
+        ul = (ul as f32 * scaling_ul) as u64;
+    }
 
-                                        let background = "none";
-                                        let strokebg = "white";
-                                        let outerstrokefg = "blue";
-                                        let outerpercentage = dl.to_string();
-                                        let innerstrokefg = "red";
-                                        let innerpercentage = ul.to_string();
-                                        let mut svg = String::with_capacity(SVG_LEN);
-                                        svg.push_str(DBLCIRCLESTART);
-                                        svg.push_str(&background);
-                                        svg.push_str(DBLCIRCLEPART2);
-                                        svg.push_str(&strokebg);
-                                        svg.push_str(DBLCIRCLEPART3);
-                                        svg.push_str(&outerstrokefg);
-                                        svg.push_str(DBLCIRCLEPART4);
-                                        svg.push_str(&outerpercentage);
-                                        svg.push_str(DBLCIRCLEPART5);
-                                        svg.push_str(&strokebg);
-                                        svg.push_str(DBLCIRCLEPART6);
-                                        svg.push_str(&innerstrokefg);
-                                        svg.push_str(DBLCIRCLEPART7);
-                                        svg.push_str(&innerpercentage);
-                                        svg.push_str(DBLCIRCLEPART8);
+    let background = "none";
+    let strokebg = "white";
+    let outerstrokefg = "blue";
+    let outerpercentage = dl.to_string();
+    let innerstrokefg = "red";
+    let innerpercentage = ul.to_string();
+    let mut svg = String::with_capacity(SVG_LEN);
+    svg.push_str(DBLCIRCLESTART);
+    svg.push_str(&background);
+    svg.push_str(DBLCIRCLEPART2);
+    svg.push_str(&strokebg);
+    svg.push_str(DBLCIRCLEPART3);
+    svg.push_str(&outerstrokefg);
+    svg.push_str(DBLCIRCLEPART4);
+    svg.push_str(&outerpercentage);
+    svg.push_str(DBLCIRCLEPART5);
+    svg.push_str(&strokebg);
+    svg.push_str(DBLCIRCLEPART6);
+    svg.push_str(&innerstrokefg);
+    svg.push_str(DBLCIRCLEPART7);
+    svg.push_str(&innerpercentage);
+    svg.push_str(DBLCIRCLEPART8);
 
-                                        svg
-                                    }
+    svg
+}
 
-                                    const SVG_LEN: usize = DBLCIRCLESTART.len()
-                                        + DBLCIRCLEPART2.len()
-                                        + DBLCIRCLEPART3.len()
-                                        + DBLCIRCLEPART4.len()
-                                        + DBLCIRCLEPART5.len()
-                                        + DBLCIRCLEPART6.len()
-                                        + DBLCIRCLEPART7.len()
-                                        + DBLCIRCLEPART8.len()
-                                        + 40;
+const SVG_LEN: usize = DBLCIRCLESTART.len()
+    + DBLCIRCLEPART2.len()
+    + DBLCIRCLEPART3.len()
+    + DBLCIRCLEPART4.len()
+    + DBLCIRCLEPART5.len()
+    + DBLCIRCLEPART6.len()
+    + DBLCIRCLEPART7.len()
+    + DBLCIRCLEPART8.len()
+    + 40;
 
-                                    const DBLCIRCLESTART: &str = "<svg viewBox=\"0 0 34 34\" xmlns=\"http://www.w3.org/2000/svg\">
-                                      <path d=\"M17 2.0845
-                                          a 13.9155 13.9155 0 0 1 0 29.831
-                                          a 13.9155 13.9155 0 0 1 0 -29.831\" fill=\""; // background
+const DBLCIRCLESTART: &str = "<svg viewBox=\"0 0 34 34\" xmlns=\"http://www.w3.org/2000/svg\">
+  <path d=\"M17 2.0845
+      a 13.9155 13.9155 0 0 1 0 29.831
+      a 13.9155 13.9155 0 0 1 0 -29.831\" fill=\""; // background
 
                                     const DBLCIRCLEPART2: &str = "\" stroke=\""; // outerstrokebg
 
                                     const DBLCIRCLEPART3: &str = "\" stroke-width=\"4\"/>
                                       <path d=\"M17 31.931
-                                          a 13.9155 13.9155 0 0 1 0 -29.831
-                                          a 13.9155 13.9155 0 0 1 0 29.931\" fill=\"none\" stroke=\""; //outerstrokefg
+      a 13.9155 13.9155 0 0 1 0 -29.831
+      a 13.9155 13.9155 0 0 1 0 29.931\" fill=\"none\" stroke=\""; //outerstrokefg
 
                                     const DBLCIRCLEPART4: &str = "\" stroke-width=\"4\" stroke-dasharray=\""; //outerpercentage
 
                                     const DBLCIRCLEPART5: &str = ", 94\"/>
                                       <path d=\"M17 28
-                                          a 7.9155 7.9155 0 0 1 0 -22
-                                          a 7.9155 7.9155 0 0 1 0 22\" fill=\"none\" stroke=\""; //innerstrokebg
+      a 7.9155 7.9155 0 0 1 0 -22
+      a 7.9155 7.9155 0 0 1 0 22\" fill=\"none\" stroke=\""; //innerstrokebg
 
                                     const DBLCIRCLEPART6: &str = "\" stroke-width=\"3.7\"/>
                                       <path d=\"M17 28
-                                          a 7.9155 7.9155 0 0 1 0 -22
-                                          a 7.9155 7.9155 0 0 1 0 22\" fill=\"none\" stroke=\""; //innerstrokefg
+      a 7.9155 7.9155 0 0 1 0 -22
+      a 7.9155 7.9155 0 0 1 0 22\" fill=\"none\" stroke=\""; //innerstrokefg
 
                                     const DBLCIRCLEPART7: &str = "\" stroke-width=\"3.7\" stroke-dasharray=\""; //innerpercentage
 
                                     const DBLCIRCLEPART8: &str = ", 69\"/></svg>";
-                                    */
+*/
 /*
 <svg viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">
   <path d="M17 2.0845
