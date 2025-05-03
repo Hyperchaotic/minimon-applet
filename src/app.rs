@@ -1476,8 +1476,10 @@ impl Minimon {
                     widget::vertical_space().into(),
                 ];
                 elements.push(Column::from_vec(gpu_labels).into());
-            } else {
+
+            } else if config.gpu_label {
                 elements.push(self.figure_label(formatted_gpu).into());
+
             }
 
             if config.gpu_chart {
