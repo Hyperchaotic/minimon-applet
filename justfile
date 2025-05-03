@@ -77,6 +77,7 @@ run *args:
 
 # Installs files
 install:
+    strip {{bin-src}}
     install -Dm0755 {{bin-src}} {{bin-dst}}
     install -Dm0644 {{desktop-src}} {{desktop-dst}}
     install -Dm0644 {{metainfo-src}} {{metainfo-dst}}
@@ -119,6 +120,7 @@ vendor-extract:
     tar pxf vendor.tar
     
 deb:
+    strip {{bin-src}}
     install -D {{bin-src}} {{debname}}{{bin-dst}}
     install -D {{desktop-src}} {{debname}}{{desktop-dst}}
     for svg in {{icons-src}}/apps/*.svg; do \
