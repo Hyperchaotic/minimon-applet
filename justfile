@@ -134,3 +134,49 @@ deb:
     echo "Description: {{summary}}" >> {{debcontrol}}
     dpkg-deb --build --root-owner-group {{debname}}
     rm -Rf {{debname}}/
+
+rpmarch := arch()    
+rpmname := name + '-' + version + '-1.' + rpmarch
+rpmdir := rpmname / 'BUILDROOT'
+rpminstall := rpmdir / prefix
+rpm_bin_dst := rpminstall / 'bin' / name
+rpm_desktop_dst := rpminstall / 'share' / 'applications' / desktop
+rpm_metainfo_dst := rpminstall / 'share' / 'metainfo' / metainfo
+rpm_icons_dst := rpminstall / 'share' / 'icons' / 'hicolor' / 'scalable' / 'apps'
+
+rpm:
+    strip {{bin-src}}
+    install -D {{bin-src}} {{rpm_bin_dst}}
+    install -D {{desktop-src}} {{rpm_desktop_dst}}
+    install -D {{metainfo-src}} {{rpm_metainfo_dst}}
+    for svg in {{icons-src}}/apps/*.svg; do \
+        install -D "$svg" "{{rpm_icons_dst}}/$(basename $svg)"; \
+    done
+
+    mkdir -p {{rpmname}}
+    echo "Name: {{name}}" > {{rpmname}}/spec.spec
+    echo "Version: {{version}}" >> {{rpmname}}/spec.spec
+    echo "Release: 1%{?dist}" >> {{rpmname}}/spec.spec
+    echo "Summary: {{summary}}" >> {{rpmname}}/spec.spec
+    echo "" >> {{rpmname}}/spec.spec
+    echo "License: GPLv3" >> {{rpmname}}/spec.spec
+    echo "Group: Applications/Utilities" >> {{rpmname}}/spec.spec
+    echo "%description" >> {{rpmname}}/spec.spec
+    echo "{{summary}}" >> {{rpmname}}/spec.spec
+    echo "" >> {{rpmname}}/spec.spec
+    echo "%files" >> {{rpmname}}/spec.spec
+    echo "%defattr(-,root,root,-)" >> {{rpmname}}/spec.spec
+    echo "{{prefix}}/bin/{{name}}" >> {{rpmname}}/spec.spec
+    echo "{{prefix}}/share/applications/{{desktop}}" >> {{rpmname}}/spec.spec
+    echo "{{prefix}}/share/metainfo/{{metainfo}}" >> {{rpmname}}/spec.spec
+    echo "{{prefix}}/share/icons/hicolor/scalable/apps/*.svg" >> {{rpmname}}/spec.spec
+
+    rpmbuild -bb --buildroot="$(pwd)/{{rpmdir}}" {{rpmname}}/spec.spec \
+        --define "_rpmdir $(pwd)" \
+        --define "_topdir $(pwd)/{{rpmname}}" \
+        --define "_buildrootdir $(pwd)/{{rpmdir}}"
+
+    rm -rf {{rpmname}} {{rpmdir}}
+    mv x86_64/* .
+    rmdir x86_64
+
