@@ -169,7 +169,6 @@ impl AmdGpu {
         debug!("AmdGpu::get_gpus().");
 
         let mut gpus = Vec::new();
-        return gpus; // REMOVE
 
         let lspci_map = AmdGpu::get_lspci_gpu_names();
 
