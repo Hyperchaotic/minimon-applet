@@ -109,7 +109,7 @@ impl NvidiaGpu<'_> {
                 .filter_map(|i| {
                     // Try to get both name and UUID, skip this GPU if either fails
                     let name = NvidiaGpu::name(i).ok()?;
-                    let uuid = NvidiaGpu::uuid(i).ok()?;
+                    let uuid = format!("{}{}", NvidiaGpu::uuid(i).ok()?, count);
 
                     Some(Gpu::new(Box::new(NvidiaGpu::new(i, name, uuid))))
                 })

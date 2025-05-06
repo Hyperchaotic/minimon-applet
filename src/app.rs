@@ -486,7 +486,7 @@ impl cosmic::Application for Minimon {
                                             }
                                         )),
                                     );
-                                    content = content.push(disable_row.width(350));
+                                    content = content.push(disable_row.width(320));
                                 }
                                 content = content.push(gpu.settings_ui(config));
                             } else {
@@ -586,16 +586,18 @@ impl cosmic::Application for Minimon {
             }
 
             content = content.padding(padding).spacing(padding);
+            
+
             //let content = column!(sensor_settings);
             let limits = Limits::NONE
                 .max_width(420.0)
                 .min_width(360.0)
                 .min_height(200.0)
-                .max_height(750.0);
+                .max_height(550.0);
 
             self.core
                 .applet
-                .popup_container(content)
+                .popup_container(content.apply(cosmic::widget::scrollable))
                 .limits(limits)
                 .into()
         }
