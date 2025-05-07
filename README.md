@@ -5,7 +5,7 @@ A configurable applet for displaying the following:
 * Memory usage
 * Network utilization
 * Disk activity
-* GPU and VRAM usage on Nvidia and AMD GPU's. 
+* GPU and VRAM usage on Nvidia and AMD GPUs. 
 
 Can sit in the panel or Dock. Configurable refresh rate and many display options.
 
