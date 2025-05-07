@@ -130,27 +130,15 @@ impl AmdGpu {
                     .map(|(_, name)| name.clone())
             })
             .or_else(|| {
-                Self::read_file_to_string(format!("/sys/class/drm/{}/device", card))
+                Self::read_file_to_string(format!("/sys/class/drm/{}/device/subsystem_device", card))
                     .ok()
                     .and_then(|dev_id| {
-                        Self::static_amd_gpu_name_map()
-                            .get(&dev_id.to_lowercase())
+                        AMD_GPU_DEVICE_IDS
+                            .get(dev_id.to_lowercase().as_str())
                             .map(|s| s.to_string())
                     })
             })
             .unwrap_or_else(|| "Unknown AMD GPU".to_string())
-    }
-
-    fn static_amd_gpu_name_map() -> HashMap<String, &'static str> {
-        HashMap::from([
-            ("0x73ff".to_string(), "Radeon RX 6600"),
-            ("0x73bf".to_string(), "Radeon RX 6500 XT"),
-            ("0x7422".to_string(), "Radeon RX 7600"),
-            ("0x15d8".to_string(), "Vega 8 Graphics (Ryzen 3550H)"),
-            ("0x1636".to_string(), "Radeon 780M"),
-            ("0x164e".to_string(), "Radeon RX 7700 XT"),
-            ("0x164c".to_string(), "Radeon RX 7800 XT"),
-        ])
     }
 
     fn generate_gpu_id(card: &str) -> Option<String> {
@@ -268,3 +256,70 @@ impl std::fmt::Debug for AmdGpu {
         )
     }
 }
+
+use once_cell::sync::Lazy;
+
+/// A hashmap containing AMD graphics card subsystem device IDs and their names
+/// Keys are the values found in /sys/class/drm/card?/device/subsystem_device
+pub static AMD_GPU_DEVICE_IDS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+    let mut m = HashMap::new();
+    
+    // Radeon RX 7000 Series
+    m.insert("0x744C", "AMD Radeon RX 7700S");
+    m.insert("0x73FF", "AMD Radeon RX 7900 XTX");
+    m.insert("0x73DF", "AMD Radeon RX 7900 XT");
+    m.insert("0x7470", "AMD Radeon RX 7800 XT");
+    m.insert("0x7460", "AMD Radeon RX 7700 XT");
+    m.insert("0x7420", "AMD Radeon RX 7600");
+    m.insert("0x7422", "AMD Radeon RX 7600 XT");
+    
+    // Radeon RX 6000 Series
+    m.insert("0x73BF", "AMD Radeon RX 6950 XT");
+    m.insert("0x73A5", "AMD Radeon RX 6900 XT");
+    m.insert("0x73A3", "AMD Radeon RX 6800 XT");
+    m.insert("0x73AB", "AMD Radeon RX 6800");
+    m.insert("0x73DF", "AMD Radeon RX 6750 XT");
+    m.insert("0x73D5", "AMD Radeon RX 6700 XT");
+    m.insert("0x73FF", "AMD Radeon RX 6700");
+    m.insert("0x73EF", "AMD Radeon RX 6650 XT");
+    m.insert("0x73E8", "AMD Radeon RX 6600 XT");
+    m.insert("0x73E3", "AMD Radeon RX 6600");
+    m.insert("0x7422", "AMD Radeon RX 6500 XT");
+    m.insert("0x7424", "AMD Radeon RX 6400");
+    
+    // Radeon RX 5000 Series
+    m.insert("0x731F", "AMD Radeon RX 5700 XT");
+    m.insert("0x7340", "AMD Radeon RX 5700");
+    m.insert("0x7341", "AMD Radeon RX 5600 XT");
+    m.insert("0x7347", "AMD Radeon RX 5500 XT");
+    
+    // Radeon RX Vega Series
+    m.insert("0x687F", "AMD Radeon VII");
+    m.insert("0x6863", "AMD Radeon RX Vega 64");
+    m.insert("0x6867", "AMD Radeon RX Vega 56");
+    
+    // Radeon RX 500 Series
+    m.insert("0x67DF", "AMD Radeon RX 590");
+    m.insert("0x67FF", "AMD Radeon RX 580");
+    m.insert("0x67EF", "AMD Radeon RX 570");
+    m.insert("0x67E0", "AMD Radeon RX 560");
+    m.insert("0x699F", "AMD Radeon RX 550");
+    
+    // APUs - Integrated Graphics
+    m.insert("0x1681", "AMD Radeon 780M iGPU");
+    m.insert("0x15E7", "AMD Radeon 760M iGPU");
+    m.insert("0x15D8", "AMD Radeon 680M iGPU");
+    m.insert("0x1638", "AMD Radeon 660M iGPU");
+    m.insert("0x164C", "AMD Radeon 610M iGPU");
+    m.insert("0x15DD", "AMD Radeon Vega 8 iGPU");
+    m.insert("0x15D8", "AMD Radeon Vega 7 iGPU");
+    
+    // Radeon Pro Series
+    m.insert("0x73A2", "AMD Radeon Pro W6800");
+    m.insert("0x73A3", "AMD Radeon Pro W6600");
+    m.insert("0x6867", "AMD Radeon Pro VII");
+    m.insert("0x66AF", "AMD Radeon Pro WX 9100");
+    m.insert("0x67C4", "AMD Radeon Pro WX 7100");
+    
+    m
+});
