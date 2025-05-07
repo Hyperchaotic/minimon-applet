@@ -102,6 +102,7 @@ impl AmdGpu {
             return Vec::new();
         };
 
+        debug!("get_lspci_gpu_names(): {}", stdout);
         stdout
             .lines()
             .filter(|line| {
@@ -117,9 +118,12 @@ impl AmdGpu {
 
     fn get_gpu_name(card: &str, lspci_map: &[(String, String)]) -> String {
         let pci_slot = Self::get_pci_slot(card);
+        debug!("AmdGpu::get_gpu_name({}), slot: {:?}", card, pci_slot);
+        debug!("lspci_map: {:?}", lspci_map);
         pci_slot
             .and_then(|slot| {
                 let short_slot = slot.rsplit_once(':').map(|(_, s)| s).unwrap_or(&slot);
+                debug!("Short slot: {}", short_slot);
                 lspci_map
                     .iter()
                     .find(|(s, _)| s.ends_with(short_slot))
@@ -233,7 +237,7 @@ impl super::GpuIf for AmdGpu {
             return Ok(0);
         }
         let usage = Ok(Self::parse_u32_file(&self.usage_path).unwrap_or(0));
-        debug!("AmdGpu::usage({}) - {:?} %.", self.name, usage);
+//        debug!("AmdGpu::usage({}) - {:?} %.", self.name, usage);
         usage
     }
 
@@ -243,14 +247,14 @@ impl super::GpuIf for AmdGpu {
             return Err(anyhow!("AMD device paused"));
         }
         if !self.powered_on() {
-            debug!(
-                "AmdGpu::vram_used({}) - AMD device sleeping, returning 0.",
-                self.name
-            );
+//            debug!(
+  //              "AmdGpu::vram_used({}) - AMD device sleeping, returning 0.",
+    //            self.name
+      //      );
             return Ok(0);
         }
         let vram = Ok(Self::parse_u64_file(&self.vram_used_path).unwrap_or(0));
-        debug!("AmdGpu::vram_used({}) - {:?} bytes.", self.name, vram);
+//        debug!("AmdGpu::vram_used({}) - {:?} bytes.", self.name, vram);
         vram
     }
 }
