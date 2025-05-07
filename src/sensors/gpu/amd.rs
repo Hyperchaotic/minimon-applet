@@ -90,12 +90,16 @@ impl AmdGpu {
         Self::read_file_to_string(path)
             .ok()?
             .lines()
-            .find_map(|line| line.strip_prefix("PCI_SLOT_NAME=").map(|s| s.to_string()))
+            .find_map(|line| {
+                line.strip_prefix("PCI_SLOT_NAME=")
+                    .map(|s| s.to_lowercase().to_string())
+            })
     }
 
     fn get_lspci_gpu_names() -> HashMap<String, String> {
         fn clean_gpu_name(model: &str) -> String {
-            let truncated = model.split("[1002:").next().unwrap_or(model);
+            let (_, truncated) = model.split_once("]:").unwrap_or((model, model));
+            let truncated = truncated.split("[1002:").next().unwrap_or(model);
             truncated
                 .replace("Corporation", "")
                 .replace("[AMD/ATI]", "")
@@ -106,6 +110,8 @@ impl AmdGpu {
                 .replace("Display", "")
                 .replace(":", "")
                 .replace("  ", " ")
+                .replace("[", "(")
+                .replace("]", ")")
                 .trim()
                 .to_string()
         }
@@ -124,7 +130,7 @@ impl AmdGpu {
                 if let Some((slot, rest)) = line.split_once(' ') {
                     let model = rest.trim();
                     let name = clean_gpu_name(model);
-                    map.insert(slot.to_string(), name);
+                    map.insert(slot.to_lowercase().to_string(), name);
                 }
             }
         }
