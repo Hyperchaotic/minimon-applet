@@ -504,7 +504,7 @@ impl cosmic::Application for Minimon {
                     }
                 }
             } else {
-                if SYSMON_LIST.len() > 0 {
+                if !SYSMON_LIST.is_empty() {
                     let list = &*SYSMON_NAMES;
                     let safe_index = if self.config.sysmon < list.len() {
                         self.config.sysmon
@@ -1792,7 +1792,7 @@ impl Minimon {
                 if kind == 1 {
                     // Get the Online property
                     let online: bool = device_proxy.get_property("Online")?;
-                    return Ok(if online { true } else { false });
+                    return Ok(online);
                 }
             }
         }
