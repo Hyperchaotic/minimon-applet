@@ -92,90 +92,75 @@ impl AmdGpu {
             .lines()
             .find_map(|line| line.strip_prefix("PCI_SLOT_NAME=").map(|s| s.to_string()))
     }
-    fn get_lspci_gpu_names() -> Vec<(String, String)> {
-        let output = Command::new("lspci").arg("-nn").output();
 
+    fn get_lspci_gpu_names() -> HashMap<String, String> {
+        fn clean_gpu_name(model: &str) -> String {
+            let truncated = model.split("[1002:").next().unwrap_or(model);
+            truncated
+                .replace("Corporation", "")
+                .replace("[AMD/ATI]", "")
+                .replace("compatible controller", "")
+                .replace("controller", "")
+                .replace("VGA", "")
+                .replace("3D", "")
+                .replace("Display", "")
+                .replace(":", "")
+                .replace("  ", " ")
+                .trim()
+                .to_string()
+        }
+
+        let mut map = HashMap::new();
+        let output = Command::new("lspci").arg("-nn").output();
         let Ok(output) = output else {
-            return Vec::new();
+            return map;
         };
         let Ok(stdout) = String::from_utf8(output.stdout) else {
-            return Vec::new();
+            return map;
         };
 
-        let mut results = Vec::new();
         for line in stdout.lines() {
-            if line.contains("VGA")
-                || line.contains("3D controller")
-                || line.contains("Display controller")
-            {
-                let parts: Vec<&str> = line.splitn(2, ": ").collect();
-                if parts.len() != 2 {
-                    continue;
+            if line.contains("VGA") || line.contains("Display") || line.contains("3D") {
+                if let Some((slot, rest)) = line.split_once(' ') {
+                    let model = rest.trim();
+                    let name = clean_gpu_name(model);
+                    map.insert(slot.to_string(), name);
                 }
-
-                let slot = parts[0].trim().to_string();
-                let description = parts[1].trim();
-
-                // Try to extract the vendor and model
-                let model = description.split("]:").last().unwrap_or(description).trim();
-
-                let cleaned = model
-                    .replace("Corporation", "")
-                    .replace("[AMD/ATI]", "")
-                    .replace("compatible controller", "")
-                    .replace("controller", "")
-                    .replace("VGA", "")
-                    .replace("3D", "")
-                    .replace("Display", "")
-                    .replace(":", "")
-                    .replace("  ", " ")
-                    .replace("(rev", "|rev") // temporary delimiter to strip revision later
-                    .split('|')
-                    .next()
-                    .map(|s| {
-                        // Find position of PCI vendor ID block like [1002:7480]
-                        let pci_id_pos = s.find("[1002");
-                        let s = if let Some(pos) = pci_id_pos {
-                            &s[..pos]
-                        } else {
-                            s
-                        };
-                        s.replace("[", "(").replace("]", ")").trim().to_string()
-                    })
-                    .unwrap_or_else(|| "Unknown GPU".to_string());
-
-                results.push((slot, cleaned));
             }
         }
-        results
+        map
     }
 
-    fn get_gpu_name(card: &str, lspci_map: &[(String, String)]) -> String {
-        let pci_slot = Self::get_pci_slot(card);
-        debug!("AmdGpu::get_gpu_name({}), slot: {:?}", card, pci_slot);
-        debug!("lspci_map: {:?}", lspci_map);
-        pci_slot
-            .and_then(|slot| {
-                let short_slot = slot.rsplit_once(':').map(|(_, s)| s).unwrap_or(&slot);
-                debug!("Short slot: {}", short_slot);
-                lspci_map
-                    .iter()
-                    .find(|(s, _)| s.ends_with(short_slot))
-                    .map(|(_, name)| name.clone())
-            })
-            .or_else(|| {
-                Self::read_file_to_string(format!(
-                    "/sys/class/drm/{}/device/subsystem_device",
-                    card
-                ))
-                .ok()
-                .and_then(|dev_id| {
-                    AMD_GPU_DEVICE_IDS
-                        .get(dev_id.to_lowercase().as_str())
-                        .map(|s| s.to_string())
-                })
-            })
-            .unwrap_or_else(|| "Unknown AMD GPU".to_string())
+    fn get_gpu_name(card: &str, lspci_map: &HashMap<String, String>) -> String {
+        debug!("Resolving GPU name for card: {}", card);
+
+        let pci_slot = AmdGpu::get_pci_slot(card);
+        debug!("Resolved PCI slot for card {}: {:?}", card, pci_slot);
+
+        if let Some(slot) = &pci_slot {
+            if let Some(name) = lspci_map.get(slot) {
+                debug!("Found name in lspci_map: {}", name);
+                return name.clone();
+            } else {
+                debug!("No entry in lspci_map for slot: {}", slot);
+            }
+        }
+
+        let device_id_path = format!("/sys/class/drm/{}/device", card);
+        if let Ok(dev_id) = AmdGpu::read_file_to_string(&device_id_path) {
+            debug!("Read device ID from sysfs: {}", dev_id);
+            if let Some(name) = AMD_GPU_DEVICE_IDS.get(dev_id.to_lowercase().as_str()) {
+                debug!("Found name in static map: {}", name);
+                return name.to_string();
+            } else {
+                debug!("No entry in static map for device ID: {}", dev_id);
+            }
+        } else {
+            debug!("Failed to read device ID from path: {}", device_id_path);
+        }
+
+        debug!("Falling back to unknown GPU name");
+        "Unknown AMD GPU".to_string()
     }
 
     fn generate_gpu_id(card: &str) -> Option<String> {
@@ -197,12 +182,13 @@ impl AmdGpu {
     pub fn get_gpus() -> Vec<Gpu> {
         debug!("AmdGpu::get_gpus().");
 
-        let t = Self::get_lspci_gpu_names();
-        info!("NAMES: {:?}", &t);
-
         let mut gpus = Vec::new();
 
         let lspci_map = AmdGpu::get_lspci_gpu_names();
+        debug!("Available lspci_map entries:");
+        for (k, v) in &lspci_map {
+            debug!("  {} -> {}", k, v);
+        }
 
         let cards = AmdGpu::get_amd_cards();
 
