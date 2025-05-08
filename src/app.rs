@@ -35,12 +35,13 @@ use crate::colorpicker::{ColorPicker, DemoGraph};
 use crate::config::{
     ColorVariant, DeviceKind, DisksVariant, GpuConfig, GraphColors, GraphKind, NetworkVariant,
 };
-use crate::sensors::Sensor;
 use crate::sensors::cpu::Cpu;
+use crate::sensors::cputemp::CpuTemp;
 use crate::sensors::disks::{self, Disks};
 use crate::sensors::gpus::{Gpu, list_gpus};
 use crate::sensors::memory::Memory;
 use crate::sensors::network::{self, Network};
+use crate::sensors::{Sensor, TempUnit};
 use crate::{config::MinimonConfig, fl};
 use cosmic::widget::Id as WId;
 
@@ -49,6 +50,7 @@ static AUTOSIZE_MAIN_ID: Lazy<WId> = Lazy::new(|| WId::new("autosize-main"));
 const TICK: i64 = 250;
 
 const ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon";
+const TEMP_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-temperature";
 const RAM_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-ram";
 const GPU_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-gpu";
 const NETWORK_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-network";
@@ -64,6 +66,7 @@ lazy_static! {
     /// - These strings are only initialized once at program startup.
     /// - They are never deallocated since they are used globally.
     static ref SETTINGS_CPU_CHOICE: &'static str = fl!("settings-cpu").leak();
+    static ref SETTINGS_CPU_TEMP_CHOICE: &'static str = fl!("settings-cpu-temperature").leak();
     static ref SETTINGS_MEMORY_CHOICE: &'static str = fl!("settings-memory").leak();
     static ref SETTINGS_NETWORK_CHOICE: &'static str = fl!("settings-network").leak();
     static ref SETTINGS_DISKS_CHOICE: &'static str = fl!("settings-disks").leak();
@@ -72,6 +75,7 @@ lazy_static! {
     static ref SETTINGS_GENERAL_HEADING: &'static str = fl!("settings-subpage-general").leak();
     static ref SETTINGS_BACK: &'static str = fl!("settings-subpage-back").leak();
     static ref SETTINGS_CPU_HEADING: &'static str = fl!("cpu-title").leak();
+    static ref SETTINGS_CPU_TEMP_HEADING: &'static str = fl!("cpu-temperature-title").leak();
     static ref SETTINGS_MEMORY_HEADING: &'static str = fl!("memory-title").leak();
     static ref SETTINGS_NETWORK_HEADING: &'static str = fl!("net-title").leak();
     static ref SETTINGS_DISKS_HEADING: &'static str = fl!("disks-title").leak();
@@ -118,6 +122,7 @@ macro_rules! settings_sub_page_heading {
 pub enum SettingsVariant {
     General,
     Cpu,
+    CpuTemp,
     Memory,
     Network,
     Disks,
@@ -129,6 +134,8 @@ pub struct Minimon {
     core: Core,
     /// The svg image to draw for the CPU load
     cpu: Cpu,
+    /// The svg image to draw for the CPU load
+    cputemp: CpuTemp,
     /// The svg image to draw for the Memory load
     memory: Memory,
 
@@ -203,6 +210,8 @@ pub enum Message {
 
     ToggleCpuChart(bool),
     ToggleCpuLabel(bool),
+    ToggleCpuTempChart(bool),
+    ToggleCpuTempLabel(bool),
     ToggleMemoryChart(bool),
     ToggleMemoryLabel(bool),
     ToggleMemoryPercentage(bool),
@@ -212,6 +221,7 @@ pub enum Message {
     LabelSizeChanged(u16),
     ToggleMonospaceLabels(bool),
     ToggleTightSpacing(bool),
+    SelectCpuTempUnit(TempUnit),
 
     Settings(Option<SettingsVariant>),
 
@@ -254,6 +264,7 @@ impl cosmic::Application for Minimon {
         let app = Minimon {
             core,
             cpu: Cpu::new(GraphKind::Ring),
+            cputemp: CpuTemp::new(GraphKind::Ring),
             memory: Memory::new(GraphKind::Line),
             network1: Network::new(NetworkVariant::Combined, GraphKind::Line),
             network2: Network::new(NetworkVariant::Upload, GraphKind::Line),
@@ -337,18 +348,13 @@ impl cosmic::Application for Minimon {
 
         // If nothing is showing, use symbolic icon
         if !gpu_visible
-            && !self.config.cpu.chart
-            && !self.config.cpu.label
-            && !self.config.memory.chart
-            && !self.config.memory.label
-            && !self.config.network1.chart
-            && !self.config.network1.label
-            && !self.config.network2.chart
-            && !self.config.network2.label
-            && !self.config.disks1.chart
-            && !self.config.disks1.label
-            && !self.config.disks2.chart
-            && !self.config.disks2.label
+            && !self.config.cpu.is_visible()
+            && !self.config.cputemp.is_visible()
+            && !self.config.memory.is_visible()
+            && !self.config.network1.is_visible()
+            && !self.config.network2.is_visible()
+            && !self.config.disks1.is_visible()
+            && !self.config.disks2.is_visible()
         {
             return self
                 .core
@@ -362,6 +368,7 @@ impl cosmic::Application for Minimon {
         let mut elements: Vec<Element<Message>> = Vec::new();
 
         elements.extend(self.cpu_panel_ui(horizontal));
+        elements.extend(self.cpu_temp_panel_ui(horizontal));
         elements.extend(self.memory_panel_ui(horizontal));
         elements.extend(self.network_panel_ui(horizontal));
         elements.extend(self.disks_panel_ui(horizontal));
@@ -430,6 +437,11 @@ impl cosmic::Application for Minimon {
                     SettingsVariant::Cpu => {
                         content = content.push(settings_sub_page_heading!(SETTINGS_CPU_HEADING));
                         content = content.push(self.cpu.settings_ui(&self.config));
+                    }
+                    SettingsVariant::CpuTemp => {
+                        content =
+                            content.push(settings_sub_page_heading!(SETTINGS_CPU_TEMP_HEADING));
+                        content = content.push(self.cputemp.settings_ui(&self.config));
                     }
                     SettingsVariant::Memory => {
                         content = content.push(Minimon::sub_page_header(
@@ -523,6 +535,7 @@ impl cosmic::Application for Minimon {
                 }
 
                 let cpu = widget::text::body(self.cpu.to_string());
+                let cputemp = widget::text::body(self.cputemp.to_string());
                 let memory = widget::text::body(self.memory.to_string(false));
 
                 let sample_rate_ms = self.config.refresh_rate;
@@ -556,7 +569,17 @@ impl cosmic::Application for Minimon {
                         &SETTINGS_CPU_CHOICE,
                         cpu,
                         Message::Settings(Some(SettingsVariant::Cpu)),
-                    ))
+                    ));
+
+                if self.cputemp.is_found() {
+                    sensor_settings = sensor_settings.add(Minimon::go_next_with_item(
+                        &SETTINGS_CPU_TEMP_CHOICE,
+                        cputemp,
+                        Message::Settings(Some(SettingsVariant::CpuTemp)),
+                    ));
+                }
+                
+                sensor_settings = sensor_settings
                     .add(Minimon::go_next_with_item(
                         &SETTINGS_MEMORY_CHOICE,
                         memory,
@@ -586,7 +609,6 @@ impl cosmic::Application for Minimon {
             }
 
             content = content.padding(padding).spacing(padding);
-            
 
             //let content = column!(sensor_settings);
             let limits = Limits::NONE
@@ -638,12 +660,26 @@ impl cosmic::Application for Minimon {
                 match device {
                     DeviceKind::Cpu => {
                         debug!("Cpu");
-                        self.colorpicker
-                            .activate(device, kind, self.cpu.demo_graph(self.config.cpu.colors));
+                        self.colorpicker.activate(
+                            device,
+                            kind,
+                            self.cpu.demo_graph(self.config.cpu.colors),
+                        );
+                    }
+                    DeviceKind::CpuTemp => {
+                        debug!("Temp");
+                        self.colorpicker.activate(
+                            device,
+                            kind,
+                            self.cputemp.demo_graph(self.config.cputemp.colors),
+                        );
                     }
                     DeviceKind::Memory => {
-                        self.colorpicker
-                            .activate(device, kind, self.memory.demo_graph(self.config.memory.colors));
+                        self.colorpicker.activate(
+                            device,
+                            kind,
+                            self.memory.demo_graph(self.config.memory.colors),
+                        );
                     }
                     DeviceKind::Network(variant) => {
                         let (network, config) = network_select!(self, variant);
@@ -660,8 +696,11 @@ impl cosmic::Application for Minimon {
                             if let (Some(config), Some(gpu)) =
                                 (self.config.gpus.get(&id), self.gpus.get(&id))
                             {
-                                self.colorpicker
-                                    .activate(device, kind, gpu.demo_gpu_graph(config.gpu_colors));
+                                self.colorpicker.activate(
+                                    device,
+                                    kind,
+                                    gpu.demo_gpu_graph(config.gpu_colors),
+                                );
                             } else {
                                 error!("no config for selected GPU {}", id);
                             }
@@ -676,8 +715,11 @@ impl cosmic::Application for Minimon {
                                 (self.config.gpus.get(&id), self.gpus.get(&id))
                             {
                                 debug!("Vram 2");
-                                self.colorpicker
-                                    .activate(device, kind, gpu.demo_vram_graph(config.vram_colors));
+                                self.colorpicker.activate(
+                                    device,
+                                    kind,
+                                    gpu.demo_vram_graph(config.vram_colors),
+                                );
                             } else {
                                 error!("no config for selected GPU {}", id);
                             }
@@ -811,6 +853,10 @@ impl cosmic::Application for Minimon {
                         self.cpu.set_graph_kind(kind);
                         self.config.cpu.kind = kind;
                     }
+                    DeviceKind::CpuTemp => {
+                        self.cputemp.set_graph_kind(kind);
+                        self.config.cputemp.kind = kind;
+                    }
                     DeviceKind::Memory => {
                         self.memory.set_graph_kind(kind);
                         self.config.memory.kind = kind;
@@ -878,6 +924,17 @@ impl cosmic::Application for Minimon {
                 self.save_config();
             }
 
+            Message::ToggleCpuTempChart(toggled) => {
+                info!("Message::ToggleCpuTempChart({:?})", toggled);
+                self.config.cputemp.chart = toggled;
+                self.save_config();
+            }
+
+            Message::SelectCpuTempUnit(unit) => {
+                info!("Message::SelectCpuTempUnit({:?})", unit);
+                self.config.cputemp.unit = unit;
+                self.save_config();
+            }
             Message::ToggleMemoryChart(toggled) => {
                 info!("Message::ToggleMemoryChart({:?})", toggled);
                 self.config.memory.chart = toggled;
@@ -894,6 +951,12 @@ impl cosmic::Application for Minimon {
             Message::ToggleCpuLabel(toggled) => {
                 info!("Message::ToggleCpuLabel({:?})", toggled);
                 self.config.cpu.label = toggled;
+                self.save_config();
+            }
+
+            Message::ToggleCpuTempLabel(toggled) => {
+                info!("Message::ToggleCpuTempLabel({:?})", toggled);
+                self.config.cputemp.label = toggled;
                 self.save_config();
             }
 
@@ -922,6 +985,9 @@ impl cosmic::Application for Minimon {
                 self.tick_timer = self.config.refresh_rate as i64;
                 self.cpu.set_colors(self.config.cpu.colors);
                 self.cpu.set_graph_kind(self.config.cpu.kind);
+                self.cputemp.set_colors(self.config.cputemp.colors);
+                self.cputemp.set_graph_kind(self.config.cputemp.kind);
+                self.cputemp.set_unit(self.config.cputemp.unit);
                 self.memory.set_colors(self.config.memory.colors);
                 self.memory.set_graph_kind(self.config.memory.kind);
                 self.memory.set_percentage(self.config.memory.percentage);
@@ -1239,6 +1305,34 @@ impl Minimon {
         elements
     }
 
+    fn cpu_temp_panel_ui(&self, _horizontal: bool) -> Vec<Element<crate::app::Message>> {
+        let mut elements: Vec<Element<Message>> = Vec::new();
+
+        if self.cputemp.is_found() {
+            // Handle the symbols button if needed
+            if self.config.symbols && (self.config.cputemp.label || self.config.cputemp.chart) {
+                let btn = self.core.applet.icon_button(TEMP_ICON);
+                elements.push(btn.into());
+            }
+
+            // Add the CPU label if needed
+            if self.config.cputemp.label {
+                elements.push(self.figure_label(self.cputemp.to_string()).into());
+            }
+
+            // Add the CPU chart if needed
+            if self.config.cputemp.chart {
+                let content = self
+                    .core
+                    .applet
+                    .icon_button_from_handle(Minimon::make_icon_handle(&self.cputemp));
+                elements.push(content.into());
+            }
+        }
+
+        elements
+    }
+
     fn memory_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
         let mut elements: Vec<Element<Message>> = Vec::new();
 
@@ -1478,10 +1572,8 @@ impl Minimon {
                     widget::vertical_space().into(),
                 ];
                 elements.push(Column::from_vec(gpu_labels).into());
-
             } else if config.gpu_label {
                 elements.push(self.figure_label(formatted_gpu).into());
-
             }
 
             if config.gpu_chart {
@@ -1542,6 +1634,10 @@ impl Minimon {
             DeviceKind::Cpu => {
                 self.config.cpu.colors = colors;
                 self.cpu.set_colors(colors);
+            }
+            DeviceKind::CpuTemp => {
+                self.config.cputemp.colors = colors;
+                self.cputemp.set_colors(colors);
             }
             DeviceKind::Memory => {
                 self.config.memory.colors = colors;
@@ -1617,6 +1713,10 @@ impl Minimon {
         let all = self.popup.is_some();
 
         self.cpu.update();
+
+        if all || self.config.cputemp.is_visible() {
+            self.cputemp.update();
+        }
 
         if all || self.config.memory.is_visible() {
             self.memory.update();

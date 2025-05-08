@@ -6,7 +6,7 @@ use cosmic::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::fl;
+use crate::{fl, sensors::TempUnit};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum ColorVariant {
@@ -44,6 +44,7 @@ impl From<GraphKind> for usize {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeviceKind {
     Cpu,
+    CpuTemp,
     Memory,
     Network(NetworkVariant),
     Disks(DisksVariant),
@@ -55,6 +56,7 @@ impl std::fmt::Display for DeviceKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             DeviceKind::Cpu => write!(f, "{}", fl!("sensor-cpu")),
+            DeviceKind::CpuTemp => write!(f, "{}", fl!("sensor-cpu-temperature")),
             DeviceKind::Memory => write!(f, "{}", fl!("sensor-memory")),
             DeviceKind::Network(_) => write!(f, "{}", fl!("sensor-network")),
             DeviceKind::Disks(_) => write!(f, "{}", fl!("sensor-disks")),
@@ -88,6 +90,8 @@ impl GraphColors {
     pub fn new(kind: DeviceKind) -> Self {
         match kind {
             DeviceKind::Cpu => GraphColors::default(),
+            DeviceKind::CpuTemp => GraphColors::default(),
+          
             DeviceKind::Memory => GraphColors {
                 color4: Srgba::from_components((187, 41, 187, 255)),
                 ..Default::default()
@@ -153,6 +157,40 @@ impl Default for CpuConfig {
             kind: GraphKind::Ring,
             colors: GraphColors::new(DeviceKind::Cpu),
         }
+    }
+}
+
+impl CpuConfig {
+    pub fn is_visible(&self) -> bool {
+        self.chart || self.label
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
+#[version = 1]
+pub struct CpuTempConfig {
+    pub chart: bool,
+    pub label: bool,
+    pub kind: GraphKind,
+    pub colors: GraphColors,
+    pub unit: TempUnit,
+}
+
+impl Default for CpuTempConfig {
+    fn default() -> Self {
+        Self {
+            chart: false,
+            label: false,
+            kind: GraphKind::Ring,
+            colors: GraphColors::new(DeviceKind::CpuTemp),
+            unit: TempUnit::Celcius,
+        }
+    }
+}
+
+impl CpuTempConfig {
+    pub fn is_visible(&self) -> bool {
+        self.chart || self.label
     }
 }
 
@@ -302,6 +340,7 @@ pub struct MinimonConfig {
     pub monospace_labels: bool,
 
     pub cpu: CpuConfig,
+    pub cputemp: CpuTempConfig,
     pub memory: MemoryConfig,
 
     pub network1: NetworkConfig,
@@ -325,6 +364,7 @@ impl Default for MinimonConfig {
             label_size_default: 11,
             monospace_labels: false,
             cpu: CpuConfig::default(),
+            cputemp: CpuTempConfig::default(),
             memory: MemoryConfig::default(),
             network1: NetworkConfig::default(),
             network2: NetworkConfig::default(),
