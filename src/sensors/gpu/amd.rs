@@ -246,14 +246,9 @@ impl super::GpuIf for AmdGpu {
 
     fn usage(&self) -> Result<u32> {
         if !self.is_active() {
-            debug!("AmdGpu::usage({}) - AMD device paused.", self.name);
             return Err(anyhow!("AMD device paused"));
         }
         if !self.powered_on() {
-            debug!(
-                "AmdGpu::usage({}) - AMD device sleeping, returning 0.",
-                self.name
-            );
             return Ok(0);
         }
         Ok(Self::parse_u32_file(&self.usage_path).unwrap_or(0))
@@ -261,7 +256,6 @@ impl super::GpuIf for AmdGpu {
 
     fn vram_used(&self) -> Result<u64> {
         if !self.is_active() {
-            debug!("AmdGpu::vram_used({}) - AMD device paused.", self.name);
             return Err(anyhow!("AMD device paused"));
         }
         if !self.powered_on() {

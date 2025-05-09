@@ -261,8 +261,10 @@ impl CpuTemp {
             let name_path = path.join("name");
 
             if let Ok(sensor_name) = fs::read_to_string(&name_path) {
+                info!("Found: {:?} named {}",name_path, sensor_name);
                 let sensor_name = sensor_name.trim();
                 if sensor_name.contains("coretemp")
+                    || sensor_name.contains("zenpower")
                     || sensor_name.contains("k10temp")
                     || sensor_name.contains("cpu")
                 {
@@ -273,6 +275,7 @@ impl CpuTemp {
                             let input_path = path.join(format!("temp{}_{}", i, "input"));
                             let crit_path = path.join(format!("temp{}_{}", i, suffix));
                             if crit_path.exists() && input_path.exists() {
+                                info!("Found data: {:?}, {:?}", input_path, crit_path);
                                 if let Ok(raw) = fs::read_to_string(&crit_path) {
                                     if let Ok(millidegrees) = raw.trim().parse::<f32>() {
                                         critical_temp = Some(millidegrees / 1000.0);
