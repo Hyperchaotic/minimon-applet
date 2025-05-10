@@ -14,6 +14,12 @@ pub enum TempUnit {
     Rankine,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CpuVariant {
+    Amd,
+    Intel,
+}
+
 pub trait Sensor {
     fn graph_kind(&self) -> GraphKind;
     fn set_graph_kind(&mut self, kind: GraphKind);
@@ -23,11 +29,11 @@ pub trait Sensor {
     fn settings_ui(&self, config: &MinimonConfig) -> Element<crate::app::Message>;
 }
 
-pub mod gpus;
-pub mod gpu;
-pub mod cputemp;
 pub mod cpu;
+pub mod cputemp;
 pub mod disks;
+pub mod gpu;
+pub mod gpus;
 pub mod memory;
 pub mod network;
 

@@ -31,7 +31,7 @@ use std::{
 use std::fs::read_dir;
 use std::io;
 
-use super::{Sensor, TempUnit};
+use super::{CpuVariant, Sensor, TempUnit};
 
 const MAX_SAMPLES: usize = 21;
 
@@ -84,7 +84,7 @@ const UNIT_OPTIONS: [&str; 4] = ["Celcius", "Farenheit", "Kelvin", "Rankine"];
 pub struct HwmonTemp {
     pub temp_paths: Vec<PathBuf>,
     pub crit_temp: f64,
-    pub label: String,
+    pub cpu: super::CpuVariant,
 }
 
 impl HwmonTemp {
@@ -132,7 +132,7 @@ impl HwmonTemp {
                 }
 
                 // Prioritize Tdie > Tctl
-                if let Some((path, label)) = tdie.or(tctl) {
+                if let Some((path, _label)) = tdie.or(tctl) {
                     let crit_path = hwmon.join("temp1_crit");
                     let crit_temp = fs::read_to_string(&crit_path)
                         .ok()
@@ -143,13 +143,13 @@ impl HwmonTemp {
                     return Ok(Some(HwmonTemp {
                         temp_paths: vec![path.clone()],
                         crit_temp,
-                        label: label.clone(),
+                        cpu: CpuVariant::Amd,
                     }));
                 } else if !core_fallbacks.is_empty() {
                     return Ok(Some(HwmonTemp {
                         temp_paths: core_fallbacks.iter().map(|(p, _)| p.clone()).collect(),
                         crit_temp: 100.0,
-                        label: "Core temps".into(),
+                        cpu: CpuVariant::Intel,
                     }));
                 }
             }
@@ -355,10 +355,32 @@ impl Sensor for CpuTemp {
             .spacing(cosmic.space_xs()),
         ));
 
-        Row::with_children(temp_elements)
-            .align_y(Alignment::Center)
-            .spacing(0)
-            .into()
+        let mut expl = String::with_capacity(128);
+        if let Some(hw) = &self.hwmon_temp {
+            if hw.cpu == super::CpuVariant::Amd {
+                _ = write!(
+                    expl,
+                    "For AMD processors shows 'Tdie' (true die temperature) if found, otherwise show 'Tctl' (temperature with an offset set by AMD)."
+                );
+                temp_elements.push(widget::text::body("For AMD shows 'Tdie' (true die temperature) if found, otherwise show 'Tctl' (temperature with an offset set by AMD).").into());
+            } else {
+                _ = write!(
+                    expl,
+                    "For Intel processors shows single highest temperature found across all sensors/cores.",
+                );
+            }
+        }
+
+        column!(
+            Element::from(widget::text::body(expl)),
+            Element::from(
+                Row::with_children(temp_elements)
+                    .align_y(Alignment::Center)
+                    .spacing(0)
+            )
+        )
+        .spacing(10)
+        .into()
     }
 }
 
