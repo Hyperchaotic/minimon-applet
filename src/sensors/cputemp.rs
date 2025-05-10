@@ -280,7 +280,11 @@ impl Sensor for CpuTemp {
             GraphKind::Ring => {
                 let latest = self.latest_sample();
                 let mut value = self.to_string();
-                let _ = value.pop(); // remove the C/F/K unit
+
+                // remove the C/F/K unit if there's not enough space
+                if value.len() > 3 {
+                    let _ = value.pop();
+                }
                 let mut percentage = String::with_capacity(10);
 
                 write!(percentage, "{latest}").unwrap();
