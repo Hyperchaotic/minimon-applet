@@ -119,6 +119,7 @@ impl DemoGraph for Cpu {
                 self.max_val,
                 &self.svg_colors,
             ),
+            _ => panic!("Wrong graph choice!"),
         }
     }
 
@@ -183,10 +184,10 @@ impl Sensor for Cpu {
 
             if latest < 10.0 {
                 write!(value, "{:.2}", latest).unwrap();
-            } else if latest < 100.0 {
+            } else if latest <= 99.9 {
                 write!(value, "{:.1}", latest).unwrap();
             } else {
-                write!(value, "{}", latest).unwrap();
+                write!(value, "100").unwrap();
             }
             write!(percentage, "{latest}").unwrap();
 

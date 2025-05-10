@@ -1,3 +1,5 @@
+use log::info;
+
 use std::collections::VecDeque;
 
 use cosmic::cosmic_theme::palette::Srgba;
@@ -230,6 +232,90 @@ pub fn line_adaptive(
     svg
 }
 
+use plotters::prelude::*;
+use plotters_svg::SVGBackend;
+
+/// Render temperature as SVG area chart
+pub fn heat(
+    samples: &VecDeque<f64>,
+    max: f64,
+    colors: &SvgColors,
+) -> Result<String, Box<dyn std::error::Error>> {
+    use plotters::style::RGBColor;
+    let width: u32 = 42;
+    let height: u32 = 42;
+
+    /// Returns orange-to-red gradient, ending in pure red (255,0,0) at 95%+
+    pub fn temp_color(pct: f64) -> RGBColor {
+        let pct = pct.clamp(0.0, 1.0);
+
+        if pct <= 0.6 {
+            // 0% to 60%: dark orange ramp
+            let t = pct / 0.6;
+            let r = (150.0 + 105.0 * t) as u8; // 150 → 255
+            let g = (60.0 + 75.0 * t) as u8; // 60 → 135
+            RGBColor(r, g, 0)
+        } else {
+            // 60% to 95%: fade green to 0, red stays at 255
+            let t = ((pct - 0.6) / 0.35).clamp(0.0, 1.0);
+            let g = (135.0 * (1.0 - t)) as u8; // 135 → 0
+            RGBColor(255, g, 0)
+        }
+    }
+
+    let mut svg = String::new();
+    {
+        let backend = SVGBackend::with_string(&mut svg, (width, height));
+        let root = backend.into_drawing_area();
+        let chart_area = root.margin(1, 1, 1, 0);
+
+        let max_len = samples.len().max(2);
+        let mut chart = ChartBuilder::on(&chart_area)
+            .margin(0)
+            .build_cartesian_2d(0..(max_len - 1), 0f64..max)?;
+
+        chart.configure_mesh().disable_mesh().draw()?;
+
+        for i in 0..(samples.len().saturating_sub(1)) {
+            let x0 = i;
+            let x1 = i + 1;
+            let y0 = samples[i];
+            let y1 = samples[i + 1];
+
+            let avg_pct = ((y0 + y1) / 2.0 / max).clamp(0.0, 1.0);
+            let color = temp_color(avg_pct);
+
+            let points = vec![(x0, 0.0), (x0, y0), (x1, y1), (x1, 0.0)];
+
+            chart.draw_series(std::iter::once(Polygon::new(points, &color)))?;
+        }
+
+        root.present()?;
+    }
+
+    let mut clipping = String::with_capacity(280);
+    clipping.push_str("2000/svg\">\n<defs>\n  <clipPath id=\"rounded-clip\">\n    <rect x=\"0\" y=\"0\" width=\"42\" height=\"42\" rx=\"7\" ry=\"7\"/>\n  </clipPath>\n</defs>\n<g clip-path=\"url(#rounded-clip)\">\n  <rect x=\"0\" y=\"0\" rx=\"7\" ry=\"7\" width=\"42\" height=\"42\" fill=\"");
+    clipping.push_str(&colors.color1);
+    clipping.push_str("\" stroke=\"");
+    clipping.push_str(&colors.color2);
+    clipping.push_str("\"/>");
+
+    let mut end = String::with_capacity(112);
+    end.push_str(RECT1);
+    end.push_str(&colors.color2);
+    end.push_str(RECT2);
+
+    // Inject clip path and g group
+    let injected = svg
+        .replacen("2000/svg\">", &clipping, 1)
+        .replacen("</svg>", &end, 1);
+
+    Ok(injected)
+}
+
+const RECT1: &str = "<rect x=\"0\" y=\"0\" rx=\"7\" ry=\"7\" width=\"42\" height=\"42\" fill=\"#00000000\" stroke=\""; // frame color placeholder
+const RECT2: &str = r#""/></g></svg>"#;
+
 const LINESVG_1: &str = r#"<svg width="42" height="42" viewBox="0 0 42 42" xmlns="http://www.w3.org/2000/svg">
 <defs>
   <clipPath id="rounded-clip">
@@ -260,7 +346,7 @@ const RINGSVG_1: &str = r#"
 
 const RINGSVG_1_1: &str = r#"" stroke=""#;
 
-const RINGSVG_2: &str = r#"" 
+const RINGSVG_2: &str = r#""
 stroke-width="2"
 />
 <path

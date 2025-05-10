@@ -1000,10 +1000,6 @@ impl cosmic::Application for Minimon {
                 self.set_network_max_y(NetworkVariant::Download);
                 self.set_network_max_y(NetworkVariant::Upload);
                 self.set_tick();
-                print!(
-                    "disk1 - {:?}. disk2 - {:?}.",
-                    self.config.disks1.variant, self.config.disks2.variant
-                )
             }
 
             Message::ColorTextInputRedChanged(value) => {
@@ -1624,7 +1620,7 @@ impl Minimon {
             MinimonConfig::VERSION,
         ) {
             if let Err(err) = self.config.write_entry(&helper) {
-                println!("Error writing config {err}");
+                info!("Error writing config {err}");
             }
         }
     }
@@ -1907,7 +1903,7 @@ impl Minimon {
                 .filter_map(Result::ok)
                 .any(|entry| entry.file_name().to_string_lossy().starts_with("BAT")),
             Err(e) => {
-                eprintln!("Could not read power supply info: {}", e);
+                info!("Could not read power supply info: {}", e);
                 false
             }
         }

@@ -13,8 +13,8 @@ use cosmic::widget::{settings, toggler};
 
 use cosmic::{
     iced::{
-        widget::{column, row},
         Alignment,
+        widget::{column, row},
     },
     iced_widget::Row,
 };
@@ -90,6 +90,7 @@ impl DemoGraph for Memory {
                 self.max_val,
                 &self.svg_colors,
             ),
+            _ => panic!("Wrong graph choice!"),
         }
     }
 

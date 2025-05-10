@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use cosmic::{
-    cosmic_config::{self, cosmic_config_derive::CosmicConfigEntry, CosmicConfigEntry},
+    cosmic_config::{self, CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry},
     cosmic_theme::palette::Srgba,
 };
 use serde::{Deserialize, Serialize};
@@ -20,6 +20,7 @@ pub enum ColorVariant {
 pub enum GraphKind {
     Ring,
     Line,
+    Heat,
 }
 
 impl From<usize> for GraphKind {
@@ -27,6 +28,7 @@ impl From<usize> for GraphKind {
         match index {
             0 => GraphKind::Ring,
             1 => GraphKind::Line,
+            2 => GraphKind::Heat,
             _ => panic!("Invalid index for SvgKind"),
         }
     }
@@ -37,6 +39,7 @@ impl From<GraphKind> for usize {
         match kind {
             GraphKind::Ring => 0,
             GraphKind::Line => 1,
+            GraphKind::Heat => 2,
         }
     }
 }
@@ -91,7 +94,7 @@ impl GraphColors {
         match kind {
             DeviceKind::Cpu => GraphColors::default(),
             DeviceKind::CpuTemp => GraphColors::default(),
-          
+
             DeviceKind::Memory => GraphColors {
                 color4: Srgba::from_components((187, 41, 187, 255)),
                 ..Default::default()
@@ -350,7 +353,7 @@ pub struct MinimonConfig {
     pub disks2: DisksConfig,
 
     pub gpus: HashMap<String, GpuConfig>,
-    
+
     pub sysmon: usize,
 
     pub symbols: bool,

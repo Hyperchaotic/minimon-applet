@@ -28,6 +28,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use std::fs::read_dir;
+use std::io;
+
 use super::{Sensor, TempUnit};
 
 const MAX_SAMPLES: usize = 21;
@@ -61,14 +64,121 @@ lazy_static! {
     ];
 }
 
-const GRAPH_OPTIONS: [&str; 2] = ["Ring", "Line"];
+lazy_static! {
+    /// Translated color choices.
+    ///
+    /// The string values are intentionally leaked (`.leak()`) to convert them
+    /// into `'static str` because:
+    /// - These strings are only initialized once at program startup.
+    /// - They are never deallocated since they are used globally.
+    static ref COLOR_CHOICES_HEAT: [(&'static str, ColorVariant); 2] = [
+        (fl!("graph-line-back").leak(), ColorVariant::Color1),
+        (fl!("graph-line-frame").leak(), ColorVariant::Color2),
+    ];
+}
+
+const GRAPH_OPTIONS: [&str; 3] = ["Ring", "Line", "Heat"];
 const UNIT_OPTIONS: [&str; 4] = ["Celcius", "Farenheit", "Kelvin", "Rankine"];
 
 #[derive(Debug)]
+pub struct HwmonTemp {
+    pub temp_paths: Vec<PathBuf>,
+    pub crit_temp: f64,
+    pub label: String,
+}
+
+impl HwmonTemp {
+    /// Initialize and return the most relevant CPU temperature sensors
+    pub fn find_cpu_sensor() -> io::Result<Option<HwmonTemp>> {
+        info!("Find CPU temperature sensor");
+        let hwmon_base = Path::new("/sys/class/hwmon");
+
+        for entry in read_dir(hwmon_base)? {
+            let hwmon = entry?.path();
+            let name_path = hwmon.join("name");
+
+            let Ok(name) = fs::read_to_string(&name_path) else {
+                continue;
+            };
+            let name = name.trim().to_lowercase();
+            info!("  path: {:?}. name: {}", name_path, name);
+
+            if name.contains("coretemp") || name.contains("k10temp") || name.contains("cpu") {
+                let mut tdie: Option<(PathBuf, String)> = None;
+                let mut tctl: Option<(PathBuf, String)> = None;
+                let mut core_fallbacks = vec![];
+
+                for i in 0..100 {
+                    let label_path = hwmon.join(format!("temp{}_label", i));
+                    let input_path = hwmon.join(format!("temp{}_input", i));
+
+                    if !input_path.exists() {
+                        continue;
+                    }
+                    if let Ok(label) = fs::read_to_string(&label_path) {
+                        let label = label.trim();
+
+                        if label.eq_ignore_ascii_case("Tdie") {
+                            info!("  found sensor {:?} {}", label_path, label);
+                            tdie = Some((input_path.clone(), label.to_string()));
+                        } else if label.eq_ignore_ascii_case("Tctl") {
+                            info!("  found sensor {:?} {}", label_path, label);
+                            tctl = Some((input_path.clone(), label.to_string()));
+                        } else if label.starts_with("Core") || label.contains("Package") {
+                            info!("  found sensor {:?} {}", label_path, label);
+                            core_fallbacks.push((input_path.clone(), label.to_string()));
+                        }
+                    }
+                }
+
+                // Prioritize Tdie > Tctl
+                if let Some((path, label)) = tdie.or(tctl) {
+                    let crit_path = hwmon.join("temp1_crit");
+                    let crit_temp = fs::read_to_string(&crit_path)
+                        .ok()
+                        .and_then(|v| v.trim().parse::<f64>().ok())
+                        .map(|v| v / 1000.0)
+                        .unwrap_or(100.0);
+
+                    return Ok(Some(HwmonTemp {
+                        temp_paths: vec![path.clone()],
+                        crit_temp,
+                        label: label.clone(),
+                    }));
+                } else if !core_fallbacks.is_empty() {
+                    return Ok(Some(HwmonTemp {
+                        temp_paths: core_fallbacks.iter().map(|(p, _)| p.clone()).collect(),
+                        crit_temp: 100.0,
+                        label: "Core temps".into(),
+                    }));
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Read current max temperature from all tracked sensor paths
+    pub fn read_temp(&self) -> io::Result<f32> {
+        let mut max_temp = f32::MIN;
+
+        for path in &self.temp_paths {
+            let raw = fs::read_to_string(path)?;
+            let millideg: i32 = raw.trim().parse().map_err(|e| {
+                io::Error::new(io::ErrorKind::InvalidData, format!("Parse error: {e}"))
+            })?;
+            let temp_c = millideg as f32 / 1000.0;
+            max_temp = max_temp.max(temp_c);
+        }
+
+        Ok(max_temp)
+    }
+}
+
+#[derive(Debug)]
 pub struct CpuTemp {
-    hwmon_path: Option<PathBuf>,
+    hwmon_temp: Option<HwmonTemp>,
     samples: VecDeque<f64>,
-    max_val: f32,
     colors: GraphColors,
     kind: GraphKind,
     graph_options: Vec<&'static str>,
@@ -83,16 +193,28 @@ impl DemoGraph for CpuTemp {
         match self.kind {
             GraphKind::Ring => {
                 // show a number of 40% of max
-                let val = self.max_val as f64 * 0.4;
-                let percentage: u64 = ((val / self.max_val as f64) * 100.0) as u64;
-                crate::svg_graph::ring(
+                let val = 40;
+                let percentage: u64 = 40;
+                return crate::svg_graph::ring(
                     &format!("{val}"),
                     &format!("{percentage}"),
                     &self.svg_colors,
-                )
+                );
             }
             GraphKind::Line => {
-                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100, &self.svg_colors)
+                return crate::svg_graph::line(
+                    &VecDeque::from(DEMO_SAMPLES),
+                    100,
+                    &self.svg_colors,
+                );
+            }
+            GraphKind::Heat => {
+                return crate::svg_graph::heat(
+                    &VecDeque::from(DEMO_SAMPLES),
+                    100.0,
+                    &self.svg_colors,
+                )
+                .unwrap();
             }
         }
     }
@@ -107,10 +229,10 @@ impl DemoGraph for CpuTemp {
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        if self.kind == GraphKind::Line {
-            (*COLOR_CHOICES_LINE).into()
-        } else {
-            (*COLOR_CHOICES_RING).into()
+        match self.kind {
+            GraphKind::Line => (*COLOR_CHOICES_LINE).into(),
+            GraphKind::Ring => (*COLOR_CHOICES_RING).into(),
+            GraphKind::Heat => (*COLOR_CHOICES_HEAT).into(),
         }
     }
 
@@ -125,16 +247,21 @@ impl Sensor for CpuTemp {
     }
 
     fn set_graph_kind(&mut self, kind: GraphKind) {
-        assert!(kind == GraphKind::Line || kind == GraphKind::Ring);
+        assert!(kind == GraphKind::Line || kind == GraphKind::Ring || kind == GraphKind::Heat);
         self.kind = kind;
     }
 
     fn update(&mut self) {
-        if let Some(temp) = self.read_temp() {
-            if self.samples.len() >= MAX_SAMPLES {
-                self.samples.pop_front();
+        if let Some(hw) = &self.hwmon_temp {
+            match hw.read_temp() {
+                Ok(temp) => {
+                    if self.samples.len() >= MAX_SAMPLES {
+                        self.samples.pop_front();
+                    }
+                    self.samples.push_back(temp as f64);
+                }
+                Err(e) => info!("Error reading temp data {:?}", e),
             }
-            self.samples.push_back(temp as f64);
         }
     }
 
@@ -145,17 +272,25 @@ impl Sensor for CpuTemp {
     }
 
     fn graph(&self) -> String {
-        if self.kind == GraphKind::Ring {
-            let latest = self.latest_sample();
-            let mut value = self.to_string();
-            let _ = value.pop(); // remove the C/F/K unit
-            let mut percentage = String::with_capacity(10);
+        let mut max: f64 = 100.0;
+        if let Some(hwmon) = &self.hwmon_temp {
+            max = hwmon.crit_temp;
+        }
+        match self.kind {
+            GraphKind::Ring => {
+                let latest = self.latest_sample();
+                let mut value = self.to_string();
+                let _ = value.pop(); // remove the C/F/K unit
+                let mut percentage = String::with_capacity(10);
 
-            write!(percentage, "{latest}").unwrap();
+                write!(percentage, "{latest}").unwrap();
 
-            crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
-        } else {
-            crate::svg_graph::line(&self.samples, self.max_val as u64, &self.svg_colors)
+                crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
+            }
+            GraphKind::Line => crate::svg_graph::line(&self.samples, max as u64, &self.svg_colors),
+            GraphKind::Heat => {
+                crate::svg_graph::heat(&self.samples, max, &self.svg_colors).unwrap()
+            }
         }
     }
 
@@ -166,6 +301,7 @@ impl Sensor for CpuTemp {
         let mut temp_elements = Vec::new();
 
         let temp = self.to_string();
+
         temp_elements.push(Element::from(
             column!(
                 widget::svg(widget::svg::Handle::from_memory(
@@ -224,23 +360,21 @@ impl Sensor for CpuTemp {
 
 impl CpuTemp {
     pub fn new(kind: GraphKind) -> Self {
-        let mut max_val = 100.0;
-        let mut hwmon_path = None;
+        let mut hwmon = None;
 
-        match Self::detect() {
-            Ok((path, max)) => {
-                hwmon_path = path;
-                if let Some(max) = max {
-                    max_val = max;
+        match HwmonTemp::find_cpu_sensor() {
+            Ok(hwmon_option) => {
+                hwmon = hwmon_option;
+                if hwmon.is_none() {
+                    info!("CpuTemp:detect: No CPU Temp IF found.");
                 }
             }
             Err(e) => info!("CpuTemp:detect: No CPU Temp IF found. {:?}", e),
         }
 
         let mut cpu = CpuTemp {
-            hwmon_path,
+            hwmon_temp: hwmon,
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
-            max_val,
             colors: GraphColors::default(),
             kind,
             graph_options: GRAPH_OPTIONS.to_vec(),
@@ -252,86 +386,13 @@ impl CpuTemp {
         cpu
     }
 
-    pub fn detect() -> std::io::Result<(Option<PathBuf>, Option<f32>)> {
-        let hwmon_base = Path::new("/sys/class/hwmon");
-
-        for entry in fs::read_dir(hwmon_base)? {
-            let entry = entry?;
-            let path = entry.path();
-            let name_path = path.join("name");
-
-            if let Ok(sensor_name) = fs::read_to_string(&name_path) {
-                info!("Found: {:?} named {}",name_path, sensor_name);
-                let sensor_name = sensor_name.trim();
-                if sensor_name.contains("coretemp")
-                    || sensor_name.contains("zenpower")
-                    || sensor_name.contains("k10temp")
-                    || sensor_name.contains("cpu")
-                {
-                    // Try to find a critical or max temp once
-                    let mut critical_temp = None;
-                    for i in 1..=99 {
-                        for suffix in &["crit", "max"] {
-                            let input_path = path.join(format!("temp{}_{}", i, "input"));
-                            let crit_path = path.join(format!("temp{}_{}", i, suffix));
-                            if crit_path.exists() && input_path.exists() {
-                                info!("Found data: {:?}, {:?}", input_path, crit_path);
-                                if let Ok(raw) = fs::read_to_string(&crit_path) {
-                                    if let Ok(millidegrees) = raw.trim().parse::<f32>() {
-                                        critical_temp = Some(millidegrees / 1000.0);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        if critical_temp.is_some() {
-                            break;
-                        }
-                    }
-
-                    info!("CpuTemp::detect: CPUTemp IF found in {:?}", path);
-                    return Ok((Some(path), critical_temp));
-                }
-            }
-        }
-
-        Ok((None, None))
-    }
-
-    /// Read current max CPU temperature across all cores
-    pub fn read_temp(&self) -> Option<f32> {
-        let mut max_temp = f32::MIN;
-
-        if let Some(path) = &self.hwmon_path {
-            for i in 1..=99 {
-                let temp_path = path.join(format!("temp{}_input", i));
-                if temp_path.exists() {
-                    if let Ok(raw) = fs::read_to_string(&temp_path) {
-                        if let Ok(millidegrees) = raw.trim().parse::<f32>() {
-                            let degrees = millidegrees / 1000.0;
-                            if degrees > max_temp {
-                                max_temp = degrees;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if max_temp > f32::MIN {
-            Some(max_temp)
-        } else {
-            None
-        }
-    }
-
     // true if a CPU temperature hwmon path was found
     pub fn is_found(&self) -> bool {
-        self.hwmon_path.is_some()
+        self.hwmon_temp.is_some()
     }
 
     pub fn set_unit(&mut self, unit: TempUnit) {
         self.tempunit = unit;
-
     }
 
     pub fn latest_sample(&self) -> f64 {
@@ -348,7 +409,7 @@ impl fmt::Display for CpuTemp {
             TempUnit::Celcius => write!(f, "{}C", current_val.trunc()),
             TempUnit::Farenheit => write!(f, "{}F", (current_val * 9.0 / 5.0 + 32.0).trunc()),
             TempUnit::Kelvin => write!(f, "{}K", (current_val + 273.15).trunc()),
-            TempUnit::Rankine => write!(f, "{}R", (current_val * 9.0 / 5.0 + 491.67).trunc()),            
+            TempUnit::Rankine => write!(f, "{}R", (current_val * 9.0 / 5.0 + 491.67).trunc()),
         }
     }
 }
