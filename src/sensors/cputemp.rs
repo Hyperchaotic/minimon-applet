@@ -358,16 +358,9 @@ impl Sensor for CpuTemp {
         let mut expl = String::with_capacity(128);
         if let Some(hw) = &self.hwmon_temp {
             if hw.cpu == super::CpuVariant::Amd {
-                _ = write!(
-                    expl,
-                    "For AMD processors shows 'Tdie' (true die temperature) if found, otherwise show 'Tctl' (temperature with an offset set by AMD)."
-                );
-                temp_elements.push(widget::text::body("For AMD shows 'Tdie' (true die temperature) if found, otherwise show 'Tctl' (temperature with an offset set by AMD).").into());
+                _ = write!(expl, "{}", fl!("cpu-temp-amd"));
             } else {
-                _ = write!(
-                    expl,
-                    "For Intel processors shows single highest temperature found across all sensors/cores.",
-                );
+                _ = write!(expl, "{}", fl!("cpu-temp-intel"));
             }
         }
 
