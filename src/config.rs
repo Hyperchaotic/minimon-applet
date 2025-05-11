@@ -182,9 +182,9 @@ pub struct CpuTempConfig {
 impl Default for CpuTempConfig {
     fn default() -> Self {
         Self {
-            chart: false,
+            chart: true,
             label: false,
-            kind: GraphKind::Ring,
+            kind: GraphKind::Heat,
             colors: GraphColors::new(DeviceKind::CpuTemp),
             unit: TempUnit::Celcius,
         }
