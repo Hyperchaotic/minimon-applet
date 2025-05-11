@@ -96,7 +96,7 @@ impl AmdGpu {
             })
     }
 
-    fn get_lspci_gpu_names() -> HashMap<String, String> {
+    fn get_lspci_gpu_names() -> Vec<(String, String)> {
         fn clean_gpu_name(model: &str) -> String {
             let (_, truncated) = model.split_once("]:").unwrap_or((model, model));
             let truncated = truncated.split("[1002:").next().unwrap_or(model);
@@ -116,7 +116,7 @@ impl AmdGpu {
                 .to_string()
         }
 
-        let mut map = HashMap::new();
+        let mut map = Vec::new();
         let output = Command::new("lspci").arg("-nn").output();
         let Ok(output) = output else {
             return map;
@@ -130,39 +130,40 @@ impl AmdGpu {
                 if let Some((slot, rest)) = line.split_once(' ') {
                     let model = rest.trim();
                     let name = clean_gpu_name(model);
-                    map.insert(slot.to_lowercase().to_string(), name);
+                    map.push((slot.to_lowercase().to_string(), name));
                 }
             }
         }
         map
     }
 
-    fn get_gpu_name(card: &str, lspci_map: &HashMap<String, String>) -> String {
-        debug!("Resolving GPU name for card: {}", card);
+    fn get_gpu_name(card: &str, lspci_map: &Vec<(String, String)>) -> String {
+        info!("Resolving GPU name for card: {}", card);
 
-        let pci_slot = AmdGpu::get_pci_slot(card);
-        debug!("Resolved PCI slot for card {}: {:?}", card, pci_slot);
-
-        if let Some(slot) = &pci_slot {
-            if let Some(name) = lspci_map.get(slot) {
-                debug!("Found name in lspci_map: {}", name);
-                return name.clone();
-            } else {
-                debug!("No entry in lspci_map for slot: {}", slot);
-            }
-        }
-
-        let device_id_path = format!("/sys/class/drm/{}/device", card);
+        // Use static lookup table first, with nice names
+        let device_id_path = format!("/sys/class/drm/{}/device/subsystem_device", card);
         if let Ok(dev_id) = AmdGpu::read_file_to_string(&device_id_path) {
-            debug!("Read device ID from sysfs: {}", dev_id);
+            info!("Read device ID from sysfs: {}", dev_id);
             if let Some(name) = AMD_GPU_DEVICE_IDS.get(dev_id.to_uppercase().as_str()) {
                 debug!("Found name in static map: {}", name);
                 return name.to_string();
             } else {
-                debug!("No entry in static map for device ID: {}", dev_id);
+                info!("No entry in static map for device ID: {}", dev_id);
             }
         } else {
             debug!("Failed to read device ID from path: {}", device_id_path);
+        }
+
+        // Fallback: Get PCI slot and look for it in the lspci list
+        if let Some(slot) = &AmdGpu::get_pci_slot(card) {
+            info!("Resolved PCI slot for card {}: {:?}", card, slot);
+            for (p, n) in lspci_map {
+                if slot.contains(p) {
+                    info!("Found name in lspci_map: {}", n);
+                    return n.clone();
+                }
+            }
+            debug!("No entry in lspci_map for slot: {}", slot);
         }
 
         debug!("Falling back to unknown GPU name");
