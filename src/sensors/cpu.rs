@@ -19,7 +19,6 @@ use cosmic::{
 
 use crate::app::Message;
 
-use lazy_static::lazy_static;
 use std::{
     collections::{HashMap, VecDeque},
     fmt::Write,
@@ -32,34 +31,24 @@ use super::Sensor;
 
 const MAX_SAMPLES: usize = 21;
 
-lazy_static! {
-    /// Translated color choices.
-    ///
-    /// The string values are intentionally leaked (`.leak()`) to convert them
-    /// into `'static str` because:
-    /// - These strings are only initialized once at program startup.
-    /// - They are never deallocated since they are used globally.
-    static ref COLOR_CHOICES_RING: [(&'static str, ColorVariant); 4] = [
+use std::sync::LazyLock;
+
+pub static COLOR_CHOICES_RING: LazyLock<[(&'static str, ColorVariant); 4]> = LazyLock::new(|| {
+    [
         (fl!("graph-ring-r1").leak(), ColorVariant::Color4),
         (fl!("graph-ring-r2").leak(), ColorVariant::Color3),
         (fl!("graph-ring-back").leak(), ColorVariant::Color1),
         (fl!("graph-ring-text").leak(), ColorVariant::Color2),
-    ];
-}
+    ]
+});
 
-lazy_static! {
-    /// Translated color choices.
-    ///
-    /// The string values are intentionally leaked (`.leak()`) to convert them
-    /// into `'static str` because:
-    /// - These strings are only initialized once at program startup.
-    /// - They are never deallocated since they are used globally.
-    static ref COLOR_CHOICES_LINE: [(&'static str, ColorVariant); 3] = [
+pub static COLOR_CHOICES_LINE: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
+    [
         (fl!("graph-line-graph").leak(), ColorVariant::Color4),
         (fl!("graph-line-back").leak(), ColorVariant::Color1),
         (fl!("graph-line-frame").leak(), ColorVariant::Color2),
-    ];
-}
+    ]
+});
 
 const GRAPH_OPTIONS: [&str; 2] = ["Ring", "Line"];
 
@@ -106,8 +95,8 @@ impl DemoGraph for Cpu {
         match self.kind {
             GraphKind::Ring => {
                 // show a number of 40% of max
-                let val = self.max_val as f64 * 0.4;
-                let percentage: u64 = ((val / self.max_val as f64) * 100.0) as u64;
+                let val = self.max_val as f32 * 0.4;
+                let percentage: u64 = ((val / self.max_val as f32) * 100.0) as u64;
                 crate::svg_graph::ring(
                     &format!("{val}"),
                     &format!("{percentage}"),
@@ -119,7 +108,7 @@ impl DemoGraph for Cpu {
                 self.max_val,
                 &self.svg_colors,
             ),
-            _ => panic!("Wrong graph choice!"),
+            GraphKind::Heat => panic!("Wrong graph choice!"),
         }
     }
 
@@ -183,9 +172,9 @@ impl Sensor for Cpu {
             let mut percentage = String::with_capacity(10);
 
             if latest < 10.0 {
-                write!(value, "{:.2}", latest).unwrap();
+                write!(value, "{latest:.2}").unwrap();
             } else if latest <= 99.9 {
-                write!(value, "{:.1}", latest).unwrap();
+                write!(value, "{latest:.1}").unwrap();
             } else {
                 write!(value, "100").unwrap();
             }
@@ -295,20 +284,15 @@ impl Cpu {
         let mut cpu_stats = HashMap::new();
 
         // Open /proc/stat file
-        let file = match File::open(Path::new("/proc/stat")) {
-            Ok(f) => f,
-            Err(_) => return cpu_stats, // Return empty HashMap if file can't be opened
+        let Ok(file) = File::open(Path::new("/proc/stat")) else {
+            return cpu_stats;
         };
 
         let reader = BufReader::new(file);
 
         // Read each line from the file
         for line in reader.lines() {
-            let line = match line {
-                Ok(l) => l,
-                Err(_) => continue, // Skip lines that can't be read
-            };
-
+            let Ok(line) = line else { continue };
             // Split line into parts
             let parts: Vec<&str> = line.split_whitespace().collect();
 
@@ -318,9 +302,8 @@ impl Cpu {
             }
 
             // Extract CPU number
-            let cpu_num = match parts[0].trim_start_matches("cpu").parse::<usize>() {
-                Ok(num) => num,
-                Err(_) => continue, // Skip if CPU number can't be parsed
+            let Ok(cpu_num) = parts[0].trim_start_matches("cpu").parse::<usize>() else {
+                continue;
             };
 
             // Ensure we have enough parts for all fields
@@ -407,7 +390,7 @@ impl Cpu {
         self.core_loads = new_cpu_loads;
 
         if counted_cores > 0 {
-            let core_count_f64 = counted_cores as f64;
+            let core_count_f64 = f64::from(counted_cores);
             self.total_cpu_load = CpuLoad {
                 user_pct: total_user_pct / core_count_f64,
                 system_pct: total_system_pct / core_count_f64,
@@ -426,14 +409,14 @@ impl fmt::Display for Cpu {
         let unit = "%";
 
         let output = if current_val < 10.0 {
-            format!("{:.2}{}", current_val, unit)
+            format!("{current_val:.2}{unit}")
         } else if current_val < 100.0 {
-            format!("{:.1}{}", current_val, unit)
+            format!("{current_val:.1}{unit}")
         } else {
-            format!("{}{}", current_val, unit)
+            format!("{current_val}{unit}")
         };
 
-        write!(f, "{}", output)
+        write!(f, "{output}")
     }
 }
 

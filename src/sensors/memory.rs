@@ -21,7 +21,6 @@ use cosmic::{
 
 use crate::app::Message;
 
-use lazy_static::lazy_static;
 use std::{collections::VecDeque, fmt::Write};
 
 use super::Sensor;
@@ -29,35 +28,24 @@ use super::Sensor;
 const GRAPH_OPTIONS: [&str; 2] = ["Ring", "Line"];
 
 const MAX_SAMPLES: usize = 21;
+use std::sync::LazyLock;
 
-lazy_static! {
-    /// Translated color choices.
-    ///
-    /// The string values are intentionally leaked (`.leak()`) to convert them
-    /// into `'static str` because:
-    /// - These strings are only initialized once at program startup.
-    /// - They are never deallocated since they are used globally.
-    static ref COLOR_CHOICES_RING: [(&'static str, ColorVariant); 4] = [
+pub static COLOR_CHOICES_RING: LazyLock<[(&'static str, ColorVariant); 4]> = LazyLock::new(|| {
+    [
         (fl!("graph-ring-r1").leak(), ColorVariant::Color4),
         (fl!("graph-ring-r2").leak(), ColorVariant::Color3),
         (fl!("graph-ring-back").leak(), ColorVariant::Color1),
         (fl!("graph-ring-text").leak(), ColorVariant::Color2),
-    ];
-}
+    ]
+});
 
-lazy_static! {
-    /// Translated color choices.
-    ///
-    /// The string values are intentionally leaked (`.leak()`) to convert them
-    /// into `'static str` because:
-    /// - These strings are only initialized once at program startup.
-    /// - They are never deallocated since they are used globally.
-    static ref COLOR_CHOICES_LINE: [(&'static str, ColorVariant); 3] = [
+pub static COLOR_CHOICES_LINE: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
+    [
         (fl!("graph-line-graph").leak(), ColorVariant::Color4),
         (fl!("graph-line-back").leak(), ColorVariant::Color1),
         (fl!("graph-line-frame").leak(), ColorVariant::Color2),
-    ];
-}
+    ]
+});
 
 #[derive(Debug)]
 pub struct Memory {
@@ -90,7 +78,7 @@ impl DemoGraph for Memory {
                 self.max_val,
                 &self.svg_colors,
             ),
-            _ => panic!("Wrong graph choice!"),
+            GraphKind::Heat => panic!("Wrong graph choice!"),
         }
     }
 
@@ -160,11 +148,11 @@ impl Sensor for Memory {
             }
 
             if latest < 10.0 {
-                write!(value, "{:.2}", latest).unwrap();
+                write!(value, "{latest:.2}").unwrap();
             } else if latest < 100.0 {
-                write!(value, "{:.1}", latest).unwrap();
+                write!(value, "{latest:.1}").unwrap();
             } else {
-                write!(value, "{}", latest).unwrap();
+                write!(value, "{latest}").unwrap();
             }
 
             crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
@@ -281,11 +269,11 @@ impl Memory {
         }
 
         if current_val < 10.0 {
-            format!("{:.2}{}", current_val, unit)
+            format!("{current_val:.2}{unit}")
         } else if current_val < 100.0 {
-            format!("{:.1}{}", current_val, unit)
+            format!("{current_val:.1}{unit}")
         } else {
-            format!("{}{}", current_val, unit)
+            format!("{current_val}{unit}")
         }
     }
 }

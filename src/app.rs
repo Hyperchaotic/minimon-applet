@@ -16,8 +16,8 @@ use cosmic::widget::{container, list, settings, spin_button, text};
 use cosmic::{Apply, Element};
 use cosmic::{widget, widget::autosize};
 
-use once_cell::sync::Lazy;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use std::sync::atomic::{self, AtomicI64};
 
 use cosmic::{
@@ -45,7 +45,7 @@ use crate::sensors::{Sensor, TempUnit};
 use crate::{config::MinimonConfig, fl};
 use cosmic::widget::Id as WId;
 
-static AUTOSIZE_MAIN_ID: Lazy<WId> = Lazy::new(|| WId::new("autosize-main"));
+static AUTOSIZE_MAIN_ID: LazyLock<WId> = std::sync::LazyLock::new(|| WId::new("autosize-main"));
 
 const TICK: i64 = 250;
 
@@ -56,39 +56,39 @@ const GPU_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-gpu";
 const NETWORK_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-network";
 const DISK_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-harddisk";
 
-use lazy_static::lazy_static;
+pub static SETTINGS_CPU_CHOICE: LazyLock<&'static str> =
+    LazyLock::new(|| fl!("settings-cpu").leak());
+pub static SETTINGS_CPU_TEMP_CHOICE: LazyLock<&'static str> =
+    LazyLock::new(|| fl!("settings-cpu-temperature").leak());
+pub static SETTINGS_MEMORY_CHOICE: LazyLock<&'static str> =
+    LazyLock::new(|| fl!("settings-memory").leak());
+pub static SETTINGS_NETWORK_CHOICE: LazyLock<&'static str> =
+    LazyLock::new(|| fl!("settings-network").leak());
+pub static SETTINGS_DISKS_CHOICE: LazyLock<&'static str> =
+    LazyLock::new(|| fl!("settings-disks").leak());
+pub static SETTINGS_GPU_CHOICE: LazyLock<&'static str> =
+    LazyLock::new(|| fl!("settings-gpu").leak());
 
-lazy_static! {
-    /// Translated color choices.
-    ///
-    /// The string values are intentionally leaked (`.leak()`) to convert them
-    /// into `'static str` because:
-    /// - These strings are only initialized once at program startup.
-    /// - They are never deallocated since they are used globally.
-    static ref SETTINGS_CPU_CHOICE: &'static str = fl!("settings-cpu").leak();
-    static ref SETTINGS_CPU_TEMP_CHOICE: &'static str = fl!("settings-cpu-temperature").leak();
-    static ref SETTINGS_MEMORY_CHOICE: &'static str = fl!("settings-memory").leak();
-    static ref SETTINGS_NETWORK_CHOICE: &'static str = fl!("settings-network").leak();
-    static ref SETTINGS_DISKS_CHOICE: &'static str = fl!("settings-disks").leak();
-    static ref SETTINGS_GPU_CHOICE: &'static str = fl!("settings-gpu").leak();
+pub static SETTINGS_GENERAL_HEADING: LazyLock<&'static str> =
+    LazyLock::new(|| fl!("settings-subpage-general").leak());
+pub static SETTINGS_BACK: LazyLock<&'static str> =
+    LazyLock::new(|| fl!("settings-subpage-back").leak());
+pub static SETTINGS_CPU_HEADING: LazyLock<&'static str> = LazyLock::new(|| fl!("cpu-title").leak());
+pub static SETTINGS_CPU_TEMP_HEADING: LazyLock<&'static str> =
+    LazyLock::new(|| fl!("cpu-temperature-title").leak());
+pub static SETTINGS_MEMORY_HEADING: LazyLock<&'static str> =
+    LazyLock::new(|| fl!("memory-title").leak());
+pub static SETTINGS_NETWORK_HEADING: LazyLock<&'static str> =
+    LazyLock::new(|| fl!("net-title").leak());
+pub static SETTINGS_DISKS_HEADING: LazyLock<&'static str> =
+    LazyLock::new(|| fl!("disks-title").leak());
 
-    static ref SETTINGS_GENERAL_HEADING: &'static str = fl!("settings-subpage-general").leak();
-    static ref SETTINGS_BACK: &'static str = fl!("settings-subpage-back").leak();
-    static ref SETTINGS_CPU_HEADING: &'static str = fl!("cpu-title").leak();
-    static ref SETTINGS_CPU_TEMP_HEADING: &'static str = fl!("cpu-temperature-title").leak();
-    static ref SETTINGS_MEMORY_HEADING: &'static str = fl!("memory-title").leak();
-    static ref SETTINGS_NETWORK_HEADING: &'static str = fl!("net-title").leak();
-    static ref SETTINGS_DISKS_HEADING: &'static str = fl!("disks-title").leak();
+// The UI requires static lifetime of dropdown items
+pub static SYSMON_LIST: LazyLock<Vec<(String, String)>> =
+    LazyLock::new(|| Minimon::get_sysmon_list());
 
-    // The UI require static lifetime of dropdown items
-    static ref SYSMON_LIST: Vec<(String, String)> = Minimon::get_sysmon_list();
-
-    static ref SYSMON_NAMES: Vec<&'static str> = SYSMON_LIST
-    .iter()
-    .map(|(_, name)| (name.as_str()))
-    .collect();
-
-}
+pub static SYSMON_NAMES: LazyLock<Vec<&'static str>> =
+    LazyLock::new(|| SYSMON_LIST.iter().map(|(_, name)| name.as_str()).collect());
 
 macro_rules! network_select {
     ($self:ident, $variant:expr) => {
@@ -259,7 +259,7 @@ impl cosmic::Application for Minimon {
 
         let is_laptop = Minimon::is_laptop();
         if is_laptop {
-            info!("Is laptop")
+            info!("Is laptop");
         }
         let app = Minimon {
             core,
@@ -297,14 +297,14 @@ impl cosmic::Application for Minimon {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        fn time_subscription(tick: std::sync::Arc<AtomicI64>) -> Subscription<time::Instant> {
+        fn time_subscription(tick: &std::sync::Arc<AtomicI64>) -> Subscription<time::Instant> {
             let atomic = tick.clone();
             let val = atomic.load(atomic::Ordering::Relaxed);
             iced::time::every(time::Duration::from_millis(val as u64))
         }
 
         Subscription::batch(vec![
-            time_subscription(self.tick.clone()).map(|_| Message::Tick),
+            time_subscription(&self.tick).map(|_| Message::Tick),
             self.core
                 .watch_config(match self.core.applet.panel_type {
                     PanelType::Panel => APP_ID_PANEL,
@@ -328,10 +328,10 @@ impl cosmic::Application for Minimon {
 
         let mut limits = Limits::NONE.min_width(1.).min_height(1.);
         if let Some(b) = self.core.applet.suggested_bounds {
-            if b.width as i32 > 0 {
+            if b.width > 0.0 {
                 limits = limits.max_width(b.width);
             }
-            if b.height as i32 > 0 {
+            if b.height > 0.0 {
                 limits = limits.max_height(b.height);
             }
         }
@@ -383,15 +383,16 @@ impl cosmic::Application for Minimon {
         };
 
         // Layout horizontally or vertically
-        let wrapper: Element<Message> = match horizontal {
-            true => Row::from_vec(elements)
+        let wrapper: Element<Message> = if horizontal {
+            Row::from_vec(elements)
                 .align_y(Alignment::Center)
                 .spacing(spacing)
-                .into(),
-            false => Column::from_vec(elements)
+                .into()
+        } else {
+            Column::from_vec(elements)
                 .align_x(Alignment::Center)
                 .spacing(spacing)
-                .into(),
+                .into()
         };
 
         let button = widget::button::custom(wrapper)
@@ -578,7 +579,7 @@ impl cosmic::Application for Minimon {
                         Message::Settings(Some(SettingsVariant::CpuTemp)),
                     ));
                 }
-                
+
                 sensor_settings = sensor_settings
                     .add(Minimon::go_next_with_item(
                         &SETTINGS_MEMORY_CHOICE,
@@ -656,7 +657,7 @@ impl cosmic::Application for Minimon {
                 }
             }
             Message::ColorPickerOpen(device, kind, id) => {
-                info!("Message::ColorPickerOpen({:?}, {:?})", kind, id);
+                info!("Message::ColorPickerOpen({kind:?}, {id:?})");
                 match device {
                     DeviceKind::Cpu => {
                         debug!("Cpu");
@@ -702,7 +703,7 @@ impl cosmic::Application for Minimon {
                                     gpu.demo_gpu_graph(config.gpu_colors),
                                 );
                             } else {
-                                error!("no config for selected GPU {}", id);
+                                error!("no config for selected GPU {id}");
                             }
                         } else {
                             error!("Id is None");
@@ -721,7 +722,7 @@ impl cosmic::Application for Minimon {
                                     gpu.demo_vram_graph(config.vram_colors),
                                 );
                             } else {
-                                error!("no config for selected GPU {}", id);
+                                error!("no config for selected GPU {id}");
                             }
                         } else {
                             error!("Id is None");
@@ -737,7 +738,7 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ColorPickerClose(save, id) => {
-                info!("Message::ColorPickerClose({})", save);
+                info!("Message::ColorPickerClose({save})");
                 if save {
                     self.set_colors(self.colorpicker.colors(), self.colorpicker.kind().0, id);
                     self.save_config();
@@ -788,7 +789,7 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ToggleNetCombined(toggle) => {
-                info!("Message::ToggleNetCombined({})", toggle);
+                info!("Message::ToggleNetCombined({toggle})");
                 if toggle.is_true() {
                     self.network1.variant = NetworkVariant::Combined;
                     self.config.network1.variant = NetworkVariant::Combined;
@@ -802,7 +803,7 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ToggleDisksCombined(toggle) => {
-                info!("Message::ToggleDisksCombined({})", toggle);
+                info!("Message::ToggleDisksCombined({toggle})");
                 if toggle.is_true() {
                     self.disks1.variant = DisksVariant::Combined;
                     self.config.disks1.variant = DisksVariant::Combined;
@@ -816,21 +817,21 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ToggleDisksChart(variant, toggled) => {
-                info!("Message::ToggleDiskChart({:?})", variant);
+                info!("Message::ToggleDiskChart({variant:?})");
                 let (_, config) = disks_select!(self, variant);
                 config.chart = toggled;
                 self.save_config();
             }
 
             Message::ToggleDisksLabel(variant, toggled) => {
-                info!("Message::ToggleDiskLabel({:?})", variant);
+                info!("Message::ToggleDiskLabel({variant:?})");
                 let (_, config) = disks_select!(self, variant);
                 config.label = toggled;
                 self.save_config();
             }
 
             Message::ToggleAdaptiveNet(variant, toggle) => {
-                info!("Message::ToggleAdaptiveNet({:?}, {:?})", variant, toggle);
+                info!("Message::ToggleAdaptiveNet({variant:?}, {toggle:?})");
                 let (network, config) = network_select!(self, variant);
                 config.adaptive = toggle;
                 if toggle {
@@ -847,7 +848,7 @@ impl cosmic::Application for Minimon {
             }
 
             Message::SelectGraphType(dev, kind) => {
-                info!("Message::SelectGraphType({:?})", dev);
+                info!("Message::SelectGraphType({dev:?})");
                 match dev {
                     DeviceKind::Cpu => {
                         self.cpu.set_graph_kind(kind);
@@ -894,14 +895,14 @@ impl cosmic::Application for Minimon {
                     self.tick_timer -= tick;
                 } else {
                     self.tick_timer = 0;
-                };
+                }
 
                 if self.is_laptop {
                     let current_on_ac = self.is_on_ac().unwrap_or(true);
                     if self.on_ac != current_on_ac {
                         self.on_ac = current_on_ac;
 
-                        for (id, gpu) in self.gpus.iter_mut() {
+                        for (id, gpu) in &mut self.gpus {
                             if let Some(c) = self.config.gpus.get(id) {
                                 if c.pause_on_battery {
                                     if current_on_ac {
@@ -919,61 +920,62 @@ impl cosmic::Application for Minimon {
             }
 
             Message::ToggleCpuChart(toggled) => {
-                info!("Message::ToggleCpuChart({:?})", toggled);
+                info!("Message::ToggleCpuChart({toggled:?})");
                 self.config.cpu.chart = toggled;
                 self.save_config();
             }
 
             Message::ToggleCpuTempChart(toggled) => {
-                info!("Message::ToggleCpuTempChart({:?})", toggled);
+                info!("Message::ToggleCpuTempChart({toggled:?})");
                 self.config.cputemp.chart = toggled;
                 self.save_config();
             }
 
             Message::SelectCpuTempUnit(unit) => {
-                info!("Message::SelectCpuTempUnit({:?})", unit);
+                info!("Message::SelectCpuTempUnit({unit:?})");
                 self.config.cputemp.unit = unit;
                 self.save_config();
             }
             Message::ToggleMemoryChart(toggled) => {
-                info!("Message::ToggleMemoryChart({:?})", toggled);
+                info!("Message::ToggleMemoryChart({toggled:?})");
                 self.config.memory.chart = toggled;
                 self.save_config();
             }
 
             Message::ToggleNetChart(variant, toggled) => {
-                info!("Message::ToggleNetChart({:?})", toggled);
+                info!("Message::ToggleNetChart({toggled:?})");
                 let (_, config) = network_select!(self, variant);
                 config.chart = toggled;
                 self.save_config();
             }
 
             Message::ToggleCpuLabel(toggled) => {
-                info!("Message::ToggleCpuLabel({:?})", toggled);
+                info!("Message::ToggleCpuLabel({toggled:?})");
                 self.config.cpu.label = toggled;
                 self.save_config();
             }
 
             Message::ToggleCpuTempLabel(toggled) => {
-                info!("Message::ToggleCpuTempLabel({:?})", toggled);
+                info!("Message::ToggleCpuTempLabel({toggled:?})");
                 self.config.cputemp.label = toggled;
                 self.save_config();
             }
 
             Message::ToggleMemoryLabel(toggled) => {
-                info!("Message::ToggleMemoryLabel({:?})", toggled);
+                info!("Message::ToggleMemoryLabel({toggled:?})");
                 self.config.memory.label = toggled;
                 self.save_config();
             }
 
             Message::ToggleMemoryPercentage(toggled) => {
+                info!("Message::ToggleMemoryPercentage({toggled:?})");
                 self.config.memory.percentage = toggled;
                 self.memory.set_percentage(toggled);
                 self.save_config();
             }
 
             Message::ToggleNetLabel(variant, toggled) => {
-                info!("Message::ToggleNetLabel({:?})", toggled);
+                info!("Message::ToggleNetLabel({toggled:?})");
                 let (_, config) = network_select!(self, variant);
                 config.label = toggled;
                 self.save_config();
@@ -1033,41 +1035,41 @@ impl cosmic::Application for Minimon {
 
             Message::RefreshRateChanged(rate) => {
                 info!("Message::RefreshRateChanged({:?})", rate);
-                self.config.refresh_rate = (rate * 1000.0) as u64;
+                self.config.refresh_rate = (rate * 1000.0) as u32;
                 self.set_tick();
                 self.save_config();
             }
 
             Message::LabelSizeChanged(size) => {
-                info!("Message::LabelSizeChanged({:?})", size);
+                info!("Message::LabelSizeChanged({size:?})");
                 self.config.label_size_default = size;
                 self.save_config();
             }
 
             Message::ToggleMonospaceLabels(toggle) => {
-                info!("Message::Monospacelabels({:?})", toggle);
+                info!("Message::Monospacelabels({toggle:?})");
                 self.config.monospace_labels = toggle;
                 self.save_config();
             }
 
             Message::ToggleTightSpacing(toggle) => {
-                info!("Message::ToggleTightSpacing({:?})", toggle);
+                info!("Message::ToggleTightSpacing({toggle:?})");
                 self.config.tight_spacing = toggle;
                 self.save_config();
             }
 
             Message::ToggleSymbols(toggle) => {
-                info!("Message::ToggleSymbols({:?})", toggle);
+                info!("Message::ToggleSymbols({toggle:?})");
                 self.config.symbols = toggle;
                 self.save_config();
             }
 
             Message::Settings(setting) => {
-                info!("Message::Settings({:?})", setting);
+                info!("Message::Settings({setting:?})");
                 self.settings_page = setting;
             }
             Message::SysmonSelect(sysmon) => {
-                info!("Message::SysmonSelect({:?})", sysmon);
+                info!("Message::SysmonSelect({sysmon:?})");
                 self.config.sysmon = sysmon;
                 self.save_config();
             }
@@ -1079,7 +1081,7 @@ impl cosmic::Application for Minimon {
                     |config, device| match device {
                         DeviceKind::Gpu => config.gpu_chart = toggled,
                         DeviceKind::Vram => config.vram_chart = toggled,
-                        _ => error!("GpuToggleChart: wrong kind {:?}", device),
+                        _ => error!("GpuToggleChart: wrong kind {device:?}"),
                     },
                 );
             }
@@ -1092,22 +1094,22 @@ impl cosmic::Application for Minimon {
                     |config, device| match device {
                         DeviceKind::Gpu => config.gpu_label = toggled,
                         DeviceKind::Vram => config.vram_label = toggled,
-                        _ => error!("GpuToggleLabel: wrong kind {:?}", device),
+                        _ => error!("GpuToggleLabel: wrong kind {device:?}"),
                     },
                 );
             }
 
             Message::GpuToggleStackLabels(id, toggled) => {
-                info!("Message::GpuToggleStackLabels({:?}, {:?})", id, toggled);
+                info!("Message::GpuToggleStackLabels({id:?}, {toggled:?})");
                 if let Some(c) = self.config.gpus.get_mut(&id) {
                     c.stack_labels = toggled;
                 } else {
-                    error!("GpuToggleStackLabels: wrong id {:?}", id);
+                    error!("GpuToggleStackLabels: wrong id {id:?}");
                 }
             }
 
             Message::GpuSelectGraphType(id, device, kind) => {
-                info!("Message::GpuSelectGraphType({:?}, {:?})", id, device);
+                info!("Message::GpuSelectGraphType({id:?}, {device:?})");
                 self.update_gpu_config(
                     id.clone(),
                     "GpuSelectGraphType",
@@ -1115,23 +1117,23 @@ impl cosmic::Application for Minimon {
                     |config, device| match device {
                         DeviceKind::Gpu => config.gpu_kind = kind,
                         DeviceKind::Vram => config.vram_kind = kind,
-                        _ => error!("GpuSelectGraphType: wrong kind {:?}", device),
+                        _ => error!("GpuSelectGraphType: wrong kind {device:?}"),
                     },
                 );
                 if let Some(gpu) = self.gpus.get_mut(&id) {
                     match device {
                         DeviceKind::Gpu => gpu.gpu.set_graph_kind(kind),
                         DeviceKind::Vram => gpu.vram.set_graph_kind(kind),
-                        _ => error!("GpuSelectGraphType: wrong kind {:?}", device),
+                        _ => error!("GpuSelectGraphType: wrong kind {device:?}"),
                     }
                 }
             }
             Message::ToggleDisableOnBattery(id, toggled) => {
-                info!("Message::ToggleDisableOnBattery({:?}, {:?})", id, toggled);
+                info!("Message::ToggleDisableOnBattery({id:?}, {toggled:?})");
                 if let Some(c) = self.config.gpus.get_mut(&id) {
                     c.pause_on_battery = toggled;
                 } else {
-                    error!("ToggleDisableOnBattery: wrong id {:?}", id);
+                    error!("ToggleDisableOnBattery: wrong id {id:?}");
                 }
             }
         }
@@ -1204,7 +1206,7 @@ impl Minimon {
         let refresh_row = settings::item(
             fl!("refresh-rate"),
             spin_button(
-                format!("{:.2}", refresh_rate),
+                format!("{refresh_rate:.2}"),
                 refresh_rate,
                 0.250,
                 0.250,
@@ -1539,24 +1541,24 @@ impl Minimon {
             let stacked_labels = config.stack_labels && config.gpu_label && config.vram_label;
 
             if config.gpu_label {
-                if !gpu.is_active() {
-                    formatted_gpu.push_str("----%");
-                } else {
+                if gpu.is_active() {
                     let value = gpu.gpu.latest_sample();
                     if value < 10.0 && horizontal {
-                        write!(&mut formatted_gpu, "{:.2}%", value).ok();
+                        write!(&mut formatted_gpu, "{value:.2}%").ok();
                     } else {
-                        write!(&mut formatted_gpu, "{:.1}%", value).ok();
+                        write!(&mut formatted_gpu, "{value:.1}%").ok();
                     }
+                } else {
+                    formatted_gpu.push_str("----%");
                 }
             }
 
             if config.vram_label {
-                if !gpu.is_active() {
+                if gpu.is_active() {
+                    formatted_vram = gpu.vram.string(!horizontal);
+                } else {
                     let placeholder = if horizontal { "---- GB" } else { "----GB" };
                     formatted_vram.push_str(placeholder);
-                } else {
-                    formatted_vram = gpu.vram.string(!horizontal);
                 }
             }
 
@@ -1657,12 +1659,12 @@ impl Minimon {
                         config.gpu_colors = colors;
                         gpu.gpu.set_colors(colors);
                     } else {
-                        error!("No config for selected GPU {}", id);
+                        error!("No config for selected GPU {id}");
                     }
                 }
             }
             DeviceKind::Vram => {
-                debug!("Vram set colors a {:?}", colors);
+                debug!("Vram set colors a {colors:?}");
                 if let Some(id) = id {
                     if let (Some(config), Some(gpu)) =
                         (self.config.gpus.get_mut(&id), self.gpus.get_mut(&id))
@@ -1671,7 +1673,7 @@ impl Minimon {
                         config.vram_colors = colors;
                         gpu.vram.set_colors(colors);
                     } else {
-                        error!("No config for selected GPU {}", id);
+                        error!("No config for selected GPU {id}");
                     }
                 }
             }
@@ -1796,7 +1798,7 @@ impl Minimon {
                 .map(|o| o.status.success())
                 .unwrap_or(false)
             {
-                found.push((format!("flatpak run {}", flatpak_id), name.to_string()));
+                found.push((format!("flatpak run {flatpak_id}"), name.to_string()));
             }
         }
 
@@ -1832,7 +1834,7 @@ impl Minimon {
             config_gpus.entry(id.clone()).or_default();
         }
 
-        for (id, gpu) in self.gpus.iter_mut() {
+        for (id, gpu) in &mut self.gpus {
             if let Some(config) = config_gpus.get(id) {
                 gpu.gpu.set_graph_kind(config.gpu_kind);
                 gpu.vram.set_graph_kind(config.vram_kind);
@@ -1846,12 +1848,12 @@ impl Minimon {
     where
         F: FnOnce(&mut GpuConfig, DeviceKind),
     {
-        info!("{}({:?})", action, (id.clone(), &device));
+        info!("{action}({:?})", (id.to_string(), &device));
         if let Some(config) = self.config.gpus.get_mut(&id) {
             update_fn(config, device);
             self.save_config();
         } else {
-            error!("{}: no config for selected GPU {}", action, id);
+            error!("{action}: no config for selected GPU {id}");
         }
     }
 
@@ -1903,7 +1905,7 @@ impl Minimon {
                 .filter_map(Result::ok)
                 .any(|entry| entry.file_name().to_string_lossy().starts_with("BAT")),
             Err(e) => {
-                info!("Could not read power supply info: {}", e);
+                info!("Could not read power supply info: {e}");
                 false
             }
         }

@@ -11,11 +11,11 @@ mod svg_graph;
 
 use log::info;
 
-use std::io;
 use chrono::Local;
+use std::io;
 
 /// Controls whether logging goes to stdout or a file.
-const LOG_TO_FILE: bool = false; 
+const LOG_TO_FILE: bool = false;
 
 fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
     let base_config = fern::Dispatch::new()
@@ -29,7 +29,7 @@ fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
                 Local::now().format("%H:%M:%S"),
                 record.level(),
                 message
-            ))
+            ));
         });
 
     if LOG_TO_FILE {
@@ -37,16 +37,13 @@ fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
             .chain(fern::log_file("/tmp/minimon.log")?)
             .apply()?;
     } else {
-        base_config
-            .chain(io::stdout())
-            .apply()?;
+        base_config.chain(io::stdout()).apply()?;
     }
 
     Ok(())
 }
 
 fn main() -> cosmic::iced::Result {
-
     setup_logger().expect("Failed to initialize logger");
 
     info!("Application started");

@@ -9,15 +9,15 @@ use crate::{
     svg_graph::SvgColors,
 };
 
-use cosmic::{widget::Column, Element};
+use cosmic::{Element, widget::Column};
 
 use cosmic::widget;
 use cosmic::widget::settings;
 
 use cosmic::{
     iced::{
-        widget::{column, row},
         Alignment,
+        widget::{column, row},
     },
     iced_widget::Row,
 };
@@ -25,39 +25,39 @@ use cosmic::{
 use crate::app::Message;
 use crate::config::DisksVariant;
 
-use lazy_static::lazy_static;
-
 use super::Sensor;
 
 const MAX_SAMPLES: usize = 30;
 const GRAPH_SAMPLES: usize = 21;
 const UNITS_SHORT: [&str; 5] = ["B", "K", "M", "G", "T"];
 const UNITS_LONG: [&str; 5] = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s"];
+use std::sync::LazyLock;
 
-lazy_static! {
-    /// Translated color choices.
-    ///
-    /// The string values are intentionally leaked (`.leak()`) to convert them
-    /// into `'static str` because:
-    /// - These strings are only initialized once at program startup.
-    /// - They are never deallocated since they are used globally.
-    static ref COLOR_CHOICES_COMBINED: [(&'static str, ColorVariant); 4] = [
-        (fl!("graph-disks-write").leak(), ColorVariant::Color2),
-        (fl!("graph-disks-read").leak(), ColorVariant::Color3),
-        (fl!("graph-disks-back").leak(), ColorVariant::Color1),
-        (fl!("graph-disks-frame").leak(), ColorVariant::Color4),
-    ];
-    static ref COLOR_CHOICES_WRITE: [(&'static str, ColorVariant); 3] = [
+pub static COLOR_CHOICES_COMBINED: LazyLock<[(&'static str, ColorVariant); 4]> =
+    LazyLock::new(|| {
+        [
+            (fl!("graph-disks-write").leak(), ColorVariant::Color2),
+            (fl!("graph-disks-read").leak(), ColorVariant::Color3),
+            (fl!("graph-disks-back").leak(), ColorVariant::Color1),
+            (fl!("graph-disks-frame").leak(), ColorVariant::Color4),
+        ]
+    });
+
+pub static COLOR_CHOICES_WRITE: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
+    [
         (fl!("graph-disks-write").leak(), ColorVariant::Color2),
         (fl!("graph-disks-back").leak(), ColorVariant::Color1),
         (fl!("graph-disks-frame").leak(), ColorVariant::Color4),
-    ];
-    static ref COLOR_CHOICES_READ: [(&'static str, ColorVariant); 3] = [
+    ]
+});
+
+pub static COLOR_CHOICES_READ: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
+    [
         (fl!("graph-disks-read").leak(), ColorVariant::Color3),
         (fl!("graph-disks-back").leak(), ColorVariant::Color1),
         (fl!("graph-disks-frame").leak(), ColorVariant::Color4),
-    ];
-}
+    ]
+});
 
 macro_rules! disks_select {
     ($self:ident, $variant:expr) => {
@@ -83,7 +83,7 @@ pub struct Disks {
     colors: GraphColors,
     svg_colors: SvgColors,
     pub variant: DisksVariant,
-    kind: GraphKind
+    kind: GraphKind,
 }
 
 impl DemoGraph for Disks {
@@ -126,7 +126,6 @@ impl DemoGraph for Disks {
     fn id(&self) -> Option<String> {
         None
     }
-
 }
 
 impl Sensor for Disks {
@@ -226,7 +225,7 @@ impl Sensor for Disks {
             DisksVariant::Read => {
                 rate = rate.push(cosmic::widget::text::body(rdrate));
             }
-        };
+        }
         disk_elements.push(Element::from(rate));
 
         let mut disk_bandwidth_items = Vec::new();
@@ -257,8 +256,11 @@ impl Sensor for Disks {
         disk_bandwidth_items.push(
             row!(
                 widget::horizontal_space(),
-                widget::button::standard(fl!("change-colors"))
-                    .on_press(Message::ColorPickerOpen(DeviceKind::Disks(self.variant), self.kind, None)),
+                widget::button::standard(fl!("change-colors")).on_press(Message::ColorPickerOpen(
+                    DeviceKind::Disks(self.variant),
+                    self.kind,
+                    None
+                )),
                 widget::horizontal_space()
             )
             .into(),
@@ -309,11 +311,11 @@ impl Disks {
         }
 
         let s = if value < 10.0 {
-            &format!("{:.2}", value)
+            &format!("{value:.2}")
         } else if value < 99.0 {
-            &format!("{:.1}", value)
+            &format!("{value:.1}")
         } else {
-            &format!("{:.0}", value)
+            &format!("{value:.0}")
         };
 
         if format == UnitVariant::Long {
@@ -344,8 +346,8 @@ impl Disks {
 
     // If the sample rate doesn't match exactly one second (more or less),
     // we grab enough samples to cover it and average the value of samples cover a longer duration.
-    fn last_second_rate(samples: &VecDeque<u64>, sample_interval_ms: u64) -> u64 {
-        let mut total_duration = 0u64;
+    fn last_second_rate(samples: &VecDeque<u64>, sample_interval_ms: u32) -> u64 {
+        let mut total_duration = 0u32;
         let mut total_bitrate = 0u64;
 
         // Iterate from newest to oldest
@@ -359,19 +361,19 @@ impl Disks {
         }
 
         // Scale to exactly 1000ms
-        let scale = 1000.0 / total_duration as f64;
+        let scale = 1000.0 / f64::from(total_duration);
 
         (total_bitrate as f64 * scale).floor() as u64
     }
 
     // Get bytes per second
-    pub fn write_label(&self, sample_interval_ms: u64, format: UnitVariant) -> String {
+    pub fn write_label(&self, sample_interval_ms: u32, format: UnitVariant) -> String {
         let val = Disks::last_second_rate(&self.write, sample_interval_ms);
         Disks::makestr(val, format)
     }
 
     // Get bytes per second
-    pub fn read_label(&self, sample_interval_ms: u64, format: UnitVariant) -> String {
+    pub fn read_label(&self, sample_interval_ms: u32, format: UnitVariant) -> String {
         let val = Disks::last_second_rate(&self.read, sample_interval_ms);
         Disks::makestr(val, format)
     }

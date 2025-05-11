@@ -10,10 +10,7 @@ pub struct IntelGpu {
 
 impl IntelGpu {
     pub fn new(name: String, id: String) -> Self {
-        IntelGpu {
-            name,
-            id,
-        }
+        IntelGpu { name, id }
     }
 }
 
@@ -31,11 +28,11 @@ impl super::GpuIf for IntelGpu {
     }
 
     fn name(&self) -> String {
-        self.name.to_owned()
+        self.name.clone()
     }
 
     fn id(&self) -> String {
-        self.id.to_owned()
+        self.id.clone()
     }
 
     fn usage(&self) -> Result<u32> {
@@ -49,7 +46,6 @@ impl super::GpuIf for IntelGpu {
     fn vram_used(&self) -> Result<u64> {
         todo!();
     }
-
 }
 
 impl IntelGpu {

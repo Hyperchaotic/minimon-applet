@@ -338,7 +338,7 @@ impl Default for GpuConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq)]
 #[version = 1]
 pub struct MinimonConfig {
-    pub refresh_rate: u64,
+    pub refresh_rate: u32,
     pub label_size_default: u16,
     pub monospace_labels: bool,
 

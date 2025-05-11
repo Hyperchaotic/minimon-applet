@@ -1,16 +1,16 @@
-use cosmic::iced::alignment::Horizontal;
 use cosmic::iced::Background;
+use cosmic::iced::alignment::Horizontal;
 use cosmic::iced::{
-    widget::{column, row},
     Alignment,
+    widget::{column, row},
 };
-use cosmic::{cosmic_theme::palette::Srgba, Element};
+use cosmic::{Element, cosmic_theme::palette::Srgba};
 use std::rc::Rc;
 
 use cosmic::{
     iced::{
-        gradient::{ColorStop, Linear},
         Color, Length, Radians,
+        gradient::{ColorStop, Linear},
     },
     theme,
     widget::{
@@ -34,11 +34,10 @@ const ALPHA_RECT: &str = "<svg width=\"50\" height=\"50\" xmlns=\"http://www.w3.
   <line x1=\"5\" y1=\"45\" x2=\"45\" y2=\"5\" stroke=\"red\" stroke-width=\"3\"/>\
 </svg>";
 
-use lazy_static::lazy_static;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
-lazy_static! {
-    static ref COLOR_STOPS_RED_LOW: Mutex<[ColorStop; 2]> = Mutex::new([
+pub static COLOR_STOPS_RED_LOW: LazyLock<Mutex<[ColorStop; 2]>> = LazyLock::new(|| {
+    Mutex::new([
         ColorStop {
             offset: 0.0,
             color: Color::from_rgb(0.0, 0.0, 0.0),
@@ -47,8 +46,11 @@ lazy_static! {
             offset: 1.0,
             color: Color::from_rgb(0.0, 0.0, 0.0),
         },
-    ]);
-    static ref COLOR_STOPS_RED_HIGH: Mutex<[ColorStop; 2]> = Mutex::new([
+    ])
+});
+
+pub static COLOR_STOPS_RED_HIGH: LazyLock<Mutex<[ColorStop; 2]>> = LazyLock::new(|| {
+    Mutex::new([
         ColorStop {
             offset: 0.0,
             color: Color::from_rgb(0.0, 0.0, 0.0),
@@ -57,8 +59,11 @@ lazy_static! {
             offset: 1.0,
             color: Color::from_rgb(1.0, 0.0, 0.0),
         },
-    ]);
-    static ref COLOR_STOPS_GREEN_LOW: Mutex<[ColorStop; 2]> = Mutex::new([
+    ])
+});
+
+pub static COLOR_STOPS_GREEN_LOW: LazyLock<Mutex<[ColorStop; 2]>> = LazyLock::new(|| {
+    Mutex::new([
         ColorStop {
             offset: 0.0,
             color: Color::from_rgb(0.0, 0.0, 0.0),
@@ -67,8 +72,11 @@ lazy_static! {
             offset: 1.0,
             color: Color::from_rgb(0.0, 0.0, 0.0),
         },
-    ]);
-    static ref COLOR_STOPS_GREEN_HIGH: Mutex<[ColorStop; 2]> = Mutex::new([
+    ])
+});
+
+pub static COLOR_STOPS_GREEN_HIGH: LazyLock<Mutex<[ColorStop; 2]>> = LazyLock::new(|| {
+    Mutex::new([
         ColorStop {
             offset: 0.0,
             color: Color::from_rgb(0.0, 0.0, 0.0),
@@ -77,8 +85,11 @@ lazy_static! {
             offset: 1.0,
             color: Color::from_rgb(0.0, 1.0, 0.0),
         },
-    ]);
-    static ref COLOR_STOPS_BLUE_LOW: Mutex<[ColorStop; 2]> = Mutex::new([
+    ])
+});
+
+pub static COLOR_STOPS_BLUE_LOW: LazyLock<Mutex<[ColorStop; 2]>> = LazyLock::new(|| {
+    Mutex::new([
         ColorStop {
             offset: 0.0,
             color: Color::from_rgb(0.0, 0.0, 0.0),
@@ -87,8 +98,11 @@ lazy_static! {
             offset: 1.0,
             color: Color::from_rgb(0.0, 0.0, 0.0),
         },
-    ]);
-    static ref COLOR_STOPS_BLUE_HIGH: Mutex<[ColorStop; 2]> = Mutex::new([
+    ])
+});
+
+pub static COLOR_STOPS_BLUE_HIGH: LazyLock<Mutex<[ColorStop; 2]>> = LazyLock::new(|| {
+    Mutex::new([
         ColorStop {
             offset: 0.0,
             color: Color::from_rgb(0.0, 0.0, 0.0),
@@ -97,8 +111,8 @@ lazy_static! {
             offset: 1.0,
             color: Color::from_rgb(0.0, 0.0, 1.0),
         },
-    ]);
-}
+    ])
+});
 
 const ERROR: &str = "<svg width=\"800px\" height=\"800px\" viewBox=\"0 0 25 25\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">
 <path d=\"M12.5 16V14.5M12.5 9V13M20.5 12.5C20.5 16.9183 16.9183 20.5 12.5 20.5C8.08172 20.5 4.5 16.9183 4.5 12.5C4.5 8.08172 8.08172 4.5 12.5 4.5C16.9183 4.5 20.5 8.08172 20.5 12.5Z\" stroke=\"red\" stroke-width=\"1.2\"/>
@@ -149,8 +163,8 @@ impl ColorPicker {
     }
 
     pub fn activate(&mut self, device: DeviceKind, kind: GraphKind, demo_svg: Box<dyn DemoGraph>) {
-        info!("colorpicker::activate({:?}, {:?})", device, kind);
-        self.device=device;
+        info!("colorpicker::activate({device:?}, {kind:?})");
+        self.device = device;
         self.kind = kind;
         self.color_variant = ColorVariant::Color1;
         self.demo_svg = Some(demo_svg);
@@ -273,19 +287,19 @@ impl ColorPicker {
 
         // Set the shading for sliders, this is required to be static lifetime
         COLOR_STOPS_RED_LOW.lock().unwrap()[1].color =
-            Color::from_rgb(color.red as f32 / u8::MAX as f32, 0.0, 0.0);
+            Color::from_rgb(f32::from(color.red) / f32::from(u8::MAX), 0.0, 0.0);
         COLOR_STOPS_RED_HIGH.lock().unwrap()[0].color =
-            Color::from_rgb(color.red as f32 / u8::MAX as f32, 0.0, 0.0);
+            Color::from_rgb(f32::from(color.red) / f32::from(u8::MAX), 0.0, 0.0);
 
         COLOR_STOPS_GREEN_LOW.lock().unwrap()[1].color =
-            Color::from_rgb(0.0, color.green as f32 / u8::MAX as f32, 0.0);
+            Color::from_rgb(0.0, f32::from(color.green) / f32::from(u8::MAX), 0.0);
         COLOR_STOPS_GREEN_HIGH.lock().unwrap()[0].color =
-            Color::from_rgb(0.0, color.green as f32 / u8::MAX as f32, 0.0);
+            Color::from_rgb(0.0, f32::from(color.green) / f32::from(u8::MAX), 0.0);
 
         COLOR_STOPS_BLUE_LOW.lock().unwrap()[1].color =
-            Color::from_rgb(0.0, 0.0, color.blue as f32 / u8::MAX as f32);
+            Color::from_rgb(0.0, 0.0, f32::from(color.blue) / f32::from(u8::MAX));
         COLOR_STOPS_BLUE_HIGH.lock().unwrap()[0].color =
-            Color::from_rgb(0.0, 0.0, color.blue as f32 / u8::MAX as f32);
+            Color::from_rgb(0.0, 0.0, f32::from(color.blue) / f32::from(u8::MAX));
     }
 
     pub fn default_colors(&mut self) {

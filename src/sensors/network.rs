@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use cosmic::{iced_widget::Column, Element};
+use cosmic::{Element, iced_widget::Column};
 use sysinfo::Networks;
 
 use crate::{
@@ -15,15 +15,13 @@ use cosmic::widget::settings;
 
 use cosmic::{
     iced::{
-        widget::{column, row},
         Alignment,
+        widget::{column, row},
     },
     iced_widget::Row,
 };
 
 use crate::app::Message;
-
-use lazy_static::lazy_static;
 
 use super::Sensor;
 
@@ -31,31 +29,33 @@ const MAX_SAMPLES: usize = 30;
 const GRAPH_SAMPLES: usize = 21;
 const UNITS_SHORT: [&str; 5] = ["b", "K", "M", "G", "T"];
 const UNITS_LONG: [&str; 5] = ["bps", "Kbps", "Mbps", "Gbps", "Tbps"];
+use std::sync::LazyLock;
 
-lazy_static! {
-    /// Translated color choices.
-    ///
-    /// The string values are intentionally leaked (`.leak()`) to convert them
-    /// into `'static str` because:
-    /// - These strings are only initialized once at program startup.
-    /// - They are never deallocated since they are used globally.
-    static ref COLOR_CHOICES_COMBINED: [(&'static str, ColorVariant); 4] = [
-        (fl!("graph-network-download").leak(), ColorVariant::Color2),
-        (fl!("graph-network-upload").leak(), ColorVariant::Color3),
-        (fl!("graph-network-back").leak(), ColorVariant::Color1),
-        (fl!("graph-network-frame").leak(), ColorVariant::Color4),
-    ];
-    static ref COLOR_CHOICES_DL: [(&'static str, ColorVariant); 3] = [
+pub static COLOR_CHOICES_COMBINED: LazyLock<[(&'static str, ColorVariant); 4]> =
+    LazyLock::new(|| {
+        [
+            (fl!("graph-network-download").leak(), ColorVariant::Color2),
+            (fl!("graph-network-upload").leak(), ColorVariant::Color3),
+            (fl!("graph-network-back").leak(), ColorVariant::Color1),
+            (fl!("graph-network-frame").leak(), ColorVariant::Color4),
+        ]
+    });
+
+pub static COLOR_CHOICES_DL: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
+    [
         (fl!("graph-network-download").leak(), ColorVariant::Color2),
         (fl!("graph-network-back").leak(), ColorVariant::Color1),
         (fl!("graph-network-frame").leak(), ColorVariant::Color4),
-    ];
-    static ref COLOR_CHOICES_UL: [(&'static str, ColorVariant); 3] = [
+    ]
+});
+
+pub static COLOR_CHOICES_UL: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
+    [
         (fl!("graph-network-upload").leak(), ColorVariant::Color3),
         (fl!("graph-network-back").leak(), ColorVariant::Color1),
         (fl!("graph-network-frame").leak(), ColorVariant::Color4),
-    ];
-}
+    ]
+});
 
 macro_rules! network_select {
     ($self:ident, $variant:expr) => {
@@ -66,7 +66,7 @@ macro_rules! network_select {
     };
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum UnitVariant {
     Short,
     Long,
@@ -129,7 +129,6 @@ impl DemoGraph for Network {
     fn id(&self) -> Option<String> {
         None
     }
-
 }
 
 impl Sensor for Network {
@@ -233,7 +232,7 @@ impl Sensor for Network {
             NetworkVariant::Upload => {
                 rate = rate.push(cosmic::widget::text::body(ulrate));
             }
-        };
+        }
         net_elements.push(Element::from(rate));
 
         let mut net_bandwidth_items = Vec::new();
@@ -263,8 +262,10 @@ impl Sensor for Network {
         net_bandwidth_items.push(
             settings::item(
                 fl!("use-adaptive"),
-                row!(widget::checkbox("", config.adaptive)
-                    .on_toggle(move |t| Message::ToggleAdaptiveNet(k, t))),
+                row!(
+                    widget::checkbox("", config.adaptive)
+                        .on_toggle(move |t| Message::ToggleAdaptiveNet(k, t))
+                ),
             )
             .into(),
         );
@@ -290,8 +291,11 @@ impl Sensor for Network {
         net_bandwidth_items.push(
             row!(
                 widget::horizontal_space(),
-                widget::button::standard(fl!("change-colors"))
-                    .on_press(Message::ColorPickerOpen(DeviceKind::Network(self.variant), self.kind, None)),
+                widget::button::standard(fl!("change-colors")).on_press(Message::ColorPickerOpen(
+                    DeviceKind::Network(self.variant),
+                    self.kind,
+                    None
+                )),
                 widget::horizontal_space()
             )
             .into(),
@@ -346,11 +350,11 @@ impl Network {
 
         // Format the number with varying precision
         let value_str = if value < 10.0 {
-            format!("{:.2}", value)
+            format!("{value:.2}")
         } else if value < 99.0 {
-            format!("{:.1}", value)
+            format!("{value:.1}")
         } else {
-            format!("{:.0}", value)
+            format!("{value:.0}")
         };
 
         let unit_str = units[unit_index];
@@ -385,8 +389,8 @@ impl Network {
 
     // If the sample rate doesn't match exactly one second (more or less),
     // we grab enough samples to cover it and average the value of samples cover a longer duration.
-    fn last_second_bitrate(samples: &VecDeque<u64>, sample_interval_ms: u64) -> u64 {
-        let mut total_duration = 0u64;
+    fn last_second_bitrate(samples: &VecDeque<u64>, sample_interval_ms: u32) -> u64 {
+        let mut total_duration = 0u32;
         let mut total_bitrate = 0u64;
 
         // Iterate from newest to oldest
@@ -400,19 +404,19 @@ impl Network {
         }
 
         // Scale to exactly 1000ms
-        let scale = 1000.0 / total_duration as f64;
+        let scale = 1000.0 / f64::from(total_duration);
 
         (total_bitrate as f64 * scale).floor() as u64
     }
 
     // Get bits per second
-    pub fn download_label(&self, sample_interval_ms: u64, format: UnitVariant) -> String {
+    pub fn download_label(&self, sample_interval_ms: u32, format: UnitVariant) -> String {
         let rate = Network::last_second_bitrate(&self.download, sample_interval_ms);
         Network::makestr(rate, format)
     }
 
     // Get bits per second
-    pub fn upload_label(&self, sample_interval_ms: u64, format: UnitVariant) -> String {
+    pub fn upload_label(&self, sample_interval_ms: u32, format: UnitVariant) -> String {
         let rate = Network::last_second_bitrate(&self.upload, sample_interval_ms);
         Network::makestr(rate, format)
     }

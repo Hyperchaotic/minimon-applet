@@ -26,36 +26,24 @@ use super::gpu::amd::AmdGpu;
 use super::gpu::intel::IntelGpu;
 use super::gpu::{GpuIf, nvidia::NvidiaGpu};
 
-use lazy_static::lazy_static;
+use std::sync::LazyLock;
 
-lazy_static! {
-    /// Translated color choices.
-    ///
-    /// The string values are intentionally leaked (`.leak()`) to convert them
-    /// into `'static str` because:
-    /// - These strings are only initialized once at program startup.
-    /// - They are never deallocated since they are used globally.
-    static ref COLOR_CHOICES_RING: [(&'static str, ColorVariant); 4] = [
+pub static COLOR_CHOICES_RING: LazyLock<[(&'static str, ColorVariant); 4]> = LazyLock::new(|| {
+    [
         (fl!("graph-ring-r1").leak(), ColorVariant::Color4),
         (fl!("graph-ring-r2").leak(), ColorVariant::Color3),
         (fl!("graph-ring-back").leak(), ColorVariant::Color1),
         (fl!("graph-ring-text").leak(), ColorVariant::Color2),
-    ];
-}
+    ]
+});
 
-lazy_static! {
-    /// Translated color choices.
-    ///
-    /// The string values are intentionally leaked (`.leak()`) to convert them
-    /// into `'static str` because:
-    /// - These strings are only initialized once at program startup.
-    /// - They are never deallocated since they are used globally.
-    static ref COLOR_CHOICES_LINE: [(&'static str, ColorVariant); 3] = [
+pub static COLOR_CHOICES_LINE: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
+    [
         (fl!("graph-line-graph").leak(), ColorVariant::Color4),
         (fl!("graph-line-back").leak(), ColorVariant::Color1),
         (fl!("graph-line-frame").leak(), ColorVariant::Color2),
-    ];
-}
+    ]
+});
 
 const GRAPH_OPTIONS: [&str; 2] = ["Ring", "Line"];
 
@@ -97,7 +85,7 @@ impl GpuGraph {
     }
 
     pub fn clear(&mut self) {
-        for sample in self.samples.iter_mut() {
+        for sample in &mut self.samples {
             *sample = 0.0;
         }
     }
@@ -113,11 +101,11 @@ impl GpuGraph {
                 _ = write!(value, "-");
             } else {
                 if latest < 10.0 {
-                    write!(value, "{:.2}", latest).unwrap();
+                    write!(value, "{latest:.2}").unwrap();
                 } else if latest < 100.0 {
-                    write!(value, "{:.1}", latest).unwrap();
+                    write!(value, "{latest:.1}").unwrap();
                 } else {
-                    write!(value, "{}", latest).unwrap();
+                    write!(value, "{latest}").unwrap();
                 }
                 write!(percentage, "{latest}").unwrap();
             }
@@ -166,11 +154,11 @@ impl GpuGraph {
         let unit = "%";
 
         if current_val < 10.0 {
-            format!("{:.2}{}", current_val, unit)
+            format!("{current_val:.2}{unit}")
         } else if current_val < 100.0 {
-            format!("{:.1}{}", current_val, unit)
+            format!("{current_val:.1}{unit}")
         } else {
-            format!("{}{}", current_val, unit)
+            format!("{current_val}{unit}")
         }
     }
 
@@ -178,7 +166,7 @@ impl GpuGraph {
         if self.samples.len() >= MAX_SAMPLES {
             self.samples.pop_front();
         }
-        self.samples.push_back(sample as f64);
+        self.samples.push_back(f64::from(sample));
     }
 }
 
@@ -198,7 +186,7 @@ impl DemoGraph for GpuGraph {
             GraphKind::Line => {
                 crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100, &self.svg_colors)
             }
-            _ => panic!("Wrong graph choice!"),
+            GraphKind::Heat => panic!("Wrong graph choice!"),
         }
     }
 
@@ -259,7 +247,7 @@ impl VramGraph {
     }
 
     pub fn clear(&mut self) {
-        for sample in self.samples.iter_mut() {
+        for sample in &mut self.samples {
             *sample = 0.0;
         }
     }
@@ -279,11 +267,11 @@ impl VramGraph {
                 write!(percentage, "{pct}").unwrap();
 
                 if latest < 10.0 {
-                    write!(value, "{:.2}", latest).unwrap();
+                    write!(value, "{latest:.2}").unwrap();
                 } else if latest < 100.0 {
-                    write!(value, "{:.1}", latest).unwrap();
+                    write!(value, "{latest:.1}").unwrap();
                 } else {
-                    write!(value, "{}", latest).unwrap();
+                    write!(value, "{latest}").unwrap();
                 }
             }
             crate::svg_graph::ring(
@@ -327,14 +315,14 @@ impl VramGraph {
 
     pub fn string(&self, vertical_panel: bool) -> String {
         let current_val = self.latest_sample();
-        let unit: &str = if !vertical_panel { " GB" } else { "GB" };
+        let unit: &str = if vertical_panel { "GB" } else { " GB" };
 
         if current_val < 10.0 {
-            format!("{:.2}{}", current_val, unit)
+            format!("{current_val:.2}{unit}")
         } else if current_val < 100.0 {
-            format!("{:.1}{}", current_val, unit)
+            format!("{current_val:.1}{unit}")
         } else {
-            format!("{}{}", current_val, unit)
+            format!("{current_val}{unit}")
         }
     }
 
@@ -364,7 +352,7 @@ impl DemoGraph for VramGraph {
             GraphKind::Line => {
                 crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 32, &self.svg_colors)
             }
-            _ => panic!("Wrong graph choice!"),
+            GraphKind::Heat => panic!("Wrong graph choice!"),
         }
     }
 
@@ -409,11 +397,11 @@ impl Gpu {
     }
 
     pub fn name(&self) -> String {
-        self.gpu_if.as_ref().name().to_owned()
+        self.gpu_if.as_ref().name().clone()
     }
 
     pub fn id(&self) -> String {
-        self.gpu_if.as_ref().id().to_owned()
+        self.gpu_if.as_ref().id().clone()
     }
 
     pub fn demo_gpu_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {

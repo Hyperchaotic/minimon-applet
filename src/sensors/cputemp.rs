@@ -20,7 +20,6 @@ use log::info;
 
 use crate::app::Message;
 
-use lazy_static::lazy_static;
 use std::{
     collections::VecDeque,
     fmt::Write,
@@ -35,47 +34,31 @@ use super::{CpuVariant, Sensor, TempUnit};
 
 const MAX_SAMPLES: usize = 21;
 
-lazy_static! {
-    /// Translated color choices.
-    ///
-    /// The string values are intentionally leaked (`.leak()`) to convert them
-    /// into `'static str` because:
-    /// - These strings are only initialized once at program startup.
-    /// - They are never deallocated since they are used globally.
-    static ref COLOR_CHOICES_RING: [(&'static str, ColorVariant); 4] = [
+use std::sync::LazyLock;
+
+pub static COLOR_CHOICES_RING: LazyLock<[(&'static str, ColorVariant); 4]> = LazyLock::new(|| {
+    [
         (fl!("graph-ring-r1").leak(), ColorVariant::Color4),
         (fl!("graph-ring-r2").leak(), ColorVariant::Color3),
         (fl!("graph-ring-back").leak(), ColorVariant::Color1),
         (fl!("graph-ring-text").leak(), ColorVariant::Color2),
-    ];
-}
+    ]
+});
 
-lazy_static! {
-    /// Translated color choices.
-    ///
-    /// The string values are intentionally leaked (`.leak()`) to convert them
-    /// into `'static str` because:
-    /// - These strings are only initialized once at program startup.
-    /// - They are never deallocated since they are used globally.
-    static ref COLOR_CHOICES_LINE: [(&'static str, ColorVariant); 3] = [
+pub static COLOR_CHOICES_LINE: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
+    [
         (fl!("graph-line-graph").leak(), ColorVariant::Color4),
         (fl!("graph-line-back").leak(), ColorVariant::Color1),
         (fl!("graph-line-frame").leak(), ColorVariant::Color2),
-    ];
-}
+    ]
+});
 
-lazy_static! {
-    /// Translated color choices.
-    ///
-    /// The string values are intentionally leaked (`.leak()`) to convert them
-    /// into `'static str` because:
-    /// - These strings are only initialized once at program startup.
-    /// - They are never deallocated since they are used globally.
-    static ref COLOR_CHOICES_HEAT: [(&'static str, ColorVariant); 2] = [
+pub static COLOR_CHOICES_HEAT: LazyLock<[(&'static str, ColorVariant); 2]> = LazyLock::new(|| {
+    [
         (fl!("graph-line-back").leak(), ColorVariant::Color1),
         (fl!("graph-line-frame").leak(), ColorVariant::Color2),
-    ];
-}
+    ]
+});
 
 const GRAPH_OPTIONS: [&str; 3] = ["Ring", "Line", "Heat"];
 const UNIT_OPTIONS: [&str; 4] = ["Celcius", "Farenheit", "Kelvin", "Rankine"];
@@ -101,7 +84,7 @@ impl HwmonTemp {
                 continue;
             };
             let name = name.trim().to_lowercase();
-            info!("  path: {:?}. name: {}", name_path, name);
+            info!("  path: {name_path:?}. name: {name}");
 
             if name.contains("coretemp") || name.contains("k10temp") || name.contains("cpu") {
                 let mut tdie: Option<(PathBuf, String)> = None;
@@ -109,8 +92,8 @@ impl HwmonTemp {
                 let mut core_fallbacks = vec![];
 
                 for i in 0..100 {
-                    let label_path = hwmon.join(format!("temp{}_label", i));
-                    let input_path = hwmon.join(format!("temp{}_input", i));
+                    let label_path = hwmon.join(format!("temp{i}_label"));
+                    let input_path = hwmon.join(format!("temp{i}_input"));
 
                     if !input_path.exists() {
                         continue;
@@ -119,13 +102,13 @@ impl HwmonTemp {
                         let label = label.trim();
 
                         if label.eq_ignore_ascii_case("Tdie") {
-                            info!("  found sensor {:?} {}", label_path, label);
+                            info!("  found sensor {label_path:?} {label}");
                             tdie = Some((input_path.clone(), label.to_string()));
                         } else if label.eq_ignore_ascii_case("Tctl") {
-                            info!("  found sensor {:?} {}", label_path, label);
+                            info!("  found sensor {label_path:?} {label}");
                             tctl = Some((input_path.clone(), label.to_string()));
                         } else if label.starts_with("Core") || label.contains("Package") {
-                            info!("  found sensor {:?} {}", label_path, label);
+                            info!("  found sensor {label_path:?} {label}");
                             core_fallbacks.push((input_path.clone(), label.to_string()));
                         }
                     }
@@ -137,8 +120,7 @@ impl HwmonTemp {
                     let crit_temp = fs::read_to_string(&crit_path)
                         .ok()
                         .and_then(|v| v.trim().parse::<f64>().ok())
-                        .map(|v| v / 1000.0)
-                        .unwrap_or(100.0);
+                        .map_or(100.0, |v| v / 1000.0);
 
                     return Ok(Some(HwmonTemp {
                         temp_paths: vec![path.clone()],
@@ -195,26 +177,17 @@ impl DemoGraph for CpuTemp {
                 // show a number of 40% of max
                 let val = 40;
                 let percentage: u64 = 40;
-                return crate::svg_graph::ring(
+                crate::svg_graph::ring(
                     &format!("{val}"),
                     &format!("{percentage}"),
                     &self.svg_colors,
-                );
+                )
             }
             GraphKind::Line => {
-                return crate::svg_graph::line(
-                    &VecDeque::from(DEMO_SAMPLES),
-                    100,
-                    &self.svg_colors,
-                );
+                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100, &self.svg_colors)
             }
             GraphKind::Heat => {
-                return crate::svg_graph::heat(
-                    &VecDeque::from(DEMO_SAMPLES),
-                    100.0,
-                    &self.svg_colors,
-                )
-                .unwrap();
+                crate::svg_graph::heat(&VecDeque::from(DEMO_SAMPLES), 100, &self.svg_colors)
             }
         }
     }
@@ -258,9 +231,9 @@ impl Sensor for CpuTemp {
                     if self.samples.len() >= MAX_SAMPLES {
                         self.samples.pop_front();
                     }
-                    self.samples.push_back(temp as f64);
+                    self.samples.push_back(f64::from(temp));
                 }
-                Err(e) => info!("Error reading temp data {:?}", e),
+                Err(e) => info!("Error reading temp data {e:?}"),
             }
         }
     }
@@ -292,9 +265,7 @@ impl Sensor for CpuTemp {
                 crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
             }
             GraphKind::Line => crate::svg_graph::line(&self.samples, max as u64, &self.svg_colors),
-            GraphKind::Heat => {
-                crate::svg_graph::heat(&self.samples, max, &self.svg_colors).unwrap()
-            }
+            GraphKind::Heat => crate::svg_graph::heat(&self.samples, max as u64, &self.svg_colors),
         }
     }
 
@@ -388,7 +359,7 @@ impl CpuTemp {
                     info!("CpuTemp:detect: No CPU Temp IF found.");
                 }
             }
-            Err(e) => info!("CpuTemp:detect: No CPU Temp IF found. {:?}", e),
+            Err(e) => info!("CpuTemp:detect: No CPU Temp IF found. {e:?}"),
         }
 
         let mut cpu = CpuTemp {

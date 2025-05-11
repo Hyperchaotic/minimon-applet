@@ -1,6 +1,6 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use log::{debug, info, warn};
-use nvml_wrapper::{error::NvmlError, Device, Nvml};
+use nvml_wrapper::{Device, Nvml, error::NvmlError};
 
 use std::sync::LazyLock;
 
@@ -73,11 +73,11 @@ impl super::GpuIf for NvidiaGpu<'_> {
     }
 
     fn name(&self) -> String {
-        self.name.to_owned()
+        self.name.clone()
     }
 
     fn id(&self) -> String {
-        self.uuid.to_owned()
+        self.uuid.clone()
     }
 
     fn usage(&self) -> Result<u32> {
