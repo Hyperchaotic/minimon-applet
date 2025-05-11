@@ -2,6 +2,7 @@
 
 A configurable applet for displaying the following:
 * CPU load
+* CPU temperature
 * Memory usage
 * Network utilization
 * Disk activity
