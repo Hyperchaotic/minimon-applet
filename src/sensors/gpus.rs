@@ -467,9 +467,9 @@ impl Gpu {
                 ))
                 .width(90)
                 .height(60),
-                cosmic::widget::text::body(name),
+                cosmic::widget::text::title4(name),
             )
-            .padding(5)
+            .padding(cosmic::theme::spacing().space_s)
             .align_x(Alignment::Center),
         ));
 
@@ -504,9 +504,12 @@ impl Gpu {
             .spacing(cosmic.space_xs()),
         ));
 
-        let gpu = Row::with_children(gpu_elements)
+        let gpu = column![
+            widget::text::heading(fl!("gpu-title-usage")),
+            Row::with_children(gpu_elements)
             .align_y(Alignment::Center)
-            .spacing(cosmic.space_xs());
+            .spacing(cosmic.space_xs())
+        ].spacing(cosmic::theme::spacing().space_xs);
 
         // VRAM load
         let mut vram_elements = Vec::new();
@@ -555,9 +558,12 @@ impl Gpu {
             .spacing(cosmic.space_xs()),
         ));
 
-        let vram = Row::with_children(vram_elements)
+        let vram = column![
+            widget::text::heading(fl!("gpu-title-vram")),
+            Row::with_children(vram_elements)
             .align_y(Alignment::Center)
-            .spacing(cosmic.space_xs());
+            .spacing(cosmic.space_xs())
+        ].spacing(cosmic::theme::spacing().space_xs);
 
         if config.vram_label && config.gpu_label {
             let id = self.id();
