@@ -464,7 +464,7 @@ impl Gpu {
         // GPU load
         let mut gpu_elements = Vec::new();
 
-        let name = self.gpu.string();
+        let usage = self.gpu.string();
         gpu_elements.push(Element::from(
             column!(
                 widget::svg(widget::svg::Handle::from_memory(
@@ -472,9 +472,9 @@ impl Gpu {
                 ))
                 .width(90)
                 .height(60),
-                cosmic::widget::text::title4(name),
+                cosmic::widget::text::body(usage),
             )
-            .padding(cosmic::theme::spacing().space_s)
+            .padding(cosmic::theme::spacing().space_xs)
             .align_x(Alignment::Center),
         ));
 
@@ -529,7 +529,7 @@ impl Gpu {
                 .height(60),
                 cosmic::widget::text::body(vram),
             )
-            .padding(5)
+            .padding(cosmic::theme::spacing().space_xs)
             .align_x(Alignment::Center),
         ));
 
