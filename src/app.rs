@@ -82,8 +82,7 @@ pub static SETTINGS_NETWORK_HEADING: LazyLock<&'static str> =
     LazyLock::new(|| fl!("net-title").leak());
 pub static SETTINGS_DISKS_HEADING: LazyLock<&'static str> =
     LazyLock::new(|| fl!("disks-title").leak());
-pub static SETTINGS_GPU_HEADING: LazyLock<&'static str> =
-    LazyLock::new(|| fl!("gpu-title").leak());
+pub static SETTINGS_GPU_HEADING: LazyLock<&'static str> = LazyLock::new(|| fl!("gpu-title").leak());
 
 // The UI requires static lifetime of dropdown items
 pub static SYSMON_LIST: LazyLock<Vec<(String, String)>> =
@@ -120,7 +119,7 @@ macro_rules! settings_sub_page_heading {
     };
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum SettingsVariant {
     General,
     Cpu,
@@ -128,7 +127,7 @@ pub enum SettingsVariant {
     Memory,
     Network,
     Disks,
-    Gpu,
+    Gpu(String),
 }
 
 pub struct Minimon {
@@ -376,7 +375,7 @@ impl cosmic::Application for Minimon {
         elements.extend(self.disks_panel_ui(horizontal));
         for gpu in self.gpus.values() {
             elements.extend(self.gpu_panel_ui(gpu, horizontal));
-        } 
+        }
 
         let spacing = if self.config.tight_spacing {
             0
@@ -435,7 +434,7 @@ impl cosmic::Application for Minimon {
 
             let mut content = Column::new();
 
-            if let Some(variant) = self.settings_page {
+            if let Some(variant) = &self.settings_page {
                 match variant {
                     SettingsVariant::Cpu => {
                         content = content.push(settings_sub_page_heading!(SETTINGS_CPU_HEADING));
@@ -481,33 +480,32 @@ impl cosmic::Application for Minimon {
                             content = content.push(self.disks2.settings_ui(&self.config));
                         }
                     }
-                    SettingsVariant::Gpu => {
+                    SettingsVariant::Gpu(id) => {
                         content = content.push(settings_sub_page_heading!(SETTINGS_GPU_HEADING));
-                        for (id, gpu) in &self.gpus {
-                            if let Some(config) = self.config.gpus.get(id) {
-                                content = content.push(
-                                    widget::row::with_capacity(2)
-                                        .push(text::heading(gpu.name()))
-                                        .spacing(cosmic::theme::spacing().space_m),
-                                );
-                                if self.is_laptop {
-                                    let disable_row = settings::item(
-                                        fl!("settings-disable-on-battery"),
-                                        row!(widget::toggler(config.pause_on_battery).on_toggle(
-                                            move |value| {
-                                                Message::ToggleDisableOnBattery(id.clone(), value)
-                                            }
-                                        )),
-                                    ).width(350);
-                                    content = content.push(disable_row);
-                                }
-                                content = content.push(gpu.settings_ui(config));
-                            } else {
-                                error!(
-                                    "SettingsVariant::Gpu: no config for selected GPU {}",
-                                    gpu.id()
-                                );
+
+                        if let (Some(gpu), Some(config)) =
+                            (self.gpus.get(id), self.config.gpus.get(id))
+                        {
+                            content = content.push(
+                                widget::row::with_capacity(2)
+                                    .push(text::heading(gpu.name()))
+                                    .spacing(cosmic::theme::spacing().space_m),
+                            );
+                            if self.is_laptop {
+                                let disable_row = settings::item(
+                                    fl!("settings-disable-on-battery"),
+                                    row!(widget::toggler(config.pause_on_battery).on_toggle(
+                                        move |value| {
+                                            Message::ToggleDisableOnBattery(id.clone(), value)
+                                        }
+                                    )),
+                                )
+                                .width(350);
+                                content = content.push(disable_row);
                             }
+                            content = content.push(gpu.settings_ui(config));
+                        } else {
+                            error!("SettingsVariant::Gpu: Not found {}", id);
                         }
                     }
                     SettingsVariant::General => {
@@ -537,7 +535,11 @@ impl cosmic::Application for Minimon {
 
                 let cpu = widget::text::body(self.cpu.to_string());
                 let cputemp = widget::text::body(self.cputemp.to_string());
-                let memory = widget::text::body(self.memory.to_string(false));
+                let memory = widget::text::body(format!(
+                    "{} / {:.2} GB",
+                    self.memory.to_string(false),
+                    self.memory.total()
+                ));
 
                 let sample_rate_ms = self.config.refresh_rate;
                 let network = widget::text::body(format!(
@@ -599,11 +601,19 @@ impl cosmic::Application for Minimon {
                     .padding(0);
 
                 if self.has_gpus() {
-                    sensor_settings = sensor_settings.add(Minimon::go_next_with_item(
-                        &SETTINGS_GPU_CHOICE,
-                        "",
-                        Message::Settings(Some(SettingsVariant::Gpu)),
-                    ));
+                    for (key, gpu) in &self.gpus {
+                        let info = widget::text::body(format!(
+                            "{} {} / {:.2} GB",
+                            gpu.gpu.string(),
+                            gpu.vram.string(false),
+                            gpu.vram.total()
+                        ));
+                        sensor_settings = sensor_settings.add(Minimon::go_next_with_item(
+                            &SETTINGS_GPU_CHOICE,
+                            info,
+                            Message::Settings(Some(SettingsVariant::Gpu(key.clone()))),
+                        ));
+                    }
                 }
 
                 content = content.push(sensor_settings);
@@ -634,6 +644,9 @@ impl cosmic::Application for Minimon {
             Message::TogglePopup => {
                 return if let Some(p) = self.popup.take() {
                     self.colorpicker.deactivate();
+                    // GPUs that sleep on battery wil be active while settings are up
+                    // but have to go back to sleep if settings closed
+                    self.maybe_stop_gpus();
                     destroy_popup(p)
                 } else {
                     let new_id = Id::unique();
@@ -1744,7 +1757,23 @@ impl Minimon {
         for gpu in &mut self.gpus.values_mut() {
             if let Some(g) = self.config.gpus.get(&gpu.id()) {
                 if all || g.is_visible() {
+                    if all && !gpu.is_active() {
+                        gpu.restart();
+                    }
                     gpu.update();
+                }
+            }
+        }
+    }
+
+    fn maybe_stop_gpus(&mut self) {
+        if self.is_laptop && !self.on_ac {
+            for (id, gpu) in &mut self.gpus {
+                if let Some(c) = self.config.gpus.get(id) {
+                    if c.pause_on_battery {
+                        info!("Changed to DC, stop polling");
+                        gpu.stop(); // on battery, stop polling
+                    }
                 }
             }
         }

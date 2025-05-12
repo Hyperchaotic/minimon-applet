@@ -61,7 +61,7 @@ pub fn ring(value: &str, percentage: &str, color: &SvgColors) -> String {
     svg
 }
 
-pub fn line(samples: &VecDeque<f64>, max_y: u64, colors: &SvgColors) -> String {
+pub fn line(samples: &VecDeque<f64>, max_y: f64, colors: &SvgColors) -> String {
     // Generate list of coordinates for line
 
     let scaling: f32 = 40.0 / max_y as f32;

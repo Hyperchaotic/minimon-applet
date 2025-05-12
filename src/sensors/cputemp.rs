@@ -184,7 +184,7 @@ impl DemoGraph for CpuTemp {
                 )
             }
             GraphKind::Line => {
-                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100, &self.svg_colors)
+                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100.0, &self.svg_colors)
             }
             GraphKind::Heat => {
                 crate::svg_graph::heat(&VecDeque::from(DEMO_SAMPLES), 100, &self.svg_colors)
@@ -264,7 +264,7 @@ impl Sensor for CpuTemp {
 
                 crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
             }
-            GraphKind::Line => crate::svg_graph::line(&self.samples, max as u64, &self.svg_colors),
+            GraphKind::Line => crate::svg_graph::line(&self.samples, max, &self.svg_colors),
             GraphKind::Heat => crate::svg_graph::heat(&self.samples, max as u64, &self.svg_colors),
         }
     }

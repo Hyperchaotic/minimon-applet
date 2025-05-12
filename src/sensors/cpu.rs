@@ -82,7 +82,6 @@ pub struct Cpu {
     samples_sum: VecDeque<f64>,
     // CPU load for the last MAX_SAMPLES updates, split into user and system
     samples_split: VecDeque<CpuLoad>,
-    max_val: u64,
     colors: GraphColors,
     kind: GraphKind,
     graph_options: Vec<&'static str>,
@@ -95,19 +94,17 @@ impl DemoGraph for Cpu {
         match self.kind {
             GraphKind::Ring => {
                 // show a number of 40% of max
-                let val = self.max_val as f32 * 0.4;
-                let percentage: u64 = ((val / self.max_val as f32) * 100.0) as u64;
+                let val = 40;
+                let percentage: u64 = 40;
                 crate::svg_graph::ring(
                     &format!("{val}"),
                     &format!("{percentage}"),
                     &self.svg_colors,
                 )
             }
-            GraphKind::Line => crate::svg_graph::line(
-                &VecDeque::from(DEMO_SAMPLES),
-                self.max_val,
-                &self.svg_colors,
-            ),
+            GraphKind::Line => {
+                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100.0, &self.svg_colors)
+            }
             GraphKind::Heat => panic!("Wrong graph choice!"),
         }
     }
@@ -182,7 +179,7 @@ impl Sensor for Cpu {
 
             crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
         } else {
-            crate::svg_graph::line(&self.samples_sum, self.max_val, &self.svg_colors)
+            crate::svg_graph::line(&self.samples_sum, 100.0, &self.svg_colors)
         }
     }
 
@@ -241,8 +238,6 @@ impl Sensor for Cpu {
 
 impl Cpu {
     pub fn new(kind: GraphKind) -> Self {
-        let max_val = 100;
-
         // value and percentage are pre-allocated and reused as they're changed often.
         let mut percentage = String::with_capacity(6);
         write!(percentage, "0").unwrap();
@@ -265,7 +260,6 @@ impl Cpu {
                 };
                 MAX_SAMPLES
             ]),
-            max_val,
             colors: GraphColors::default(),
             kind,
             graph_options: GRAPH_OPTIONS.to_vec(),

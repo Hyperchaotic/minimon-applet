@@ -122,7 +122,7 @@ impl GpuGraph {
         } else {
             crate::svg_graph::line(
                 &self.samples,
-                100,
+                100.0,
                 if self.disabled {
                     &self.disabled_colors
                 } else {
@@ -184,7 +184,7 @@ impl DemoGraph for GpuGraph {
                 )
             }
             GraphKind::Line => {
-                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100, &self.svg_colors)
+                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100.0, &self.svg_colors)
             }
             GraphKind::Heat => panic!("Wrong graph choice!"),
         }
@@ -217,7 +217,7 @@ pub struct VramGraph {
     samples: VecDeque<f64>,
     graph_options: Vec<&'static str>,
     kind: GraphKind,
-    max_val: u64,
+    max_val: f64,
 
     //colors
     colors: GraphColors,
@@ -227,7 +227,8 @@ pub struct VramGraph {
 }
 
 impl VramGraph {
-    fn new(id: &str, total: u64) -> Self {
+    // id: a unique id, total: RAM size in GB
+    fn new(id: &str, total: f64) -> Self {
         VramGraph {
             id: id.to_owned(),
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
@@ -262,7 +263,7 @@ impl VramGraph {
                 _ = write!(percentage, "0");
                 _ = write!(value, "-");
             } else {
-                let pct: u64 = ((latest / (self.max_val as f64 / 1_073_741_824.0)) * 100.0) as u64;
+                let pct: u64 = ((latest / self.max_val) * 100.0) as u64;
 
                 write!(percentage, "{pct}").unwrap();
 
@@ -286,7 +287,7 @@ impl VramGraph {
         } else {
             crate::svg_graph::line(
                 &self.samples,
-                (self.max_val as f64 / 1_073_741_824.0) as u64,
+                self.max_val,
                 if self.disabled {
                     &self.disabled_colors
                 } else {
@@ -326,6 +327,10 @@ impl VramGraph {
         }
     }
 
+    pub fn total(&self) -> f64 {
+        self.max_val
+    }
+
     pub fn update(&mut self, sample: u64) {
         let new_val: f64 = sample as f64 / 1_073_741_824.0;
 
@@ -350,7 +355,7 @@ impl DemoGraph for VramGraph {
                 )
             }
             GraphKind::Line => {
-                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 32, &self.svg_colors)
+                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 32.0, &self.svg_colors)
             }
             GraphKind::Heat => panic!("Wrong graph choice!"),
         }
@@ -392,7 +397,7 @@ impl Gpu {
         Gpu {
             gpu_if,
             gpu: GpuGraph::new(&id),
-            vram: VramGraph::new(&id, total),
+            vram: VramGraph::new(&id, total as f64 / 1_073_741_824.0),
         }
     }
 
@@ -507,9 +512,10 @@ impl Gpu {
         let gpu = column![
             widget::text::heading(fl!("gpu-title-usage")),
             Row::with_children(gpu_elements)
-            .align_y(Alignment::Center)
-            .spacing(cosmic.space_xs())
-        ].spacing(cosmic::theme::spacing().space_xs);
+                .align_y(Alignment::Center)
+                .spacing(cosmic.space_xs())
+        ]
+        .spacing(cosmic::theme::spacing().space_xs);
 
         // VRAM load
         let mut vram_elements = Vec::new();
@@ -561,9 +567,10 @@ impl Gpu {
         let vram = column![
             widget::text::heading(fl!("gpu-title-vram")),
             Row::with_children(vram_elements)
-            .align_y(Alignment::Center)
-            .spacing(cosmic.space_xs())
-        ].spacing(cosmic::theme::spacing().space_xs);
+                .align_y(Alignment::Center)
+                .spacing(cosmic.space_xs())
+        ]
+        .spacing(cosmic::theme::spacing().space_xs);
 
         if config.vram_label && config.gpu_label {
             let id = self.id();
