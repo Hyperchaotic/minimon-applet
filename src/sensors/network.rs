@@ -237,14 +237,6 @@ impl Sensor for Network {
 
         let mut net_bandwidth_items = Vec::new();
 
-        let title = match self.variant {
-            NetworkVariant::Combined => fl!("net-title-combined"),
-            NetworkVariant::Download => fl!("net-title-dl"),
-            NetworkVariant::Upload => fl!("net-title-ul"),
-        };
-
-        net_bandwidth_items.push(Element::from(widget::text::title4(title)));
-
         net_bandwidth_items.push(
             settings::item(
                 fl!("enable-net-chart"),
@@ -304,11 +296,19 @@ impl Sensor for Network {
         let net_right_column = Column::with_children(net_bandwidth_items);
 
         net_elements.push(Element::from(net_right_column.spacing(cosmic.space_xs())));
+        
+        let title_content = match self.variant {
+            NetworkVariant::Combined => fl!("net-title-combined"),
+            NetworkVariant::Download => fl!("net-title-dl"),
+            NetworkVariant::Upload => fl!("net-title-ul"),
+        };
+        let title = widget::text::heading(title_content);
 
-        Row::with_children(net_elements)
+        column![
+            title,
+            Row::with_children(net_elements)
             .align_y(Alignment::Center)
-            .spacing(0)
-            .into()
+        ].spacing(cosmic::theme::spacing().space_xs).into()
     }
 }
 

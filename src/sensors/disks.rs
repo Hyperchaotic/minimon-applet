@@ -230,14 +230,6 @@ impl Sensor for Disks {
 
         let mut disk_bandwidth_items = Vec::new();
 
-        let title = match self.variant {
-            DisksVariant::Combined => fl!("disks-title-combined"),
-            DisksVariant::Write => fl!("disks-title-write"),
-            DisksVariant::Read => fl!("disks-title-read"),
-        };
-
-        disk_bandwidth_items.push(Element::from(widget::text::title4(title)));
-
         disk_bandwidth_items.push(
             settings::item(
                 fl!("enable-disks-chart"),
@@ -270,10 +262,19 @@ impl Sensor for Disks {
 
         disk_elements.push(Element::from(disk_right_column.spacing(cosmic.space_xs())));
 
-        Row::with_children(disk_elements)
-            .align_y(Alignment::Center)
-            .spacing(0)
-            .into()
+        let title_content = match self.variant {
+            DisksVariant::Combined => fl!("disks-title-combined"),
+            DisksVariant::Write => fl!("disks-title-write"),
+            DisksVariant::Read => fl!("disks-title-read"),
+        };
+        let title = widget::text::heading(title_content);
+
+        column![
+            title,
+            Row::with_children(disk_elements).align_y(Alignment::Center)
+        ]
+        .spacing(cosmic::theme::spacing().space_xs)
+        .into()
     }
 }
 

@@ -184,7 +184,6 @@ impl Sensor for Memory {
         let mem_kind = self.graph_kind();
         mem_elements.push(Element::from(
             column!(
-                widget::text::title4(fl!("memory-title")),
                 settings::item(
                     fl!("enable-memory-chart"),
                     toggler(config.memory.chart)

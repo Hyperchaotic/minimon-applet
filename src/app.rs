@@ -82,6 +82,8 @@ pub static SETTINGS_NETWORK_HEADING: LazyLock<&'static str> =
     LazyLock::new(|| fl!("net-title").leak());
 pub static SETTINGS_DISKS_HEADING: LazyLock<&'static str> =
     LazyLock::new(|| fl!("disks-title").leak());
+pub static SETTINGS_GPU_HEADING: LazyLock<&'static str> =
+    LazyLock::new(|| fl!("gpu-title").leak());
 
 // The UI requires static lifetime of dropdown items
 pub static SYSMON_LIST: LazyLock<Vec<(String, String)>> =
@@ -374,7 +376,7 @@ impl cosmic::Application for Minimon {
         elements.extend(self.disks_panel_ui(horizontal));
         for gpu in self.gpus.values() {
             elements.extend(self.gpu_panel_ui(gpu, horizontal));
-        }
+        } 
 
         let spacing = if self.config.tight_spacing {
             0
@@ -480,15 +482,13 @@ impl cosmic::Application for Minimon {
                         }
                     }
                     SettingsVariant::Gpu => {
-                        content = content.push(Minimon::sub_page_header(
-                            None,
-                            &SETTINGS_BACK,
-                            Message::Settings(None),
-                        ));
+                        content = content.push(settings_sub_page_heading!(SETTINGS_GPU_HEADING));
                         for (id, gpu) in &self.gpus {
                             if let Some(config) = self.config.gpus.get(id) {
                                 content = content.push(
-                                    widget::row::with_capacity(2).push(text::heading(gpu.name())),
+                                    widget::row::with_capacity(2)
+                                        .push(text::heading(gpu.name()))
+                                        .spacing(cosmic::theme::spacing().space_m),
                                 );
                                 if self.is_laptop {
                                     let disable_row = settings::item(
@@ -498,8 +498,8 @@ impl cosmic::Application for Minimon {
                                                 Message::ToggleDisableOnBattery(id.clone(), value)
                                             }
                                         )),
-                                    );
-                                    content = content.push(disable_row.width(320));
+                                    ).width(350);
+                                    content = content.push(disable_row);
                                 }
                                 content = content.push(gpu.settings_ui(config));
                             } else {
