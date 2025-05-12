@@ -3,8 +3,7 @@ use cosmic::applet::{PanelType, Size};
 use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::cosmic_theme::palette::bool_mask::BoolMask;
 use cosmic::cosmic_theme::palette::{FromColor, WithAlpha};
-use cosmic::iced::Length::Shrink;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::{fs, time};
 
@@ -151,7 +150,7 @@ pub struct Minimon {
     disks2: Disks,
 
     //GPUs
-    gpus: HashMap<String, Gpu>,
+    gpus: BTreeMap<String, Gpu>,
 
     /// The popup id.
     popup: Option<Id>,
@@ -252,7 +251,7 @@ impl cosmic::Application for Minimon {
 
     fn init(core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
         // Find GPUs
-        let gpus: HashMap<String, Gpu> = list_gpus()
+        let gpus: BTreeMap<String, Gpu> = list_gpus()
             .into_iter()
             .map(|gpu| {
                 info!("Found GPU. Name: {}. UUID: {}", gpu.name(), gpu.id());
