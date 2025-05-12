@@ -142,7 +142,7 @@ impl AmdGpu {
         info!("Resolving GPU name for card: {card}");
 
         // Use static lookup table first, with nice names
-        let device_id_path = format!("/sys/class/drm/{card}/device/subsystem_device");
+        let device_id_path = format!("/sys/class/drm/{card}/device/device");
         if let Ok(dev_id) = AmdGpu::read_file_to_string(&device_id_path) {
             info!("Read device ID from sysfs: {dev_id}");
             if let Some(name) = AMD_GPU_DEVICE_IDS.get(dev_id.to_uppercase().as_str()) {
