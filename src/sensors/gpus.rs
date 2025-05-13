@@ -2,7 +2,7 @@ use cosmic::Element;
 use log::info;
 use std::{collections::VecDeque, fmt::Write};
 
-use cosmic::widget;
+use cosmic::widget::{self, Column};
 use cosmic::widget::{settings, toggler};
 
 use cosmic::{
@@ -387,6 +387,7 @@ pub struct Gpu {
     gpu_if: Box<dyn GpuIf>,
     pub gpu: GpuGraph,
     pub vram: VramGraph,
+    is_laptop: bool,
 }
 
 impl Gpu {
@@ -398,6 +399,7 @@ impl Gpu {
             gpu_if,
             gpu: GpuGraph::new(&id),
             vram: VramGraph::new(&id, total as f64 / 1_073_741_824.0),
+            is_laptop: false,
         }
     }
 
@@ -407,6 +409,10 @@ impl Gpu {
 
     pub fn id(&self) -> String {
         self.gpu_if.as_ref().id().clone()
+    }
+
+    pub fn set_laptop(&mut self) {
+        self.is_laptop = true;
     }
 
     pub fn demo_gpu_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
@@ -460,6 +466,17 @@ impl Gpu {
     ) -> cosmic::Element<crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
+
+        let battery_disable = if self.is_laptop {
+            Some(settings::item(
+                fl!("settings-disable-on-battery"),
+                widget::toggler(config.pause_on_battery).on_toggle(move |value| {
+                    Message::ToggleDisableOnBattery(self.id().clone(), value)
+                }),
+            ))
+        } else {
+            None
+        };
 
         // GPU load
         let mut gpu_elements = Vec::new();
@@ -572,20 +589,26 @@ impl Gpu {
         ]
         .spacing(cosmic::theme::spacing().space_xs);
 
-        if config.vram_label && config.gpu_label {
-            let id = self.id();
-            let disable_row = settings::item(
+        let stacked = if config.vram_label && config.gpu_label {
+            Some(settings::item(
                 fl!("settings-gpu-stack-labels"),
                 row!(
                     widget::toggler(config.stack_labels).on_toggle(move |value| {
-                        Message::GpuToggleStackLabels(id.clone(), value)
+                        Message::GpuToggleStackLabels(self.id().clone(), value)
                     })
                 ),
-            );
-            column!(gpu, vram, disable_row).spacing(10).into()
+            ))
         } else {
-            column!(gpu, vram).spacing(10).into()
-        }
+            None
+        };
+
+        Column::new()
+            .push_maybe(battery_disable)
+            .push(gpu)
+            .push(vram)
+            .push_maybe(stacked)
+            .spacing(cosmic::theme::spacing().space_xs)
+            .into()
     }
 }
 

@@ -249,19 +249,23 @@ impl cosmic::Application for Minimon {
     const APP_ID: &'static str = "io.github.cosmic-utils.cosmic-applet-minimon";
 
     fn init(core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
-        // Find GPUs
-        let gpus: BTreeMap<String, Gpu> = list_gpus()
-            .into_iter()
-            .map(|gpu| {
-                info!("Found GPU. Name: {}. UUID: {}", gpu.name(), gpu.id());
-                (gpu.id().to_string(), gpu)
-            })
-            .collect();
-
         let is_laptop = Minimon::is_laptop();
         if is_laptop {
             info!("Is laptop");
         }
+
+        // Find GPUs
+        let gpus: BTreeMap<String, Gpu> = list_gpus()
+            .into_iter()
+            .map(|mut gpu| {
+                info!("Found GPU. Name: {}. UUID: {}", gpu.name(), gpu.id());
+                if is_laptop {
+                    gpu.set_laptop();
+                }
+                (gpu.id().to_string(), gpu)
+            })
+            .collect();
+
         let app = Minimon {
             core,
             cpu: Cpu::new(GraphKind::Ring),
@@ -491,18 +495,6 @@ impl cosmic::Application for Minimon {
                                     .push(text::heading(gpu.name()))
                                     .spacing(cosmic::theme::spacing().space_m),
                             );
-                            if self.is_laptop {
-                                let disable_row = settings::item(
-                                    fl!("settings-disable-on-battery"),
-                                    row!(widget::toggler(config.pause_on_battery).on_toggle(
-                                        move |value| {
-                                            Message::ToggleDisableOnBattery(id.clone(), value)
-                                        }
-                                    )),
-                                )
-                                .width(350);
-                                content = content.push(disable_row);
-                            }
                             content = content.push(gpu.settings_ui(config));
                         } else {
                             error!("SettingsVariant::Gpu: Not found {}", id);
@@ -626,7 +618,7 @@ impl cosmic::Application for Minimon {
                 .max_width(420.0)
                 .min_width(360.0)
                 .min_height(200.0)
-                .max_height(550.0);
+                .max_height(600.0);
 
             self.core
                 .applet
