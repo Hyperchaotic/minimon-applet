@@ -470,8 +470,11 @@ impl Gpu {
         let battery_disable = if self.is_laptop {
             Some(settings::item(
                 fl!("settings-disable-on-battery"),
-                widget::toggler(config.pause_on_battery).on_toggle(move |value| {
+                widget::checkbox("", config.pause_on_battery).on_toggle(move |value| {
                     Message::ToggleDisableOnBattery(self.id().clone(), value)
+
+                    //widget::toggler(config.pause_on_battery).on_toggle(move |value| {
+                    //   Message::ToggleDisableOnBattery(self.id().clone(), value)
                 }),
             ))
         } else {
