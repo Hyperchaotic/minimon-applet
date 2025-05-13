@@ -78,5 +78,5 @@ settings-disable-on-battery = Systeemmonitor pauzeren als u uw laptop van het st
 enable-symbols = Symbolen tonen
 settings-gpu-stack-labels = GPU- en VRAM-labels verticaal weergeven, indien van toepassing
 settings-tight-spacing = Compacte weergave
-cpu-temp-amd = Indien beschikbaar geeft dit voor AMD-processoren de 'Tdie' (echte die-temperatuur) weer, en anders geeft dit de 'Tctl' (de temperatuur met een offset ingesteld door AMD) weer.
+cpu-temp-amd = Indien beschikbaar geeft dit de 'Tdie' (echte die-temperatuur) weer voor AMD-processoren, en anders de 'Tctl' (de temperatuur met een offset ingesteld door AMD).
 cpu-temp-intel = Toont voor Intel-processoren de hoogste temperatuur gemeten bij alle sensoren/cores.
