@@ -46,14 +46,17 @@ just build-release
 just install
 ```
 
-Alternatively generate a deb file for installation:
+Alternatively generate a deb or rpm file for installation:
 
 ```sh
+just build-release
 just deb
+just rpm
 ```
 and install with:
 
 ```sh
 sudo dpkg -i <name_of.deb>
+sudo dnf install <name_of.rpm>
 ```
 
