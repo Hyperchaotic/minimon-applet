@@ -468,15 +468,18 @@ impl Gpu {
         let cosmic = theme.cosmic();
 
         let battery_disable = if self.is_laptop {
-            Some(settings::item(
-                fl!("settings-disable-on-battery"),
-                widget::checkbox("", config.pause_on_battery).on_toggle(move |value| {
-                    Message::ToggleDisableOnBattery(self.id().clone(), value)
+            Some(
+                settings::item(
+                    fl!("settings-disable-on-battery"),
+                    widget::checkbox("", config.pause_on_battery).on_toggle(move |value| {
+                        Message::ToggleDisableOnBattery(self.id().clone(), value)
 
-                    //widget::toggler(config.pause_on_battery).on_toggle(move |value| {
-                    //   Message::ToggleDisableOnBattery(self.id().clone(), value)
-                }),
-            ))
+                        //widget::toggler(config.pause_on_battery).on_toggle(move |value| {
+                        //   Message::ToggleDisableOnBattery(self.id().clone(), value)
+                    }),
+                )
+                .width(340),
+            )
         } else {
             None
         };
