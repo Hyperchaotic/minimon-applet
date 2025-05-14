@@ -357,9 +357,11 @@ impl cosmic::Application for Minimon {
             && !self.config.cputemp.is_visible()
             && !self.config.memory.is_visible()
             && !self.config.network1.is_visible()
-            && !self.config.network2.is_visible()
+            && !(self.config.network1.variant != NetworkVariant::Combined
+                && self.config.network2.is_visible())
             && !self.config.disks1.is_visible()
-            && !self.config.disks2.is_visible()
+            && !(self.config.disks1.variant != DisksVariant::Combined
+                && self.config.disks2.is_visible())
         {
             return self
                 .core
