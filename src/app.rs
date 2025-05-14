@@ -3,6 +3,7 @@ use cosmic::applet::{PanelType, Size};
 use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::cosmic_theme::palette::bool_mask::BoolMask;
 use cosmic::cosmic_theme::palette::{FromColor, WithAlpha};
+use cosmic::iced_futures::backend::native::tokio;
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::{fs, time};
@@ -207,6 +208,7 @@ pub enum Message {
 
     SelectGraphType(DeviceKind, GraphKind),
     Tick,
+    ACCheck,
     PopupClosed(Id),
 
     ToggleCpuChart(bool),
@@ -308,7 +310,11 @@ impl cosmic::Application for Minimon {
             iced::time::every(time::Duration::from_millis(val as u64))
         }
 
-        Subscription::batch(vec![
+        fn ac_time_subscription() -> Subscription<time::Instant> {
+            iced::time::every(time::Duration::from_millis(4000))
+        }
+
+        let mut subs: Vec<Subscription<Message>> = vec![
             time_subscription(&self.tick).map(|_| Message::Tick),
             self.core
                 .watch_config(match self.core.applet.panel_type {
@@ -317,12 +323,19 @@ impl cosmic::Application for Minimon {
                     PanelType::Other(_) => APP_ID_OTHER,
                 })
                 .map(|u| Message::ConfigChanged(Box::new(u.config))),
-        ])
+        ];
+
+        if self.is_laptop {
+            subs.push(ac_time_subscription().map(|_| Message::ACCheck));
+        }
+
+        Subscription::batch(subs)
     }
 
     fn on_close_requested(&self, id: Id) -> Option<Message> {
         Some(Message::PopupClosed(id))
     }
+
     fn view(&self) -> Element<Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
@@ -903,22 +916,22 @@ impl cosmic::Application for Minimon {
                 } else {
                     self.tick_timer = 0;
                 }
+            }
 
-                if self.is_laptop {
-                    let current_on_ac = self.is_on_ac().unwrap_or(true);
-                    if self.on_ac != current_on_ac {
-                        self.on_ac = current_on_ac;
+            Message::ACCheck => {
+                let current_on_ac = self.is_on_ac().unwrap_or(true);
+                if self.on_ac != current_on_ac {
+                    self.on_ac = current_on_ac;
 
-                        for (id, gpu) in &mut self.gpus {
-                            if let Some(c) = self.config.gpus.get(id) {
-                                if c.pause_on_battery {
-                                    if current_on_ac {
-                                        info!("Changed to AC, restart polling");
-                                        gpu.restart(); // on AC, start polling
-                                    } else {
-                                        info!("Changed to DC, stop polling");
-                                        gpu.stop(); // on battery, stop polling
-                                    }
+                    for (id, gpu) in &mut self.gpus {
+                        if let Some(c) = self.config.gpus.get(id) {
+                            if c.pause_on_battery {
+                                if current_on_ac {
+                                    info!("Changed to AC, restart polling");
+                                    gpu.restart(); // on AC, start polling
+                                } else {
+                                    info!("Changed to DC, stop polling");
+                                    gpu.stop(); // on battery, stop polling
                                 }
                             }
                         }

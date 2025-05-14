@@ -259,6 +259,7 @@ pub fn heat(samples: &VecDeque<f64>, max_y: u64, colors: &SvgColors) -> String {
     svg.push_str(HEATSVG_8);
     svg.push_str(&colors.color2);
     svg.push_str(HEATSVG_9);
+
     svg
 }
 /*
