@@ -1717,7 +1717,9 @@ impl Minimon {
         // Update everything if popup open
         let all = self.popup.is_some();
 
-        self.cpu.update();
+        if all || self.config.cpu.is_visible() {
+            self.cpu.update();
+        }
 
         if all || self.config.cputemp.is_visible() {
             self.cputemp.update();
