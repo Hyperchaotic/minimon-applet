@@ -138,7 +138,10 @@ impl Sensor for Memory {
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
 
-            let pct: u64 = ((latest / self.max_val as f64) * 100.0) as u64;
+            let mut pct: u64 = ((latest / self.max_val as f64) * 100.0) as u64;
+            if pct > 100 {
+                pct = 100;
+            }
 
             write!(percentage, "{pct}").unwrap();
 
@@ -149,10 +152,10 @@ impl Sensor for Memory {
 
             if latest < 10.0 {
                 write!(value, "{latest:.2}").unwrap();
-            } else if latest < 100.0 {
+            } else if latest <= 99.9 {
                 write!(value, "{latest:.1}").unwrap();
             } else {
-                write!(value, "{latest}").unwrap();
+                write!(value, "100").unwrap();
             }
 
             crate::svg_graph::ring(&value, &percentage, &self.svg_colors)

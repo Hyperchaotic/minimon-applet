@@ -3,7 +3,6 @@ use cosmic::applet::{PanelType, Size};
 use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::cosmic_theme::palette::bool_mask::BoolMask;
 use cosmic::cosmic_theme::palette::{FromColor, WithAlpha};
-use cosmic::iced_futures::backend::native::tokio;
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::{fs, time};
@@ -19,7 +18,7 @@ use cosmic::{widget, widget::autosize};
 
 use std::sync::Arc;
 use std::sync::LazyLock;
-use std::sync::atomic::{self, AtomicI64};
+use std::sync::atomic::{self, AtomicU32};
 
 use cosmic::{
     applet::cosmic_panel_config::PanelAnchor,
@@ -47,8 +46,6 @@ use crate::{config::MinimonConfig, fl};
 use cosmic::widget::Id as WId;
 
 static AUTOSIZE_MAIN_ID: LazyLock<WId> = std::sync::LazyLock::new(|| WId::new("autosize-main"));
-
-const TICK: i64 = 250;
 
 const ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon";
 const TEMP_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-temperature";
@@ -163,12 +160,9 @@ pub struct Minimon {
 
     /// Settings stored on disk, including refresh rate, colors, etc.
     config: MinimonConfig,
-    /// Countdown timer, as the subscription tick is 250ms
-    /// this counter can be set higher and controls refresh/update rate.
-    /// Refreshes machine stats when reaching 0 and is reset to configured rate.
-    tick_timer: i64,
+
     /// tick can be 250, 500 or 1000, depending on refresh rate modolu tick
-    tick: Arc<AtomicI64>,
+    refresh_rate: Arc<AtomicU32>,
 
     // On AC or battery?
     is_laptop: bool,
@@ -282,8 +276,7 @@ impl cosmic::Application for Minimon {
             settings_page: None,
             colorpicker: ColorPicker::new(),
             config: MinimonConfig::default(),
-            tick_timer: TICK,
-            tick: Arc::new(AtomicI64::new(TICK)),
+            refresh_rate: Arc::new(AtomicU32::new(1000)),
             is_laptop,
             on_ac: true,
         };
@@ -304,7 +297,7 @@ impl cosmic::Application for Minimon {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        fn time_subscription(tick: &std::sync::Arc<AtomicI64>) -> Subscription<time::Instant> {
+        fn time_subscription(tick: &std::sync::Arc<AtomicU32>) -> Subscription<time::Instant> {
             let atomic = tick.clone();
             let val = atomic.load(atomic::Ordering::Relaxed);
             iced::time::every(time::Duration::from_millis(val as u64))
@@ -315,7 +308,7 @@ impl cosmic::Application for Minimon {
         }
 
         let mut subs: Vec<Subscription<Message>> = vec![
-            time_subscription(&self.tick).map(|_| Message::Tick),
+            time_subscription(&self.refresh_rate).map(|_| Message::Tick),
             self.core
                 .watch_config(match self.core.applet.panel_type {
                     PanelType::Panel => APP_ID_PANEL,
@@ -904,18 +897,7 @@ impl cosmic::Application for Minimon {
             }
 
             Message::Tick => {
-                let tick = self.tick.load(atomic::Ordering::Relaxed);
-
-                if self.tick_timer <= 0 {
-                    self.tick_timer = self.config.refresh_rate as i64;
-                    self.refresh_stats();
-                }
-
-                if self.tick_timer >= tick {
-                    self.tick_timer -= tick;
-                } else {
-                    self.tick_timer = 0;
-                }
+                self.refresh_stats();
             }
 
             Message::ACCheck => {
@@ -1004,7 +986,7 @@ impl cosmic::Application for Minimon {
             Message::ConfigChanged(config) => {
                 self.config = *config;
                 self.sync_gpu_configs();
-                self.tick_timer = self.config.refresh_rate as i64;
+                self.set_refresh_rate();
                 self.cpu.set_colors(self.config.cpu.colors);
                 self.cpu.set_graph_kind(self.config.cpu.kind);
                 self.cputemp.set_colors(self.config.cputemp.colors);
@@ -1021,7 +1003,6 @@ impl cosmic::Application for Minimon {
                 self.disks2.variant = DisksVariant::Read;
                 self.set_network_max_y(NetworkVariant::Download);
                 self.set_network_max_y(NetworkVariant::Upload);
-                self.set_tick();
             }
 
             Message::ColorTextInputRedChanged(value) => {
@@ -1056,7 +1037,7 @@ impl cosmic::Application for Minimon {
             Message::RefreshRateChanged(rate) => {
                 info!("Message::RefreshRateChanged({:?})", rate);
                 self.config.refresh_rate = (rate * 1000.0) as u32;
-                self.set_tick();
+                self.set_refresh_rate();
                 self.save_config();
             }
 
@@ -1230,7 +1211,7 @@ impl Minimon {
                 refresh_rate,
                 0.250,
                 0.250,
-                5.00,
+                2.00,
                 Message::RefreshRateChanged,
             ),
         );
@@ -1700,17 +1681,9 @@ impl Minimon {
         }
     }
 
-    fn set_tick(&mut self) {
-        self.tick.store(
-            if self.config.refresh_rate % 1000 == 0 {
-                1000
-            } else if self.config.refresh_rate % 500 == 0 {
-                500
-            } else {
-                250
-            },
-            atomic::Ordering::Relaxed,
-        );
+    fn set_refresh_rate(&mut self) {
+        self.refresh_rate
+            .store(self.config.refresh_rate, atomic::Ordering::Relaxed);
     }
 
     fn set_network_max_y(&mut self, variant: NetworkVariant) {
