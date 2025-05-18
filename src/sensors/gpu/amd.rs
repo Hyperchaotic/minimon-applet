@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use hex;
 use log::{debug, info};
 use sha2::{Digest, Sha256};
@@ -18,6 +18,7 @@ pub struct AmdGpu {
     usage_path: String,
     vram_used_path: String,
     power_status_path: String,
+    temp_input_path: Option<String>,
     vram_total: u64,
     paused: bool,
 }
@@ -25,12 +26,14 @@ pub struct AmdGpu {
 impl AmdGpu {
     pub fn new(name: &str, card: &str, id: &str, vram_total: u64) -> Self {
         let base = format!("/sys/class/drm/{card}/device");
+        let temp_input_path = AmdGpu::find_temp_input_path(card);
         Self {
             name: name.to_string(),
             id: id.to_string(),
             usage_path: format!("{base}/gpu_busy_percent"),
             vram_used_path: format!("{base}/mem_info_vram_used"),
             power_status_path: format!("{base}/power/runtime_status"),
+            temp_input_path,
             vram_total,
             paused: false,
         }
@@ -79,6 +82,23 @@ impl AmdGpu {
             }
         }
         cards
+    }
+
+    fn find_temp_input_path(card: &str) -> Option<String> {
+        log::info!("AMD find_temp_input_path({card})");
+        let hwmon_base = format!("/sys/class/drm/{card}/device/hwmon");
+        let entries = fs::read_dir(hwmon_base).ok()?;
+
+        for entry in entries.flatten() {
+            let path = entry.path().join("temp1_input");
+            if path.exists() {
+                log::info!("    Found temperature file {path:?}");
+                return Some(path.to_string_lossy().to_string());
+            }
+        }
+
+        log::info!("    Couldn't find temp1_input.");
+        None
     }
 
     fn get_vram_total(card: &str) -> Option<u64> {
@@ -147,7 +167,7 @@ impl AmdGpu {
             info!("Read device ID from sysfs: {dev_id}");
             if let Some(name) = AMD_GPU_DEVICE_IDS.get(dev_id.to_uppercase().as_str()) {
                 debug!("Found name in static map: {name}");
-                return name.to_string();
+                return (*name).to_string();
             }
             info!("No entry in static map for device ID: {dev_id}");
         } else {
@@ -253,6 +273,27 @@ impl super::GpuIf for AmdGpu {
             return Ok(0);
         }
         Ok(Self::parse_u32_file(&self.usage_path).unwrap_or(0))
+    }
+
+    fn temperature(&self) -> Result<u32> {
+        if !self.powered_on() {
+            return Ok(0);
+        }
+
+        let path = self
+            .temp_input_path
+            .as_ref()
+            .context("Temperature path not found")?;
+
+        let contents = fs::read_to_string(path)
+            .with_context(|| format!("Failed to read temperature from {path}"))?;
+
+        let temp_millidegrees: u32 = contents
+            .trim()
+            .parse()
+            .context("Failed to parse temperature value")?;
+
+        Ok(temp_millidegrees)
     }
 
     fn vram_used(&self) -> Result<u64> {

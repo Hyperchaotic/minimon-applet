@@ -188,12 +188,12 @@ impl Sensor for Memory {
         mem_elements.push(Element::from(
             column!(
                 settings::item(
-                    fl!("enable-memory-chart"),
+                    fl!("enable-chart"),
                     toggler(config.memory.chart)
                         .on_toggle(|value| { Message::ToggleMemoryChart(value) }),
                 ),
                 settings::item(
-                    fl!("enable-memory-label"),
+                    fl!("enable-label"),
                     toggler(config.memory.label)
                         .on_toggle(|value| { Message::ToggleMemoryLabel(value) }),
                 ),
@@ -263,7 +263,7 @@ impl Memory {
     }
 
     pub fn total(&self) -> f64 {
-        self.max_val as f64
+        self.max_val
     }
 
     pub fn to_string(&self, vertical_panel: bool) -> String {
@@ -271,7 +271,7 @@ impl Memory {
         let unit: &str;
 
         if self.show_percentage {
-            current_val = (current_val * 100.0) / self.max_val as f64;
+            current_val = (current_val * 100.0) / self.max_val;
             unit = "%";
         } else if !vertical_panel {
             unit = " GB";

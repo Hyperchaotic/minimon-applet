@@ -209,11 +209,11 @@ impl Sensor for Cpu {
         cpu_elements.push(Element::from(
             column!(
                 settings::item(
-                    fl!("enable-cpu-chart"),
+                    fl!("enable-chart"),
                     toggler(config.cpu.chart).on_toggle(|value| { Message::ToggleCpuChart(value) }),
                 ),
                 settings::item(
-                    fl!("enable-cpu-label"),
+                    fl!("enable-label"),
                     toggler(config.cpu.label).on_toggle(|value| { Message::ToggleCpuLabel(value) }),
                 ),
                 row!(

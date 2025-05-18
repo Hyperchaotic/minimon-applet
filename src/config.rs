@@ -53,6 +53,7 @@ pub enum DeviceKind {
     Disks(DisksVariant),
     Gpu,
     Vram,
+    GpuTemp,
 }
 
 impl std::fmt::Display for DeviceKind {
@@ -64,7 +65,8 @@ impl std::fmt::Display for DeviceKind {
             DeviceKind::Network(_) => write!(f, "{}", fl!("sensor-network")),
             DeviceKind::Disks(_) => write!(f, "{}", fl!("sensor-disks")),
             DeviceKind::Gpu => write!(f, "{}", fl!("sensor-gpu")),
-            &DeviceKind::Vram => write!(f, "{}", fl!("sensor-vram")),
+            DeviceKind::Vram => write!(f, "{}", fl!("sensor-vram")),
+            DeviceKind::GpuTemp => write!(f, "{}", fl!("sensor-gpu-temp")),
         }
     }
 }
@@ -119,6 +121,10 @@ impl GraphColors {
             },
             DeviceKind::Vram => GraphColors {
                 color4: Srgba::from_components((0, 255, 0, 255)),
+                ..Default::default()
+            },
+            DeviceKind::GpuTemp => GraphColors {
+                color4: Srgba::from_components((255, 95, 31, 255)),
                 ..Default::default()
             },
         }
@@ -299,36 +305,106 @@ impl Default for DisksConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
 #[version = 1]
+pub struct GpuUsageConfig {
+    pub chart: bool,
+    pub label: bool,
+    pub kind: GraphKind,
+    pub colors: GraphColors,
+}
+
+impl Default for GpuUsageConfig {
+    fn default() -> Self {
+        Self {
+            chart: true,
+            label: false,
+            kind: GraphKind::Ring,
+            colors: GraphColors::new(DeviceKind::GpuTemp),
+        }
+    }
+}
+
+impl GpuUsageConfig {
+    pub fn is_visible(&self) -> bool {
+        self.chart || self.label
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
+#[version = 1]
+pub struct GpuVramConfig {
+    pub chart: bool,
+    pub label: bool,
+    pub kind: GraphKind,
+    pub colors: GraphColors,
+}
+
+impl Default for GpuVramConfig {
+    fn default() -> Self {
+        Self {
+            chart: true,
+            label: false,
+            kind: GraphKind::Ring,
+            colors: GraphColors::new(DeviceKind::Vram),
+        }
+    }
+}
+
+impl GpuVramConfig {
+    pub fn is_visible(&self) -> bool {
+        self.chart || self.label
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
+#[version = 1]
+pub struct GpuTempConfig {
+    pub chart: bool,
+    pub label: bool,
+    pub kind: GraphKind,
+    pub colors: GraphColors,
+    pub unit: TempUnit,
+}
+
+impl Default for GpuTempConfig {
+    fn default() -> Self {
+        Self {
+            chart: false,
+            label: false,
+            kind: GraphKind::Heat,
+            colors: GraphColors::new(DeviceKind::GpuTemp),
+            unit: TempUnit::Celcius,
+        }
+    }
+}
+
+impl GpuTempConfig {
+    pub fn is_visible(&self) -> bool {
+        self.chart || self.label
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
+#[version = 1]
 pub struct GpuConfig {
-    pub gpu_chart: bool,
-    pub gpu_label: bool,
-    pub gpu_kind: GraphKind,
-    pub gpu_colors: GraphColors,
-    pub vram_chart: bool,
-    pub vram_label: bool,
-    pub vram_kind: GraphKind,
-    pub vram_colors: GraphColors,
+    pub usage: GpuUsageConfig,
+    pub vram: GpuVramConfig,
+    pub temp: GpuTempConfig,
     pub pause_on_battery: bool,
     pub stack_labels: bool,
 }
 
 impl GpuConfig {
     pub fn is_visible(&self) -> bool {
-        self.gpu_chart || self.gpu_label || self.vram_chart || self.vram_label
+        self.usage.is_visible() || self.vram.is_visible() || self.temp.is_visible()
     }
 }
 
 impl Default for GpuConfig {
     fn default() -> Self {
         Self {
-            gpu_chart: true,
-            gpu_label: false,
-            gpu_kind: GraphKind::Ring,
-            gpu_colors: GraphColors::new(DeviceKind::Gpu),
-            vram_chart: true,
-            vram_label: false,
-            vram_kind: GraphKind::Ring,
-            vram_colors: GraphColors::new(DeviceKind::Vram),
+            usage: GpuUsageConfig::default(),
+            vram: GpuVramConfig::default(),
+            temp: GpuTempConfig::default(),
             pause_on_battery: true,
             stack_labels: true,
         }

@@ -13,6 +13,7 @@ use cosmic::{
     iced_widget::Row,
 };
 
+use super::TempUnit;
 use crate::app::Message;
 use crate::colorpicker::DemoGraph;
 use crate::config::DeviceKind;
@@ -45,7 +46,16 @@ pub static COLOR_CHOICES_LINE: LazyLock<[(&'static str, ColorVariant); 3]> = Laz
     ]
 });
 
+pub static COLOR_CHOICES_HEAT: LazyLock<[(&'static str, ColorVariant); 2]> = LazyLock::new(|| {
+    [
+        (fl!("graph-line-back").leak(), ColorVariant::Color1),
+        (fl!("graph-line-frame").leak(), ColorVariant::Color2),
+    ]
+});
+
 const GRAPH_OPTIONS: [&str; 2] = ["Ring", "Line"];
+const TEMP_GRAPH_OPTIONS: [&str; 3] = ["Ring", "Line", "Heat"];
+const UNIT_OPTIONS: [&str; 4] = ["Celcius", "Farenheit", "Kelvin", "Rankine"];
 
 const MAX_SAMPLES: usize = 21;
 
@@ -149,24 +159,28 @@ impl GpuGraph {
         self.svg_colors.set_colors(&colors);
     }
 
-    pub fn string(&self) -> String {
-        let current_val = self.latest_sample();
-        let unit = "%";
-
-        if current_val < 10.0 {
-            format!("{current_val:.2}{unit}")
-        } else if current_val < 100.0 {
-            format!("{current_val:.1}{unit}")
-        } else {
-            format!("{current_val}{unit}")
-        }
-    }
-
     pub fn update(&mut self, sample: u32) {
         if self.samples.len() >= MAX_SAMPLES {
             self.samples.pop_front();
         }
         self.samples.push_back(f64::from(sample));
+    }
+}
+
+impl fmt::Display for GpuGraph {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.disabled {
+            write!(f, "----%")
+        } else {
+            let current_val = self.latest_sample();
+            if current_val < 10.0 {
+                write!(f, "{current_val:.2}%")
+            } else if current_val < 100.0 {
+                write!(f, "{current_val:.1}%")
+            } else {
+                write!(f, "{current_val}%")
+            }
+        }
     }
 }
 
@@ -318,7 +332,9 @@ impl VramGraph {
         let current_val = self.latest_sample();
         let unit: &str = if vertical_panel { "GB" } else { " GB" };
 
-        if current_val < 10.0 {
+        if self.disabled {
+            format!("----{unit}")
+        } else if current_val < 10.0 {
             format!("{current_val:.2}{unit}")
         } else if current_val < 100.0 {
             format!("{current_val:.1}{unit}")
@@ -338,6 +354,195 @@ impl VramGraph {
             self.samples.pop_front();
         }
         self.samples.push_back(new_val);
+    }
+}
+
+pub struct TempGraph {
+    supported: bool,
+    id: String,
+    samples: VecDeque<f64>,
+    pub tempunit: TempUnit,
+    unit_options: Vec<&'static str>,
+    graph_options: Vec<&'static str>,
+    kind: GraphKind,
+    max_val: f64,
+
+    //colors
+    colors: GraphColors,
+    svg_colors: SvgColors,
+    disabled: bool,
+    disabled_colors: SvgColors,
+}
+
+impl TempGraph {
+    // id: a unique id, total: RAM size in GB
+    fn new(id: &str) -> Self {
+        TempGraph {
+            supported: true,
+            id: id.to_owned(),
+            samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
+            tempunit: TempUnit::Celcius,
+            unit_options: UNIT_OPTIONS.to_vec(),
+            graph_options: TEMP_GRAPH_OPTIONS.to_vec(),
+            kind: GraphKind::Ring,
+            max_val: 100.0,
+            colors: GraphColors::default(),
+            svg_colors: SvgColors::new(&GraphColors::default()),
+            disabled: false,
+            disabled_colors: SvgColors {
+                color1: String::from("#FFFFFF20"),
+                color2: String::from("#727272FF"),
+                color3: String::from("#727272FF"),
+                color4: String::from("#727272FF"),
+            },
+        }
+    }
+
+    pub fn clear(&mut self) {
+        for sample in &mut self.samples {
+            *sample = 0.0;
+        }
+    }
+
+    pub fn is_supported(&self) -> bool {
+        self.supported
+    }
+
+    pub fn set_supported(&mut self, supported: bool) {
+        self.supported = supported;
+    }
+
+    pub fn graph(&self) -> String {
+        match self.kind {
+            GraphKind::Ring => {
+                let latest = self.latest_sample();
+                let mut value = self.to_string();
+
+                // remove the C/F/K unit if there's not enough space
+                if value.len() > 3 {
+                    let _ = value.pop();
+                }
+                let mut percentage = String::with_capacity(10);
+
+                write!(percentage, "{latest}").unwrap();
+
+                crate::svg_graph::ring(
+                    &value,
+                    &percentage,
+                    if self.disabled {
+                        &self.disabled_colors
+                    } else {
+                        &self.svg_colors
+                    },
+                )
+            }
+            GraphKind::Line => crate::svg_graph::line(
+                &self.samples,
+                self.max_val,
+                if self.disabled {
+                    &self.disabled_colors
+                } else {
+                    &self.svg_colors
+                },
+            ),
+            GraphKind::Heat => {
+                crate::svg_graph::heat(&self.samples, self.max_val as u64, &self.svg_colors)
+            }
+        }
+    }
+
+    pub fn latest_sample(&self) -> f64 {
+        *self.samples.back().unwrap_or(&0f64)
+    }
+
+    pub fn graph_kind(&self) -> crate::config::GraphKind {
+        self.kind
+    }
+
+    pub fn set_graph_kind(&mut self, kind: crate::config::GraphKind) {
+        self.kind = kind;
+    }
+
+    pub fn set_colors(&mut self, colors: GraphColors) {
+        self.colors = colors;
+        self.svg_colors.set_colors(&colors);
+    }
+
+    pub fn update(&mut self, sample: u32) {
+        let new_val = f64::from(sample) / 1000.0;
+        if self.samples.len() >= MAX_SAMPLES {
+            self.samples.pop_front();
+        }
+        self.samples.push_back(new_val);
+    }
+}
+
+impl DemoGraph for TempGraph {
+    fn demo(&self) -> String {
+        match self.kind {
+            GraphKind::Ring => {
+                // show a number of 40% of max
+                let val = 40;
+                let percentage: u64 = 40;
+                crate::svg_graph::ring(
+                    &format!("{val}"),
+                    &format!("{percentage}"),
+                    &self.svg_colors,
+                )
+            }
+            GraphKind::Line => {
+                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100.0, &self.svg_colors)
+            }
+            GraphKind::Heat => {
+                crate::svg_graph::heat(&VecDeque::from(HEAT_DEMO_SAMPLES), 100, &self.svg_colors)
+            }
+        }
+    }
+
+    fn colors(&self) -> GraphColors {
+        self.colors
+    }
+
+    fn set_colors(&mut self, colors: GraphColors) {
+        self.colors = colors;
+        self.svg_colors.set_colors(&colors);
+    }
+
+    fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
+        match self.kind {
+            GraphKind::Line => (*COLOR_CHOICES_LINE).into(),
+            GraphKind::Ring => (*COLOR_CHOICES_RING).into(),
+            GraphKind::Heat => (*COLOR_CHOICES_HEAT).into(),
+        }
+    }
+
+    fn id(&self) -> Option<String> {
+        Some(self.id.clone())
+    }
+}
+
+use std::fmt;
+
+impl fmt::Display for TempGraph {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let current_val = self.latest_sample();
+        if !self.is_supported() {
+            Ok(())
+        } else if self.disabled || current_val <= 0.0 {
+            match self.tempunit {
+                TempUnit::Celcius => write!(f, "--C"),
+                TempUnit::Farenheit => write!(f, "---F"),
+                TempUnit::Kelvin => write!(f, "---K"),
+                TempUnit::Rankine => write!(f, "---R"),
+            }
+        } else {
+            match self.tempunit {
+                TempUnit::Celcius => write!(f, "{}C", current_val.trunc()),
+                TempUnit::Farenheit => write!(f, "{}F", (current_val * 9.0 / 5.0 + 32.0).trunc()),
+                TempUnit::Kelvin => write!(f, "{}K", (current_val + 273.15).trunc()),
+                TempUnit::Rankine => write!(f, "{}R", (current_val * 9.0 / 5.0 + 491.67).trunc()),
+            }
+        }
     }
 }
 
@@ -387,6 +592,7 @@ pub struct Gpu {
     gpu_if: Box<dyn GpuIf>,
     pub gpu: GpuGraph,
     pub vram: VramGraph,
+    pub temp: TempGraph,
     is_laptop: bool,
 }
 
@@ -395,10 +601,18 @@ impl Gpu {
         let total = gpu_if.vram_total();
         let id = gpu_if.id();
 
+        // Make sure we can read temperature
+        let mut temp = TempGraph::new(&id);
+        if let Err(err) = gpu_if.temperature() {
+            info!("Gpu: Temperature reading unsupported: {err:?}");
+            temp.set_supported(false);
+        }
+
         Gpu {
             gpu_if,
             gpu: GpuGraph::new(&id),
             vram: VramGraph::new(&id, total as f64 / 1_073_741_824.0),
+            temp,
             is_laptop: false,
         }
     }
@@ -415,18 +629,28 @@ impl Gpu {
         self.is_laptop = true;
     }
 
-    pub fn demo_gpu_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
-        let mut dmo = GpuGraph::new(&self.id());
-        dmo.set_colors(colors);
-        dmo.set_graph_kind(self.gpu.kind);
-        Box::new(dmo)
-    }
-
-    pub fn demo_vram_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
-        let mut dmo = VramGraph::new(&self.id(), self.vram.max_val);
-        dmo.set_colors(colors);
-        dmo.set_graph_kind(self.vram.kind);
-        Box::new(dmo)
+    pub fn demo_graph(&self, colors: GraphColors, device: DeviceKind) -> Box<dyn DemoGraph> {
+        match device {
+            DeviceKind::Gpu => {
+                let mut dmo = GpuGraph::new(&self.id());
+                dmo.set_colors(colors);
+                dmo.set_graph_kind(self.gpu.kind);
+                Box::new(dmo)
+            }
+            DeviceKind::Vram => {
+                let mut dmo = VramGraph::new(&self.id(), self.vram.max_val);
+                dmo.set_colors(colors);
+                dmo.set_graph_kind(self.vram.kind);
+                Box::new(dmo)
+            }
+            DeviceKind::GpuTemp => {
+                let mut dmo = TempGraph::new(&self.id());
+                dmo.set_colors(colors);
+                dmo.set_graph_kind(self.temp.kind);
+                Box::new(dmo)
+            }
+            _ => panic!("Gpu::demo_graph({device:?}) Wrong device kind"),
+        }
     }
 
     pub fn update(&mut self) {
@@ -437,6 +661,13 @@ impl Gpu {
             if let Ok(sample) = self.gpu_if.vram_used() {
                 self.vram.update(sample);
             }
+            if self.temp.is_supported() {
+                if let Ok(sample) = self.gpu_if.temperature() {
+                    self.temp.update(sample);
+                } else {
+                    self.temp.set_supported(false);
+                }
+            }
         }
     }
 
@@ -445,6 +676,7 @@ impl Gpu {
         self.gpu_if.restart();
         self.gpu.disabled = false;
         self.vram.disabled = false;
+        self.temp.disabled = false;
     }
 
     pub fn stop(&mut self) {
@@ -452,42 +684,26 @@ impl Gpu {
         self.gpu_if.stop();
         self.gpu.clear();
         self.vram.clear();
+        self.temp.clear();
         self.gpu.disabled = true;
         self.vram.disabled = true;
+        self.temp.disabled = true;
     }
 
     pub fn is_active(&self) -> bool {
         self.gpu_if.is_active()
     }
 
-    pub fn settings_ui(
+    fn settings_usage_ui(
         &self,
-        config: &crate::config::GpuConfig,
-    ) -> cosmic::Element<crate::app::Message> {
+        config: &crate::config::GpuUsageConfig,
+    ) -> Element<crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 
-        let battery_disable = if self.is_laptop {
-            Some(
-                settings::item(
-                    fl!("settings-disable-on-battery"),
-                    widget::checkbox("", config.pause_on_battery).on_toggle(move |value| {
-                        Message::ToggleDisableOnBattery(self.id().clone(), value)
-
-                        //widget::toggler(config.pause_on_battery).on_toggle(move |value| {
-                        //   Message::ToggleDisableOnBattery(self.id().clone(), value)
-                    }),
-                )
-                .width(340),
-            )
-        } else {
-            None
-        };
-
-        // GPU load
         let mut gpu_elements = Vec::new();
 
-        let usage = self.gpu.string();
+        let usage = self.gpu.to_string();
         gpu_elements.push(Element::from(
             column!(
                 widget::svg(widget::svg::Handle::from_memory(
@@ -507,14 +723,14 @@ impl Gpu {
         gpu_elements.push(Element::from(
             column!(
                 settings::item(
-                    fl!("enable-gpu-chart"),
-                    toggler(config.gpu_chart).on_toggle(move |value| {
+                    fl!("enable-chart"),
+                    toggler(config.chart).on_toggle(move |value| {
                         Message::GpuToggleChart(self.id(), DeviceKind::Gpu, value)
                     }),
                 ),
                 settings::item(
-                    fl!("enable-gpu-label"),
-                    toggler(config.gpu_label).on_toggle(move |value| {
+                    fl!("enable-label"),
+                    toggler(config.label).on_toggle(move |value| {
                         Message::GpuToggleLabel(self.id(), DeviceKind::Gpu, value)
                     }),
                 ),
@@ -532,13 +748,22 @@ impl Gpu {
             .spacing(cosmic.space_xs()),
         ));
 
-        let gpu = column![
+        column![
             widget::text::heading(fl!("gpu-title-usage")),
             Row::with_children(gpu_elements)
                 .align_y(Alignment::Center)
                 .spacing(cosmic.space_xs())
         ]
-        .spacing(cosmic::theme::spacing().space_xs);
+        .spacing(cosmic::theme::spacing().space_xs)
+        .into()
+    }
+
+    fn settings_vram_ui(
+        &self,
+        config: &crate::config::GpuVramConfig,
+    ) -> Element<crate::app::Message> {
+        let theme = cosmic::theme::active();
+        let cosmic = theme.cosmic();
 
         // VRAM load
         let mut vram_elements = Vec::new();
@@ -562,14 +787,14 @@ impl Gpu {
         vram_elements.push(Element::from(
             column!(
                 settings::item(
-                    fl!("enable-vram-chart"),
-                    toggler(config.vram_chart).on_toggle(|value| {
+                    fl!("enable-chart"),
+                    toggler(config.chart).on_toggle(|value| {
                         Message::GpuToggleChart(self.id(), DeviceKind::Vram, value)
                     }),
                 ),
                 settings::item(
-                    fl!("enable-vram-label"),
-                    toggler(config.vram_label).on_toggle(|value| {
+                    fl!("enable-label"),
+                    toggler(config.label).on_toggle(|value| {
                         Message::GpuToggleLabel(self.id(), DeviceKind::Vram, value)
                     }),
                 ),
@@ -587,15 +812,119 @@ impl Gpu {
             .spacing(cosmic.space_xs()),
         ));
 
-        let vram = column![
+        column![
             widget::text::heading(fl!("gpu-title-vram")),
             Row::with_children(vram_elements)
                 .align_y(Alignment::Center)
                 .spacing(cosmic.space_xs())
         ]
-        .spacing(cosmic::theme::spacing().space_xs);
+        .spacing(cosmic::theme::spacing().space_xs)
+        .into()
+    }
 
-        let stacked = if config.vram_label && config.gpu_label {
+    fn settings_temp_ui(
+        &self,
+        config: &crate::config::GpuTempConfig,
+    ) -> Option<Element<crate::app::Message>> {
+        if !self.temp.is_supported() {
+            return None;
+        }
+
+        let theme = cosmic::theme::active();
+        let cosmic = theme.cosmic();
+
+        // GPU temperature
+        let mut temp_elements = Vec::new();
+        let temp = self.temp.to_string();
+        temp_elements.push(Element::from(
+            column!(
+                widget::svg(widget::svg::Handle::from_memory(
+                    self.temp.graph().as_bytes().to_owned(),
+                ))
+                .width(90)
+                .height(60),
+                cosmic::widget::text::body(temp),
+            )
+            .padding(cosmic::theme::spacing().space_xs)
+            .align_x(Alignment::Center),
+        ));
+
+        let selected: Option<usize> = Some(self.temp.graph_kind().into());
+        let selected_unit: Option<usize> = Some(self.temp.tempunit.into());
+        let temp_kind = self.temp.graph_kind();
+        let id1 = self.id();
+        let id2 = self.id();
+        temp_elements.push(Element::from(
+            column!(
+                settings::item(
+                    fl!("enable-chart"),
+                    toggler(config.chart).on_toggle(|value| {
+                        Message::GpuToggleChart(self.id(), DeviceKind::GpuTemp, value)
+                    }),
+                ),
+                settings::item(
+                    fl!("enable-label"),
+                    toggler(config.label).on_toggle(|value| {
+                        Message::GpuToggleLabel(self.id(), DeviceKind::GpuTemp, value)
+                    }),
+                ),
+                settings::item(
+                    fl!("temperature-unit"),
+                    widget::dropdown(&self.temp.unit_options, selected_unit, move |m| {
+                        Message::SelectGpuTempUnit(id1.clone(), m.into())
+                    },)
+                ),
+                row!(
+                    widget::dropdown(&self.temp.graph_options, selected, move |m| {
+                        Message::GpuSelectGraphType(id2.clone(), DeviceKind::GpuTemp, m.into())
+                    },)
+                    .width(70),
+                    widget::horizontal_space(),
+                    widget::button::standard(fl!("change-colors")).on_press(
+                        Message::ColorPickerOpen(DeviceKind::GpuTemp, temp_kind, Some(self.id())),
+                    )
+                ),
+            )
+            .spacing(cosmic.space_xs()),
+        ));
+
+        Some(
+            column![
+                widget::text::heading(fl!("gpu-title-temperature")),
+                Row::with_children(temp_elements)
+                    .align_y(Alignment::Center)
+                    .spacing(cosmic.space_xs())
+            ]
+            .spacing(cosmic::theme::spacing().space_xs)
+            .into(),
+        )
+    }
+
+    pub fn settings_ui(
+        &self,
+        config: &crate::config::GpuConfig,
+    ) -> cosmic::Element<crate::app::Message> {
+        let battery_disable = if self.is_laptop {
+            Some(
+                settings::item(
+                    fl!("settings-disable-on-battery"),
+                    widget::checkbox("", config.pause_on_battery).on_toggle(move |value| {
+                        Message::ToggleDisableOnBattery(self.id().clone(), value)
+
+                        //widget::toggler(config.pause_on_battery).on_toggle(move |value| {
+                        //   Message::ToggleDisableOnBattery(self.id().clone(), value)
+                    }),
+                )
+                .width(340),
+            )
+        } else {
+            None
+        };
+
+        let usage = self.settings_usage_ui(&config.usage);
+        let vram = self.settings_vram_ui(&config.vram);
+
+        let stacked = if config.vram.label && config.usage.label {
             Some(settings::item(
                 fl!("settings-gpu-stack-labels"),
                 row!(
@@ -608,11 +937,14 @@ impl Gpu {
             None
         };
 
+        let temp = self.settings_temp_ui(&config.temp);
+
         Column::new()
             .push_maybe(battery_disable)
-            .push(gpu)
+            .push(usage)
             .push(vram)
             .push_maybe(stacked)
+            .push_maybe(temp)
             .spacing(cosmic::theme::spacing().space_xs)
             .into()
     }
@@ -649,4 +981,9 @@ const DEMO_SAMPLES: [f64; 21] = [
     14.770732879638672,
     14.496528625488281,
     13.892818450927734,
+];
+
+const HEAT_DEMO_SAMPLES: [f64; 21] = [
+    41.0, 42.0, 43.5, 45.0, 48.0, 51.0, 55.0, 57.0, 59.5, 62.0, 64.0, 67.0, 70.0, 74.0, 78.0, 83.0,
+    87.0, 90.0, 95.0, 98.0, 100.0,
 ];

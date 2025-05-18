@@ -239,14 +239,14 @@ impl Sensor for Network {
 
         net_bandwidth_items.push(
             settings::item(
-                fl!("enable-net-chart"),
+                fl!("enable-chart"),
                 widget::toggler(config.chart).on_toggle(move |t| Message::ToggleNetChart(k, t)),
             )
             .into(),
         );
         net_bandwidth_items.push(
             settings::item(
-                fl!("enable-net-label"),
+                fl!("enable-label"),
                 widget::toggler(config.label).on_toggle(move |t| Message::ToggleNetLabel(k, t)),
             )
             .into(),
@@ -296,7 +296,7 @@ impl Sensor for Network {
         let net_right_column = Column::with_children(net_bandwidth_items);
 
         net_elements.push(Element::from(net_right_column.spacing(cosmic.space_xs())));
-        
+
         let title_content = match self.variant {
             NetworkVariant::Combined => fl!("net-title-combined"),
             NetworkVariant::Download => fl!("net-title-dl"),
@@ -306,9 +306,10 @@ impl Sensor for Network {
 
         column![
             title,
-            Row::with_children(net_elements)
-            .align_y(Alignment::Center)
-        ].spacing(cosmic::theme::spacing().space_xs).into()
+            Row::with_children(net_elements).align_y(Alignment::Center)
+        ]
+        .spacing(cosmic::theme::spacing().space_xs)
+        .into()
     }
 }
 

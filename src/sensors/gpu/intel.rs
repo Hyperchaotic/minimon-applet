@@ -39,6 +39,10 @@ impl super::GpuIf for IntelGpu {
         todo!();
     }
 
+    fn temperature(&self) -> Result<u32> {
+        todo!();
+    }
+
     fn vram_total(&self) -> u64 {
         todo!();
     }

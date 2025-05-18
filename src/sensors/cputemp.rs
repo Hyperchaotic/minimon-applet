@@ -297,17 +297,17 @@ impl Sensor for CpuTemp {
         temp_elements.push(Element::from(
             column!(
                 settings::item(
-                    fl!("enable-cpu-temperature-chart"),
+                    fl!("enable-chart"),
                     toggler(config.cputemp.chart)
                         .on_toggle(|value| { Message::ToggleCpuTempChart(value) }),
                 ),
                 settings::item(
-                    fl!("enable-cpu-temperature-label"),
+                    fl!("enable-label"),
                     toggler(config.cputemp.label)
                         .on_toggle(|value| { Message::ToggleCpuTempLabel(value) }),
                 ),
                 settings::item(
-                    fl!("cpu-temperature-unit"),
+                    fl!("temperature-unit"),
                     widget::dropdown(&self.unit_options, selected_unit, |m| {
                         Message::SelectCpuTempUnit(m.into())
                     },)

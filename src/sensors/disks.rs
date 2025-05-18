@@ -232,14 +232,14 @@ impl Sensor for Disks {
 
         disk_bandwidth_items.push(
             settings::item(
-                fl!("enable-disks-chart"),
+                fl!("enable-chart"),
                 widget::toggler(config.chart).on_toggle(move |t| Message::ToggleDisksChart(k, t)),
             )
             .into(),
         );
         disk_bandwidth_items.push(
             settings::item(
-                fl!("enable-disks-label"),
+                fl!("enable-label"),
                 widget::toggler(config.label).on_toggle(move |t| Message::ToggleDisksLabel(k, t)),
             )
             .into(),
