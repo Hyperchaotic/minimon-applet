@@ -365,6 +365,7 @@ pub static AMD_GPU_DEVICE_IDS: LazyLock<HashMap<&'static str, &'static str>> =
         m.insert("0x699F", "AMD Radeon RX 550");
 
         // APUs - Integrated Graphics
+        m.insert("0x15BF", "AMD Radeon 780M iGPU");
         m.insert("0x1681", "AMD Radeon 780M iGPU");
         m.insert("0x15E7", "AMD Radeon 760M iGPU");
         m.insert("0x15D8", "AMD Radeon 680M iGPU");
