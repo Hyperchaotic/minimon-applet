@@ -1235,6 +1235,10 @@ impl Minimon {
     fn general_settings_ui(&self) -> Element<crate::app::Message> {
         let refresh_rate = f64::from(self.config.refresh_rate) / 1000.0;
 
+        let version_row = text::heading(format!(
+            "Minimon version {} for COSMIC.",
+            env!("CARGO_PKG_VERSION")
+        ));
         // Create settings rows
         let refresh_row = settings::item(
             fl!("refresh-rate"),
@@ -1292,6 +1296,7 @@ impl Minimon {
 
         // Combine rows into a column with spacing
         column!(
+            version_row,
             refresh_row,
             label_row,
             mono_row,
