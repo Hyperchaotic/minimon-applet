@@ -27,32 +27,6 @@ use super::gpu::amd::AmdGpu;
 use super::gpu::intel::IntelGpu;
 use super::gpu::{GpuIf, nvidia::NvidiaGpu};
 
-use std::sync::LazyLock;
-
-pub static COLOR_CHOICES_RING: LazyLock<[(&'static str, ColorVariant); 4]> = LazyLock::new(|| {
-    [
-        (fl!("graph-ring-r1").leak(), ColorVariant::Color4),
-        (fl!("graph-ring-r2").leak(), ColorVariant::Color3),
-        (fl!("graph-ring-back").leak(), ColorVariant::Color1),
-        (fl!("graph-ring-text").leak(), ColorVariant::Color2),
-    ]
-});
-
-pub static COLOR_CHOICES_LINE: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
-    [
-        (fl!("graph-line-graph").leak(), ColorVariant::Color4),
-        (fl!("graph-line-back").leak(), ColorVariant::Color1),
-        (fl!("graph-line-frame").leak(), ColorVariant::Color2),
-    ]
-});
-
-pub static COLOR_CHOICES_HEAT: LazyLock<[(&'static str, ColorVariant); 2]> = LazyLock::new(|| {
-    [
-        (fl!("graph-line-back").leak(), ColorVariant::Color1),
-        (fl!("graph-line-frame").leak(), ColorVariant::Color2),
-    ]
-});
-
 const GRAPH_OPTIONS: [&str; 2] = ["Ring", "Line"];
 const TEMP_GRAPH_OPTIONS: [&str; 3] = ["Ring", "Line", "Heat"];
 const UNIT_OPTIONS: [&str; 4] = ["Celcius", "Farenheit", "Kelvin", "Rankine"];
@@ -215,9 +189,9 @@ impl DemoGraph for GpuGraph {
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
         if self.kind == GraphKind::Line {
-            (*COLOR_CHOICES_LINE).into()
+            (*super::COLOR_CHOICES_LINE).into()
         } else {
-            (*COLOR_CHOICES_RING).into()
+            (*super::COLOR_CHOICES_RING).into()
         }
     }
 
@@ -358,7 +332,6 @@ impl VramGraph {
 }
 
 pub struct TempGraph {
-    supported: bool,
     id: String,
     samples: VecDeque<f64>,
     pub tempunit: TempUnit,
@@ -378,7 +351,6 @@ impl TempGraph {
     // id: a unique id, total: RAM size in GB
     fn new(id: &str) -> Self {
         TempGraph {
-            supported: true,
             id: id.to_owned(),
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
             tempunit: TempUnit::Celcius,
@@ -402,14 +374,6 @@ impl TempGraph {
         for sample in &mut self.samples {
             *sample = 0.0;
         }
-    }
-
-    pub fn is_supported(&self) -> bool {
-        self.supported
-    }
-
-    pub fn set_supported(&mut self, supported: bool) {
-        self.supported = supported;
     }
 
     pub fn graph(&self) -> String {
@@ -510,9 +474,9 @@ impl DemoGraph for TempGraph {
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
         match self.kind {
-            GraphKind::Line => (*COLOR_CHOICES_LINE).into(),
-            GraphKind::Ring => (*COLOR_CHOICES_RING).into(),
-            GraphKind::Heat => (*COLOR_CHOICES_HEAT).into(),
+            GraphKind::Line => (*super::COLOR_CHOICES_LINE).into(),
+            GraphKind::Ring => (*super::COLOR_CHOICES_RING).into(),
+            GraphKind::Heat => (*super::COLOR_CHOICES_HEAT).into(),
         }
     }
 
@@ -526,9 +490,7 @@ use std::fmt;
 impl fmt::Display for TempGraph {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let current_val = self.latest_sample();
-        if !self.is_supported() {
-            Ok(())
-        } else if self.disabled || current_val <= 0.0 {
+        if self.disabled || current_val <= 0.0 {
             match self.tempunit {
                 TempUnit::Celcius => write!(f, "--C"),
                 TempUnit::Farenheit => write!(f, "---F"),
@@ -577,9 +539,9 @@ impl DemoGraph for VramGraph {
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
         if self.kind == GraphKind::Line {
-            (*COLOR_CHOICES_LINE).into()
+            (*super::COLOR_CHOICES_LINE).into()
         } else {
-            (*COLOR_CHOICES_RING).into()
+            (*super::COLOR_CHOICES_RING).into()
         }
     }
 
@@ -601,18 +563,11 @@ impl Gpu {
         let total = gpu_if.vram_total();
         let id = gpu_if.id();
 
-        // Make sure we can read temperature
-        let mut temp = TempGraph::new(&id);
-        if let Err(err) = gpu_if.temperature() {
-            info!("Gpu: Temperature reading unsupported: {err:?}");
-            temp.set_supported(false);
-        }
-
         Gpu {
             gpu_if,
             gpu: GpuGraph::new(&id),
             vram: VramGraph::new(&id, total as f64 / 1_073_741_824.0),
-            temp,
+            temp: TempGraph::new(&id),
             is_laptop: false,
         }
     }
@@ -661,12 +616,8 @@ impl Gpu {
             if let Ok(sample) = self.gpu_if.vram_used() {
                 self.vram.update(sample);
             }
-            if self.temp.is_supported() {
-                if let Ok(sample) = self.gpu_if.temperature() {
-                    self.temp.update(sample);
-                } else {
-                    self.temp.set_supported(false);
-                }
+            if let Ok(sample) = self.gpu_if.temperature() {
+                self.temp.update(sample);
             }
         }
     }
@@ -825,11 +776,7 @@ impl Gpu {
     fn settings_temp_ui(
         &self,
         config: &crate::config::GpuTempConfig,
-    ) -> Option<Element<crate::app::Message>> {
-        if !self.temp.is_supported() {
-            return None;
-        }
-
+    ) -> Element<crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 
@@ -888,16 +835,14 @@ impl Gpu {
             .spacing(cosmic.space_xs()),
         ));
 
-        Some(
-            column![
-                widget::text::heading(fl!("gpu-title-temperature")),
-                Row::with_children(temp_elements)
-                    .align_y(Alignment::Center)
-                    .spacing(cosmic.space_xs())
-            ]
-            .spacing(cosmic::theme::spacing().space_xs)
-            .into(),
-        )
+        column![
+            widget::text::heading(fl!("gpu-title-temperature")),
+            Row::with_children(temp_elements)
+                .align_y(Alignment::Center)
+                .spacing(cosmic.space_xs())
+        ]
+        .spacing(cosmic::theme::spacing().space_xs)
+        .into()
     }
 
     pub fn settings_ui(
@@ -944,7 +889,7 @@ impl Gpu {
             .push(usage)
             .push(vram)
             .push_maybe(stacked)
-            .push_maybe(temp)
+            .push(temp)
             .spacing(cosmic::theme::spacing().space_xs)
             .into()
     }

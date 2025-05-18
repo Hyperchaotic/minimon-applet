@@ -1,5 +1,32 @@
 use cosmic::Element;
 use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
+
+use crate::{config::ColorVariant, fl};
+
+pub static COLOR_CHOICES_RING: LazyLock<[(&'static str, ColorVariant); 4]> = LazyLock::new(|| {
+    [
+        (fl!("graph-ring-r1").leak(), ColorVariant::Color4),
+        (fl!("graph-ring-r2").leak(), ColorVariant::Color3),
+        (fl!("graph-ring-back").leak(), ColorVariant::Color1),
+        (fl!("graph-ring-text").leak(), ColorVariant::Color2),
+    ]
+});
+
+pub static COLOR_CHOICES_LINE: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
+    [
+        (fl!("graph-line-graph").leak(), ColorVariant::Color4),
+        (fl!("graph-line-back").leak(), ColorVariant::Color1),
+        (fl!("graph-line-frame").leak(), ColorVariant::Color2),
+    ]
+});
+
+pub static COLOR_CHOICES_HEAT: LazyLock<[(&'static str, ColorVariant); 2]> = LazyLock::new(|| {
+    [
+        (fl!("graph-line-back").leak(), ColorVariant::Color1),
+        (fl!("graph-line-frame").leak(), ColorVariant::Color2),
+    ]
+});
 
 use crate::{
     colorpicker::DemoGraph,
