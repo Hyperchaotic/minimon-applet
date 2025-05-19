@@ -211,6 +211,7 @@ pub enum Message {
     ToggleCpuLabel(bool),
     ToggleCpuTempChart(bool),
     ToggleCpuTempLabel(bool),
+    ToggleCpuNoDecimals(bool),
     ToggleMemoryChart(bool),
     ToggleMemoryLabel(bool),
     ToggleMemoryPercentage(bool),
@@ -908,6 +909,12 @@ impl cosmic::Application for Minimon {
                 self.save_config();
             }
 
+            Message::ToggleCpuNoDecimals(toggle) => {
+                info!("Message::ToggleCpuNoDecimals({toggle:?})");
+                self.config.cpu.no_decimals = toggle;
+                self.save_config();
+            }
+
             Message::SelectCpuTempUnit(unit) => {
                 info!("Message::SelectCpuTempUnit({unit:?})");
                 self.config.cputemp.unit = unit;
@@ -1133,6 +1140,7 @@ impl Minimon {
         self.set_refresh_rate();
         self.cpu.set_colors(self.config.cpu.colors);
         self.cpu.set_graph_kind(self.config.cpu.kind);
+        self.cpu.no_decimals = config.cpu.no_decimals;
         self.cputemp.set_colors(self.config.cputemp.colors);
         self.cputemp.set_graph_kind(self.config.cputemp.kind);
         self.cputemp.set_unit(self.config.cputemp.unit);
@@ -1317,11 +1325,18 @@ impl Minimon {
             elements.push(btn.into());
         }
 
+        let cpu_usage = self.cpu.latest_sample();
         // Format CPU usage based on horizontal layout and sample value
-        let formatted_cpu = if self.cpu.latest_sample() < 10.0 && horizontal {
-            format!("{:.2}%", self.cpu.latest_sample())
+        let formatted_cpu = if self.config.cpu.no_decimals {
+            if cpu_usage.round() < 10.0 {
+                format!(" {}%", cpu_usage.round())
+            } else {
+                format!("{}%", cpu_usage.round())
+            }
+        } else if cpu_usage < 10.0 && horizontal {
+            format!("{:.2}%", cpu_usage)
         } else {
-            format!("{:.1}%", self.cpu.latest_sample())
+            format!("{:.1}%", cpu_usage)
         };
 
         // Add the CPU label if needed
