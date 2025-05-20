@@ -1,6 +1,6 @@
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, GraphColors, GraphKind, MinimonConfig},
+    config::{ColorVariant, CpuTempConfig, DeviceKind, GraphColors, GraphKind},
     fl,
     svg_graph::SvgColors,
 };
@@ -19,6 +19,7 @@ use cosmic::{
 use log::info;
 
 use crate::app::Message;
+use std::any::Any;
 
 use std::{
     collections::VecDeque,
@@ -135,18 +136,16 @@ impl HwmonTemp {
 pub struct CpuTemp {
     hwmon_temp: Option<HwmonTemp>,
     samples: VecDeque<f64>,
-    colors: GraphColors,
-    kind: GraphKind,
     graph_options: Vec<&'static str>,
     unit_options: Vec<&'static str>,
     /// colors cached so we don't need to convert to string every time
     svg_colors: SvgColors,
-    tempunit: TempUnit,
+    config: CpuTempConfig,
 }
 
 impl DemoGraph for CpuTemp {
     fn demo(&self) -> String {
-        match self.kind {
+        match self.config.kind {
             GraphKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
@@ -167,16 +166,16 @@ impl DemoGraph for CpuTemp {
     }
 
     fn colors(&self) -> GraphColors {
-        self.colors
+        self.config.colors
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.colors = colors;
+        self.config.colors = colors;
         self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        match self.kind {
+        match self.config.kind {
             GraphKind::Line => (*super::COLOR_CHOICES_LINE).into(),
             GraphKind::Ring => (*super::COLOR_CHOICES_RING).into(),
             GraphKind::Heat => (*super::COLOR_CHOICES_HEAT).into(),
@@ -189,13 +188,20 @@ impl DemoGraph for CpuTemp {
 }
 
 impl Sensor for CpuTemp {
+    fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
+        if let Some(cfg) = config.downcast_ref::<CpuTempConfig>() {
+            self.config = cfg.clone();
+            self.svg_colors.set_colors(&cfg.colors);
+        }
+    }
+
     fn graph_kind(&self) -> GraphKind {
-        self.kind
+        self.config.kind
     }
 
     fn set_graph_kind(&mut self, kind: GraphKind) {
         assert!(kind == GraphKind::Line || kind == GraphKind::Ring || kind == GraphKind::Heat);
-        self.kind = kind;
+        self.config.kind = kind;
     }
 
     fn update(&mut self) {
@@ -212,9 +218,9 @@ impl Sensor for CpuTemp {
         }
     }
 
-    fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
-        let mut dmo = CpuTemp::new(self.kind);
-        dmo.set_colors(colors);
+    fn demo_graph(&self) -> Box<dyn DemoGraph> {
+        let mut dmo = CpuTemp::default();
+        dmo.update_config(&self.config, 0);
         Box::new(dmo)
     }
 
@@ -223,7 +229,7 @@ impl Sensor for CpuTemp {
         if let Some(hwmon) = &self.hwmon_temp {
             max = hwmon.crit_temp;
         }
-        match self.kind {
+        match self.config.kind {
             GraphKind::Ring => {
                 let latest = self.latest_sample();
                 let mut value = self.to_string();
@@ -243,7 +249,7 @@ impl Sensor for CpuTemp {
         }
     }
 
-    fn settings_ui(&self, config: &MinimonConfig) -> Element<crate::app::Message> {
+    fn settings_ui(&self) -> Element<crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 
@@ -265,20 +271,19 @@ impl Sensor for CpuTemp {
         ));
 
         let selected_graph: Option<usize> = Some(self.graph_kind().into());
-        let selected_unit: Option<usize> = Some(self.tempunit.into());
+        let selected_unit: Option<usize> = Some(self.config.unit.into());
 
+        let config = &self.config;
         let temp_kind = self.graph_kind();
         temp_elements.push(Element::from(
             column!(
                 settings::item(
                     fl!("enable-chart"),
-                    toggler(config.cputemp.chart)
-                        .on_toggle(|value| { Message::ToggleCpuTempChart(value) }),
+                    toggler(config.chart).on_toggle(|value| { Message::ToggleCpuTempChart(value) }),
                 ),
                 settings::item(
                     fl!("enable-label"),
-                    toggler(config.cputemp.label)
-                        .on_toggle(|value| { Message::ToggleCpuTempLabel(value) }),
+                    toggler(config.label).on_toggle(|value| { Message::ToggleCpuTempLabel(value) }),
                 ),
                 settings::item(
                     fl!("temperature-unit"),
@@ -322,8 +327,8 @@ impl Sensor for CpuTemp {
     }
 }
 
-impl CpuTemp {
-    pub fn new(kind: GraphKind) -> Self {
+impl Default for CpuTemp {
+    fn default() -> Self {
         let mut hwmon = None;
 
         match HwmonTemp::find_cpu_sensor() {
@@ -339,24 +344,20 @@ impl CpuTemp {
         let mut cpu = CpuTemp {
             hwmon_temp: hwmon,
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
-            colors: GraphColors::default(),
-            kind,
             graph_options: GRAPH_OPTIONS.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
-            tempunit: TempUnit::Celcius,
             unit_options: UNIT_OPTIONS.to_vec(),
+            config: CpuTempConfig::default(),
         };
         cpu.set_colors(GraphColors::default());
         cpu
     }
+}
 
+impl CpuTemp {
     // true if a CPU temperature hwmon path was found
     pub fn is_found(&self) -> bool {
         self.hwmon_temp.is_some()
-    }
-
-    pub fn set_unit(&mut self, unit: TempUnit) {
-        self.tempunit = unit;
     }
 
     pub fn latest_sample(&self) -> f64 {
@@ -369,7 +370,7 @@ use std::fmt;
 impl fmt::Display for CpuTemp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let current_val = self.latest_sample();
-        match self.tempunit {
+        match self.config.unit {
             TempUnit::Celcius => write!(f, "{}C", current_val.trunc()),
             TempUnit::Farenheit => write!(f, "{}F", (current_val * 9.0 / 5.0 + 32.0).trunc()),
             TempUnit::Kelvin => write!(f, "{}K", (current_val + 273.15).trunc()),

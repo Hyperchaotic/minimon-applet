@@ -1,10 +1,11 @@
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, GraphColors, GraphKind, MinimonConfig},
+    config::{ColorVariant, CpuConfig, DeviceKind, GraphColors, GraphKind},
     fl,
     svg_graph::SvgColors,
 };
 use cosmic::Element;
+use std::any::Any;
 
 use cosmic::widget;
 use cosmic::widget::{settings, toggler};
@@ -63,17 +64,15 @@ pub struct Cpu {
     samples_sum: VecDeque<f64>,
     // CPU load for the last MAX_SAMPLES updates, split into user and system
     samples_split: VecDeque<CpuLoad>,
-    colors: GraphColors,
-    kind: GraphKind,
     graph_options: Vec<&'static str>,
     /// colors cached so we don't need to convert to string every time
     svg_colors: SvgColors,
-    pub no_decimals: bool,
+    config: CpuConfig,
 }
 
 impl DemoGraph for Cpu {
     fn demo(&self) -> String {
-        match self.kind {
+        match self.config.kind {
             GraphKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
@@ -92,16 +91,16 @@ impl DemoGraph for Cpu {
     }
 
     fn colors(&self) -> GraphColors {
-        self.colors
+        self.config.colors
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.colors = colors;
+        self.config.colors = colors;
         self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        if self.kind == GraphKind::Line {
+        if self.config.kind == GraphKind::Line {
             (*super::COLOR_CHOICES_LINE).into()
         } else {
             (*super::COLOR_CHOICES_RING).into()
@@ -114,13 +113,20 @@ impl DemoGraph for Cpu {
 }
 
 impl Sensor for Cpu {
+    fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
+        if let Some(cfg) = config.downcast_ref::<CpuConfig>() {
+            self.config = cfg.clone();
+            self.svg_colors.set_colors(&cfg.colors);
+        }
+    }
+
     fn graph_kind(&self) -> GraphKind {
-        self.kind
+        self.config.kind
     }
 
     fn set_graph_kind(&mut self, kind: GraphKind) {
         assert!(kind == GraphKind::Line || kind == GraphKind::Ring);
-        self.kind = kind;
+        self.config.kind = kind;
     }
 
     fn update(&mut self) {
@@ -138,28 +144,28 @@ impl Sensor for Cpu {
         self.samples_sum.push_back(new_sum);
     }
 
-    fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
-        let mut dmo = Cpu::new(self.kind);
-        dmo.set_colors(colors);
+    fn demo_graph(&self) -> Box<dyn DemoGraph> {
+        let mut dmo = Cpu::default();
+        dmo.update_config(&self.config, 0);
         Box::new(dmo)
     }
 
     fn graph(&self) -> String {
-        if self.kind == GraphKind::Ring {
+        if self.config.kind == GraphKind::Ring {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
 
-            if self.no_decimals {
-                write!(value, "{}%", latest.round()).unwrap()
+            if self.config.no_decimals {
+                write!(value, "{}%", latest.round()).unwrap();
             } else {
                 if latest < 10.0 {
                     write!(value, "{latest:.2}").unwrap()
                 } else if latest <= 99.9 {
-                    write!(value, "{latest:.1}").unwrap()
+                    write!(value, "{latest:.1}").unwrap();
                 } else {
-                    write!(value, "100").unwrap()
-                };
+                    write!(value, "100").unwrap();
+                }
             }
             write!(percentage, "{latest}").unwrap();
 
@@ -169,7 +175,7 @@ impl Sensor for Cpu {
         }
     }
 
-    fn settings_ui(&self, config: &MinimonConfig) -> Element<crate::app::Message> {
+    fn settings_ui(&self) -> Element<crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 
@@ -191,21 +197,22 @@ impl Sensor for Cpu {
 
         let selected: Option<usize> = Some(self.graph_kind().into());
 
+        let config = &self.config;
         let cpu_kind = self.graph_kind();
         cpu_elements.push(Element::from(
             column!(
                 settings::item(
                     fl!("enable-chart"),
-                    toggler(config.cpu.chart).on_toggle(|value| { Message::ToggleCpuChart(value) }),
+                    toggler(config.chart).on_toggle(|value| { Message::ToggleCpuChart(value) }),
                 ),
                 settings::item(
                     fl!("enable-label"),
-                    toggler(config.cpu.label).on_toggle(|value| { Message::ToggleCpuLabel(value) }),
+                    toggler(config.label).on_toggle(|value| { Message::ToggleCpuLabel(value) }),
                 ),
                 settings::item(
                     fl!("cpu-no-decimals"),
                     row!(
-                        widget::checkbox("", config.cpu.no_decimals)
+                        widget::checkbox("", config.no_decimals)
                             .on_toggle(Message::ToggleCpuNoDecimals)
                     ),
                 ),
@@ -229,8 +236,8 @@ impl Sensor for Cpu {
     }
 }
 
-impl Cpu {
-    pub fn new(kind: GraphKind) -> Self {
+impl Default for Cpu {
+    fn default() -> Self {
         // value and percentage are pre-allocated and reused as they're changed often.
         let mut percentage = String::with_capacity(6);
         write!(percentage, "0").unwrap();
@@ -253,16 +260,16 @@ impl Cpu {
                 };
                 MAX_SAMPLES
             ]),
-            colors: GraphColors::default(),
-            kind,
             graph_options: GRAPH_OPTIONS.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
-            no_decimals: false,
+            config: CpuConfig::default(),
         };
         cpu.set_colors(GraphColors::default());
         cpu
     }
+}
 
+impl Cpu {
     pub fn latest_sample(&self) -> f64 {
         *self.samples_sum.back().unwrap_or(&0f64)
     }
@@ -395,7 +402,7 @@ impl fmt::Display for Cpu {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let current_val = self.latest_sample();
 
-        if self.no_decimals {
+        if self.config.no_decimals {
             write!(f, "{}%", current_val.round())
         } else {
             if current_val < 10.0 {

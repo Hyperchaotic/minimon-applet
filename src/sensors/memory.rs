@@ -3,13 +3,14 @@ use sysinfo::{MemoryRefreshKind, System};
 
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, GraphColors, GraphKind, MinimonConfig},
+    config::{ColorVariant, DeviceKind, GraphColors, GraphKind, MemoryConfig},
     fl,
     svg_graph::SvgColors,
 };
 
 use cosmic::widget;
 use cosmic::widget::{settings, toggler};
+use std::any::Any;
 
 use cosmic::{
     iced::{
@@ -33,18 +34,16 @@ const MAX_SAMPLES: usize = 21;
 pub struct Memory {
     samples: VecDeque<f64>,
     max_val: f64,
-    colors: GraphColors,
     system: System,
-    kind: GraphKind,
-    show_percentage: bool,
     graph_options: Vec<&'static str>,
     /// colors cached so we don't need to convert to string every time
     svg_colors: SvgColors,
+    config: MemoryConfig,
 }
 
 impl DemoGraph for Memory {
     fn demo(&self) -> String {
-        match self.kind {
+        match self.config.kind {
             GraphKind::Ring => {
                 // show a number of 40% of max
                 let val = self.max_val * 0.4;
@@ -65,16 +64,16 @@ impl DemoGraph for Memory {
     }
 
     fn colors(&self) -> GraphColors {
-        self.colors
+        self.config.colors
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.colors = colors;
+        self.config.colors = colors;
         self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        if self.kind == GraphKind::Line {
+        if self.config.kind == GraphKind::Line {
             (*super::COLOR_CHOICES_LINE).into()
         } else {
             (*super::COLOR_CHOICES_RING).into()
@@ -87,13 +86,20 @@ impl DemoGraph for Memory {
 }
 
 impl Sensor for Memory {
+    fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
+        if let Some(cfg) = config.downcast_ref::<MemoryConfig>() {
+            self.config = cfg.clone();
+            self.svg_colors.set_colors(&cfg.colors);
+        }
+    }
+
     fn graph_kind(&self) -> GraphKind {
-        self.kind
+        self.config.kind
     }
 
     fn set_graph_kind(&mut self, kind: GraphKind) {
         assert!(kind == GraphKind::Line || kind == GraphKind::Ring);
-        self.kind = kind;
+        self.config.kind = kind;
     }
 
     fn update(&mut self) {
@@ -108,14 +114,14 @@ impl Sensor for Memory {
         self.samples.push_back(new_val);
     }
 
-    fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
-        let mut dmo = Memory::new(self.kind);
-        dmo.set_colors(colors);
+    fn demo_graph(&self) -> Box<dyn DemoGraph> {
+        let mut dmo = Memory::default();
+        dmo.update_config(&self.config, 0);
         Box::new(dmo)
     }
 
     fn graph(&self) -> String {
-        if self.kind == GraphKind::Ring {
+        if self.config.kind == GraphKind::Ring {
             let mut latest = self.latest_sample();
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
@@ -128,7 +134,7 @@ impl Sensor for Memory {
             write!(percentage, "{pct}").unwrap();
 
             // If set, convert to percentage
-            if self.show_percentage {
+            if self.config.percentage {
                 latest = (latest * 100.0) / self.max_val as f64;
             }
 
@@ -146,7 +152,7 @@ impl Sensor for Memory {
         }
     }
 
-    fn settings_ui(&self, config: &MinimonConfig) -> Element<crate::app::Message> {
+    fn settings_ui(&self) -> Element<crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 
@@ -165,23 +171,22 @@ impl Sensor for Memory {
             .align_x(Alignment::Center),
         ));
 
+        let config = &self.config;
         let selected: Option<usize> = Some(self.graph_kind().into());
         let mem_kind = self.graph_kind();
         mem_elements.push(Element::from(
             column!(
                 settings::item(
                     fl!("enable-chart"),
-                    toggler(config.memory.chart)
-                        .on_toggle(|value| { Message::ToggleMemoryChart(value) }),
+                    toggler(config.chart).on_toggle(|value| { Message::ToggleMemoryChart(value) }),
                 ),
                 settings::item(
                     fl!("enable-label"),
-                    toggler(config.memory.label)
-                        .on_toggle(|value| { Message::ToggleMemoryLabel(value) }),
+                    toggler(config.label).on_toggle(|value| { Message::ToggleMemoryLabel(value) }),
                 ),
                 settings::item(
                     fl!("memory-as-percentage"),
-                    toggler(config.memory.percentage).on_toggle(Message::ToggleMemoryPercentage),
+                    toggler(config.percentage).on_toggle(Message::ToggleMemoryPercentage),
                 ),
                 row!(
                     widget::dropdown(&self.graph_options, selected, move |m| {
@@ -203,8 +208,8 @@ impl Sensor for Memory {
     }
 }
 
-impl Memory {
-    pub fn new(kind: GraphKind) -> Self {
+impl Default for Memory {
+    fn default() -> Self {
         let mut system = System::new();
         system.refresh_memory();
 
@@ -225,19 +230,19 @@ impl Memory {
         let mut memory = Memory {
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
             max_val,
-            colors: GraphColors::default(),
             system,
-            kind,
-            show_percentage: false,
+            config: MemoryConfig::default(),
             graph_options: GRAPH_OPTIONS.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
         };
         memory.set_colors(GraphColors::default());
         memory
     }
+}
 
+impl Memory {
     pub fn set_percentage(&mut self, percentage: bool) {
-        self.show_percentage = percentage;
+        self.config.percentage = percentage;
     }
 
     pub fn latest_sample(&self) -> f64 {
@@ -252,7 +257,7 @@ impl Memory {
         let mut current_val = self.latest_sample();
         let unit: &str;
 
-        if self.show_percentage {
+        if self.config.percentage {
             current_val = (current_val * 100.0) / self.max_val;
             unit = "%";
         } else if !vertical_panel {

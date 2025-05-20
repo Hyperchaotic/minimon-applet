@@ -4,7 +4,7 @@ use sysinfo::{DiskRefreshKind, Disks as DisksInfo};
 
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, GraphColors, GraphKind, MinimonConfig},
+    config::{ColorVariant, DeviceKind, DisksConfig, GraphColors, GraphKind},
     fl,
     svg_graph::SvgColors,
 };
@@ -24,6 +24,7 @@ use cosmic::{
 
 use crate::app::Message;
 use crate::config::DisksVariant;
+use std::any::Any;
 
 use super::Sensor;
 
@@ -59,15 +60,6 @@ pub static COLOR_CHOICES_READ: LazyLock<[(&'static str, ColorVariant); 3]> = Laz
     ]
 });
 
-macro_rules! disks_select {
-    ($self:ident, $variant:expr) => {
-        match $variant {
-            DisksVariant::Combined | DisksVariant::Write => &$self.disks1,
-            _ => &$self.disks2,
-        }
-    };
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum UnitVariant {
     Short,
@@ -80,10 +72,9 @@ pub struct Disks {
     write: VecDeque<u64>,
     read: VecDeque<u64>,
     max_y: Option<u64>,
-    colors: GraphColors,
     svg_colors: SvgColors,
-    pub variant: DisksVariant,
-    kind: GraphKind,
+    config: DisksConfig,
+    refresh_rate: u32,
 }
 
 impl DemoGraph for Disks {
@@ -91,7 +82,7 @@ impl DemoGraph for Disks {
         let write = VecDeque::from(DL_DEMO);
         let read = VecDeque::from(UL_DEMO);
 
-        match self.variant {
+        match self.config.variant {
             DisksVariant::Combined => {
                 crate::svg_graph::double_line(&write, &read, GRAPH_SAMPLES, &self.svg_colors, None)
             }
@@ -107,16 +98,16 @@ impl DemoGraph for Disks {
     }
 
     fn colors(&self) -> GraphColors {
-        self.colors
+        self.config.colors
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.colors = colors;
+        self.config.colors = colors;
         self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        match self.variant {
+        match self.config.variant {
             DisksVariant::Combined => (*COLOR_CHOICES_COMBINED).into(),
             DisksVariant::Write => (*COLOR_CHOICES_WRITE).into(),
             DisksVariant::Read => (*COLOR_CHOICES_READ).into(),
@@ -129,6 +120,14 @@ impl DemoGraph for Disks {
 }
 
 impl Sensor for Disks {
+    fn update_config(&mut self, config: &dyn Any, refresh_rate: u32) {
+        if let Some(cfg) = config.downcast_ref::<DisksConfig>() {
+            self.config = cfg.clone();
+            self.svg_colors.set_colors(&cfg.colors);
+            self.refresh_rate = refresh_rate;
+        }
+    }
+
     fn graph_kind(&self) -> GraphKind {
         GraphKind::Line
     }
@@ -161,14 +160,14 @@ impl Sensor for Disks {
         self.read.push_back(rd);
     }
 
-    fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
-        let mut dmo = Disks::new(self.variant, self.kind);
-        dmo.set_colors(colors);
+    fn demo_graph(&self) -> Box<dyn DemoGraph> {
+        let mut dmo = Disks::default();
+        dmo.update_config(&self.config, 0);
         Box::new(dmo)
     }
 
     fn graph(&self) -> String {
-        match self.variant {
+        match self.config.variant {
             DisksVariant::Combined => crate::svg_graph::double_line(
                 &self.write,
                 &self.read,
@@ -190,19 +189,19 @@ impl Sensor for Disks {
         }
     }
 
-    fn settings_ui(&self, mmconfig: &MinimonConfig) -> Element<crate::app::Message> {
+    fn settings_ui(&self) -> Element<crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
         let mut disk_elements = Vec::new();
 
-        let sample_rate_ms = mmconfig.refresh_rate;
+        let sample_rate_ms = self.refresh_rate;
 
         let wrrate = format!("W {}", &self.write_label(sample_rate_ms, UnitVariant::Long));
 
         let rdrate = format!("R {}", &self.read_label(sample_rate_ms, UnitVariant::Long));
 
-        let config = disks_select!(mmconfig, self.variant);
-        let k = self.variant;
+        let config = &self.config;
+        let k = self.config.variant;
 
         let mut rate = column!(Element::from(
             widget::svg(widget::svg::Handle::from_memory(
@@ -214,7 +213,7 @@ impl Sensor for Disks {
 
         rate = rate.push(Element::from(cosmic::widget::text::body("")));
 
-        match self.variant {
+        match self.config.variant {
             DisksVariant::Combined => {
                 rate = rate.push(cosmic::widget::text::body(wrrate));
                 rate = rate.push(cosmic::widget::text::body(rdrate));
@@ -249,8 +248,8 @@ impl Sensor for Disks {
             row!(
                 widget::horizontal_space(),
                 widget::button::standard(fl!("change-colors")).on_press(Message::ColorPickerOpen(
-                    DeviceKind::Disks(self.variant),
-                    self.kind,
+                    DeviceKind::Disks(self.config.variant),
+                    GraphKind::Line,
                     None
                 )),
                 widget::horizontal_space()
@@ -262,7 +261,7 @@ impl Sensor for Disks {
 
         disk_elements.push(Element::from(disk_right_column.spacing(cosmic.space_xs())));
 
-        let title_content = match self.variant {
+        let title_content = match self.config.variant {
             DisksVariant::Combined => fl!("disks-title-combined"),
             DisksVariant::Write => fl!("disks-title-write"),
             DisksVariant::Read => fl!("disks-title-read"),
@@ -278,22 +277,22 @@ impl Sensor for Disks {
     }
 }
 
-impl Disks {
-    pub fn new(variant: DisksVariant, kind: GraphKind) -> Self {
+impl Default for Disks {
+    fn default() -> Self {
         let disks = DisksInfo::new_with_refreshed_list();
-        let colors = GraphColors::new(DeviceKind::Disks(variant));
         Disks {
             disks,
             write: VecDeque::from(vec![0; MAX_SAMPLES]),
             read: VecDeque::from(vec![0; MAX_SAMPLES]),
             max_y: None,
-            colors,
-            variant,
-            kind,
-            svg_colors: SvgColors::new(&colors),
+            svg_colors: SvgColors::new(&GraphColors::default()),
+            config: DisksConfig::default(),
+            refresh_rate: 1000,
         }
     }
+}
 
+impl Disks {
     fn makestr(val: u64, format: UnitVariant) -> String {
         let mut formatted = String::with_capacity(20);
 

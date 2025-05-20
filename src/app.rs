@@ -28,9 +28,9 @@ use cosmic::{
 use zbus::blocking::Connection;
 use zvariant::OwnedObjectPath;
 
-use log::{debug, error, info};
+use log::{error, info};
 
-use crate::colorpicker::{ColorPicker, DemoGraph};
+use crate::colorpicker::ColorPicker;
 use crate::config::{
     ColorVariant, DeviceKind, DisksVariant, GpuConfig, GraphColors, GraphKind, NetworkVariant,
 };
@@ -145,7 +145,7 @@ pub struct Minimon {
     disks1: Disks,
     disks2: Disks,
 
-    //GPUs
+    //GPUs, in Btree so they're always ordered the same.
     gpus: BTreeMap<String, Gpu>,
 
     /// The popup id.
@@ -268,17 +268,17 @@ impl cosmic::Application for Minimon {
 
         let app = Minimon {
             core,
-            cpu: Cpu::new(GraphKind::Ring),
-            cputemp: CpuTemp::new(GraphKind::Ring),
-            memory: Memory::new(GraphKind::Line),
-            network1: Network::new(NetworkVariant::Combined, GraphKind::Line),
-            network2: Network::new(NetworkVariant::Upload, GraphKind::Line),
-            disks1: Disks::new(DisksVariant::Combined, GraphKind::Line),
-            disks2: Disks::new(DisksVariant::Read, GraphKind::Line),
+            cpu: Cpu::default(),
+            cputemp: CpuTemp::default(),
+            memory: Memory::default(),
+            network1: Network::default(),
+            network2: Network::default(),
+            disks1: Disks::default(),
+            disks2: Disks::default(),
             gpus,
             popup: None,
             settings_page: None,
-            colorpicker: ColorPicker::new(),
+            colorpicker: ColorPicker::default(),
             config: MinimonConfig::default(),
             refresh_rate: Arc::new(AtomicU32::new(1000)),
             is_laptop,
@@ -352,6 +352,7 @@ impl cosmic::Application for Minimon {
             }
         }
 
+        // If the applet is not visible, return an icon button to toggle the popup
         if !self.data_is_visible {
             return self
                 .core
@@ -363,7 +364,6 @@ impl cosmic::Application for Minimon {
 
         // Build the full list of panel elements
         let mut elements: Vec<Element<Message>> = Vec::new();
-
         elements.extend(self.cpu_panel_ui(horizontal));
         elements.extend(self.cpu_temp_panel_ui(horizontal));
         elements.extend(self.memory_panel_ui(horizontal));
@@ -406,7 +406,9 @@ impl cosmic::Application for Minimon {
             .into()
     }
 
+    // Settings popup, can be list overview, individual page or colorpicker
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
+        // Colorpicker
         if self.colorpicker.active() {
             let limits = Limits::NONE
                 .max_width(400.0)
@@ -419,6 +421,8 @@ impl cosmic::Application for Minimon {
                 .popup_container(self.colorpicker.view_colorpicker())
                 .limits(limits)
                 .into()
+
+        // Individual settingspage
         } else {
             let theme = cosmic::theme::active();
 
@@ -434,12 +438,12 @@ impl cosmic::Application for Minimon {
                 match variant {
                     SettingsVariant::Cpu => {
                         content = content.push(settings_sub_page_heading!(SETTINGS_CPU_HEADING));
-                        content = content.push(self.cpu.settings_ui(&self.config));
+                        content = content.push(self.cpu.settings_ui());
                     }
                     SettingsVariant::CpuTemp => {
                         content =
                             content.push(settings_sub_page_heading!(SETTINGS_CPU_TEMP_HEADING));
-                        content = content.push(self.cputemp.settings_ui(&self.config));
+                        content = content.push(self.cputemp.settings_ui());
                     }
                     SettingsVariant::Memory => {
                         content = content.push(Minimon::sub_page_header(
@@ -447,7 +451,7 @@ impl cosmic::Application for Minimon {
                             &SETTINGS_BACK,
                             Message::Settings(None),
                         ));
-                        content = content.push(self.memory.settings_ui(&self.config));
+                        content = content.push(self.memory.settings_ui());
                     }
                     SettingsVariant::Network => {
                         content =
@@ -459,9 +463,9 @@ impl cosmic::Application for Minimon {
                             )
                             .on_toggle(Message::ToggleNetCombined),
                         ));
-                        content = content.push(self.network1.settings_ui(&self.config));
+                        content = content.push(self.network1.settings_ui());
                         if self.config.network1.variant == NetworkVariant::Download {
-                            content = content.push(self.network2.settings_ui(&self.config));
+                            content = content.push(self.network2.settings_ui());
                         }
                     }
                     SettingsVariant::Disks => {
@@ -471,9 +475,9 @@ impl cosmic::Application for Minimon {
                             widget::toggler(self.config.disks1.variant == DisksVariant::Combined)
                                 .on_toggle(Message::ToggleDisksCombined),
                         ));
-                        content = content.push(self.disks1.settings_ui(&self.config));
+                        content = content.push(self.disks1.settings_ui());
                         if self.config.disks1.variant == DisksVariant::Write {
-                            content = content.push(self.disks2.settings_ui(&self.config));
+                            content = content.push(self.disks2.settings_ui());
                         }
                     }
                     SettingsVariant::Gpu(id) => {
@@ -498,6 +502,8 @@ impl cosmic::Application for Minimon {
                         content = content.push(self.general_settings_ui());
                     }
                 }
+
+            // List settings overview
             } else {
                 if !SYSMON_LIST.is_empty() {
                     let list = &*SYSMON_NAMES;
@@ -659,56 +665,26 @@ impl cosmic::Application for Minimon {
                 info!("Message::ColorPickerOpen({kind:?}, {id:?})");
                 match device {
                     DeviceKind::Cpu => {
-                        debug!("Cpu");
-                        self.colorpicker.activate(
-                            device,
-                            kind,
-                            self.cpu.demo_graph(self.config.cpu.colors),
-                        );
+                        self.colorpicker.activate(device, self.cpu.demo_graph());
                     }
                     DeviceKind::CpuTemp => {
-                        debug!("Temp");
-                        self.colorpicker.activate(
-                            device,
-                            kind,
-                            self.cputemp.demo_graph(self.config.cputemp.colors),
-                        );
+                        self.colorpicker.activate(device, self.cputemp.demo_graph());
                     }
                     DeviceKind::Memory => {
-                        self.colorpicker.activate(
-                            device,
-                            kind,
-                            self.memory.demo_graph(self.config.memory.colors),
-                        );
+                        self.colorpicker.activate(device, self.memory.demo_graph());
                     }
                     DeviceKind::Network(variant) => {
-                        let (network, config) = network_select!(self, variant);
-                        self.colorpicker
-                            .activate(device, kind, network.demo_graph(config.colors));
+                        let (network, _config) = network_select!(self, variant);
+                        self.colorpicker.activate(device, network.demo_graph());
                     }
                     DeviceKind::Disks(variant) => {
                         let (disks, _) = disks_select!(self, variant);
-                        self.colorpicker
-                            .activate(device, kind, disks.demo_graph(disks.colors()));
+                        self.colorpicker.activate(device, disks.demo_graph());
                     }
                     DeviceKind::Gpu | DeviceKind::Vram | DeviceKind::GpuTemp => {
                         if let Some(id) = id {
-                            if let (Some(config), Some(gpu)) =
-                                (self.config.gpus.get(&id), self.gpus.get(&id))
-                            {
-                                let colors = if device == DeviceKind::Gpu {
-                                    config.usage.colors
-                                } else if device == DeviceKind::Vram {
-                                    config.vram.colors
-                                } else {
-                                    config.temp.colors
-                                };
-
-                                self.colorpicker.activate(
-                                    device,
-                                    kind,
-                                    gpu.demo_graph(colors, device),
-                                );
+                            if let Some(gpu) = self.gpus.get(&id) {
+                                self.colorpicker.activate(device, gpu.demo_graph(device));
                             } else {
                                 error!("no config for selected GPU {id}");
                             }
@@ -717,18 +693,17 @@ impl cosmic::Application for Minimon {
                         }
                     }
                 }
-                self.colorpicker.set_variant(ColorVariant::Color1);
-                let col = self
-                    .colorpicker
-                    .colors()
-                    .get_color(self.colorpicker.variant());
-                self.colorpicker.set_sliders(col);
+                self.colorpicker.set_color_variant(ColorVariant::Color1);
             }
 
-            Message::ColorPickerClose(save, id) => {
-                info!("Message::ColorPickerClose({save},{id:?})");
+            Message::ColorPickerClose(save, maybe_gpu_id) => {
+                info!("Message::ColorPickerClose({save},{maybe_gpu_id:?})");
                 if save {
-                    self.set_colors(self.colorpicker.colors(), self.colorpicker.kind().0, id);
+                    self.save_colors(
+                        self.colorpicker.colors(),
+                        self.colorpicker.device(),
+                        maybe_gpu_id,
+                    );
                     self.save_config();
                 }
                 self.colorpicker.deactivate();
@@ -745,48 +720,45 @@ impl cosmic::Application for Minimon {
                     let srgba = cosmic::cosmic_theme::palette::Srgba::from_color(
                         theme.cosmic().accent_color().color,
                     );
-                    self.colorpicker.set_sliders(srgba.opaque().into());
+                    self.colorpicker.update_color(srgba.opaque().into());
                 }
             }
 
             Message::ColorPickerSliderRedChanged(val) => {
                 let mut col = self.colorpicker.sliders();
                 col.red = val;
-                self.colorpicker.set_sliders(col);
+                self.colorpicker.update_color(col);
             }
 
             Message::ColorPickerSliderGreenChanged(val) => {
                 let mut col = self.colorpicker.sliders();
                 col.green = val;
-                self.colorpicker.set_sliders(col);
+                self.colorpicker.update_color(col);
             }
 
             Message::ColorPickerSliderBlueChanged(val) => {
                 let mut col = self.colorpicker.sliders();
                 col.blue = val;
-                self.colorpicker.set_sliders(col);
+                self.colorpicker.update_color(col);
             }
 
             Message::ColorPickerSliderAlphaChanged(val) => {
                 let mut col = self.colorpicker.sliders();
                 col.alpha = val;
-                self.colorpicker.set_sliders(col);
+                self.colorpicker.update_color(col);
             }
 
             Message::ColorPickerSelectVariant(variant) => {
-                self.colorpicker.set_variant(variant);
+                self.colorpicker.set_color_variant(variant);
             }
 
             Message::ToggleNetCombined(toggle) => {
                 info!("Message::ToggleNetCombined({toggle})");
                 if toggle.is_true() {
-                    self.network1.variant = NetworkVariant::Combined;
                     self.config.network1.variant = NetworkVariant::Combined;
                 } else {
-                    self.network1.variant = NetworkVariant::Download;
                     self.config.network1.variant = NetworkVariant::Download;
                 }
-                self.network2.variant = NetworkVariant::Upload;
                 self.config.network2.variant = NetworkVariant::Upload;
                 self.save_config();
             }
@@ -794,13 +766,10 @@ impl cosmic::Application for Minimon {
             Message::ToggleDisksCombined(toggle) => {
                 info!("Message::ToggleDisksCombined({toggle})");
                 if toggle.is_true() {
-                    self.disks1.variant = DisksVariant::Combined;
                     self.config.disks1.variant = DisksVariant::Combined;
                 } else {
-                    self.disks1.variant = DisksVariant::Write;
                     self.config.disks1.variant = DisksVariant::Write;
                 }
-                self.disks2.variant = DisksVariant::Read;
                 self.config.disks2.variant = DisksVariant::Read;
                 self.save_config();
             }
@@ -821,18 +790,14 @@ impl cosmic::Application for Minimon {
 
             Message::ToggleAdaptiveNet(variant, toggle) => {
                 info!("Message::ToggleAdaptiveNet({variant:?}, {toggle:?})");
-                let (network, config) = network_select!(self, variant);
+                let (_network, config) = network_select!(self, variant);
                 config.adaptive = toggle;
-                if toggle {
-                    network.set_max_y(None);
-                }
                 self.save_config();
             }
 
             Message::NetworkSelectUnit(variant, unit) => {
                 let (_, config) = network_select!(self, variant);
                 config.unit = Some(unit);
-                self.set_network_max_y(variant);
                 self.save_config();
             }
 
@@ -867,8 +832,6 @@ impl cosmic::Application for Minimon {
                     let (_, config) = network_select!(self, variant);
                     config.bandwidth = val;
                 }
-
-                self.set_network_max_y(variant);
                 self.save_config();
             }
 
@@ -974,25 +937,25 @@ impl cosmic::Application for Minimon {
             Message::ColorTextInputRedChanged(value) => {
                 let mut col = self.colorpicker.sliders();
                 Minimon::set_color(&value, &mut col.red);
-                self.colorpicker.set_sliders(col);
+                self.colorpicker.update_color(col);
             }
 
             Message::ColorTextInputGreenChanged(value) => {
                 let mut col = self.colorpicker.sliders();
                 Minimon::set_color(&value, &mut col.green);
-                self.colorpicker.set_sliders(col);
+                self.colorpicker.update_color(col);
             }
 
             Message::ColorTextInputBlueChanged(value) => {
                 let mut col = self.colorpicker.sliders();
                 Minimon::set_color(&value, &mut col.blue);
-                self.colorpicker.set_sliders(col);
+                self.colorpicker.update_color(col);
             }
 
             Message::ColorTextInputAlphaChanged(value) => {
                 let mut col = self.colorpicker.sliders();
                 Minimon::set_color(&value, &mut col.alpha);
-                self.colorpicker.set_sliders(col);
+                self.colorpicker.update_color(col);
             }
 
             Message::LaunchSystemMonitor() => {
@@ -1003,7 +966,6 @@ impl cosmic::Application for Minimon {
             Message::RefreshRateChanged(rate) => {
                 info!("Message::RefreshRateChanged({rate:?})");
                 self.config.refresh_rate = (rate * 1000.0) as u32;
-                self.set_refresh_rate();
                 self.save_config();
             }
 
@@ -1136,25 +1098,16 @@ macro_rules! button_from_sensor {
 impl Minimon {
     fn config_changed(&mut self, config: &MinimonConfig) {
         self.config = config.clone();
+        let rr = self.config.refresh_rate;
+        self.refresh_rate.store(rr, atomic::Ordering::Relaxed);
+        self.cpu.update_config(&config.cpu, rr);
+        self.cputemp.update_config(&config.cputemp, rr);
+        self.memory.update_config(&config.memory, rr);
+        self.network1.update_config(&config.network1, rr);
+        self.network2.update_config(&config.network2, rr);
+        self.disks1.update_config(&config.disks1, rr);
+        self.disks2.update_config(&config.disks2, rr);
         self.sync_gpu_configs();
-        self.set_refresh_rate();
-        self.cpu.set_colors(self.config.cpu.colors);
-        self.cpu.set_graph_kind(self.config.cpu.kind);
-        self.cpu.no_decimals = config.cpu.no_decimals;
-        self.cputemp.set_colors(self.config.cputemp.colors);
-        self.cputemp.set_graph_kind(self.config.cputemp.kind);
-        self.cputemp.set_unit(self.config.cputemp.unit);
-        self.memory.set_colors(self.config.memory.colors);
-        self.memory.set_graph_kind(self.config.memory.kind);
-        self.memory.set_percentage(self.config.memory.percentage);
-        self.network1.set_colors(self.config.network1.colors);
-        self.network2.set_colors(self.config.network2.colors);
-        self.network1.variant = self.config.network1.variant;
-        self.network2.variant = NetworkVariant::Upload;
-        self.disks1.variant = self.config.disks1.variant;
-        self.disks2.variant = DisksVariant::Read;
-        self.set_network_max_y(NetworkVariant::Download);
-        self.set_network_max_y(NetworkVariant::Upload);
 
         // Track whether anything is visible on the panel, or just the app-icon
         {
@@ -1630,37 +1583,29 @@ impl Minimon {
         }
     }
 
-    fn set_colors(&mut self, colors: GraphColors, kind: DeviceKind, id: Option<String>) {
+    fn save_colors(&mut self, colors: GraphColors, kind: DeviceKind, id: Option<String>) {
         match kind {
             DeviceKind::Cpu => {
                 self.config.cpu.colors = colors;
-                self.cpu.set_colors(colors);
             }
             DeviceKind::CpuTemp => {
                 self.config.cputemp.colors = colors;
-                self.cputemp.set_colors(colors);
             }
             DeviceKind::Memory => {
                 self.config.memory.colors = colors;
-                self.memory.set_colors(colors);
             }
             DeviceKind::Network(variant) => {
-                let (network, config) = network_select!(self, variant);
+                let (_, config) = network_select!(self, variant);
                 config.colors = colors;
-                network.set_colors(colors);
             }
             DeviceKind::Disks(variant) => {
-                let (disks, config) = disks_select!(self, variant);
+                let (_, config) = disks_select!(self, variant);
                 config.colors = colors;
-                disks.set_colors(colors);
             }
             DeviceKind::Gpu => {
                 if let Some(id) = id {
-                    if let (Some(config), Some(gpu)) =
-                        (self.config.gpus.get_mut(&id), self.gpus.get_mut(&id))
-                    {
+                    if let Some(config) = self.config.gpus.get_mut(&id) {
                         config.usage.colors = colors;
-                        gpu.gpu.set_colors(colors);
                     } else {
                         error!("No config for selected GPU {id}");
                     }
@@ -1668,11 +1613,8 @@ impl Minimon {
             }
             DeviceKind::Vram => {
                 if let Some(id) = id {
-                    if let (Some(config), Some(gpu)) =
-                        (self.config.gpus.get_mut(&id), self.gpus.get_mut(&id))
-                    {
+                    if let Some(config) = self.config.gpus.get_mut(&id) {
                         config.vram.colors = colors;
-                        gpu.vram.set_colors(colors);
                     } else {
                         error!("No config for selected GPU {id}");
                     }
@@ -1680,34 +1622,13 @@ impl Minimon {
             }
             DeviceKind::GpuTemp => {
                 if let Some(id) = id {
-                    if let (Some(config), Some(gpu)) =
-                        (self.config.gpus.get_mut(&id), self.gpus.get_mut(&id))
-                    {
+                    if let Some(config) = self.config.gpus.get_mut(&id) {
                         config.temp.colors = colors;
-                        gpu.temp.set_colors(colors);
                     } else {
                         error!("No config for selected GPU {id}");
                     }
                 }
             }
-        }
-    }
-
-    fn set_refresh_rate(&mut self) {
-        self.refresh_rate
-            .store(self.config.refresh_rate, atomic::Ordering::Relaxed);
-    }
-
-    fn set_network_max_y(&mut self, variant: NetworkVariant) {
-        let (network, config) = network_select!(self, variant);
-        if config.adaptive {
-            network.set_max_y(None);
-        } else {
-            let unit = config.unit.unwrap_or(1).min(4); // ensure safe index
-            let multiplier = [1, 1_000, 1_000_000, 1_000_000_000, 1_000_000_000_000];
-            let sec_per_tic = self.config.refresh_rate as f64 / 1000.0;
-            let new_y = (config.bandwidth * multiplier[unit]) as f64 * sec_per_tic;
-            network.set_max_y(Some(new_y.round() as u64));
         }
     }
 
@@ -1859,14 +1780,7 @@ impl Minimon {
 
         for (id, gpu) in &mut self.gpus {
             if let Some(config) = config_gpus.get(id) {
-                gpu.gpu.set_graph_kind(config.usage.kind);
-                gpu.vram.set_graph_kind(config.vram.kind);
-                gpu.temp.set_graph_kind(config.temp.kind);
-                gpu.gpu.set_colors(config.usage.colors);
-                gpu.vram.set_colors(config.vram.colors);
-                gpu.temp.set_colors(config.temp.colors);
-                gpu.temp.set_colors(config.temp.colors);
-                gpu.temp.tempunit = config.temp.unit;
+                gpu.update_config(config, self.config.refresh_rate);
             }
         }
     }

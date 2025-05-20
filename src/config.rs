@@ -266,7 +266,7 @@ impl Default for NetworkConfig {
             adaptive: true,
             bandwidth: 62_500_000, // 500Mbit/s
             unit: Some(0),
-            colors: GraphColors::new(DeviceKind::Network(NetworkVariant::Download)),
+            colors: GraphColors::new(DeviceKind::Network(NetworkVariant::Combined)),
             variant: NetworkVariant::Combined,
         }
     }
@@ -447,10 +447,22 @@ impl Default for MinimonConfig {
             cpu: CpuConfig::default(),
             cputemp: CpuTempConfig::default(),
             memory: MemoryConfig::default(),
-            network1: NetworkConfig::default(),
-            network2: NetworkConfig::default(),
-            disks1: DisksConfig::default(),
-            disks2: DisksConfig::default(),
+            network1: NetworkConfig {
+                variant: NetworkVariant::Combined,
+                ..Default::default()
+            },
+            network2: NetworkConfig {
+                variant: NetworkVariant::Upload,
+                ..Default::default()
+            },
+            disks1: DisksConfig {
+                variant: DisksVariant::Combined,
+                ..Default::default()
+            },
+            disks2: DisksConfig {
+                variant: DisksVariant::Read,
+                ..Default::default()
+            },
             gpus: HashMap::new(),
             sysmon: 0,
             symbols: false,

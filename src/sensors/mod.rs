@@ -2,7 +2,10 @@ use cosmic::Element;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 
-use crate::{config::ColorVariant, fl};
+use crate::{
+    config::{ColorVariant, GpuConfig},
+    fl,
+};
 
 pub static COLOR_CHOICES_RING: LazyLock<[(&'static str, ColorVariant); 4]> = LazyLock::new(|| {
     [
@@ -28,10 +31,7 @@ pub static COLOR_CHOICES_HEAT: LazyLock<[(&'static str, ColorVariant); 2]> = Laz
     ]
 });
 
-use crate::{
-    colorpicker::DemoGraph,
-    config::{GraphColors, GraphKind, MinimonConfig},
-};
+use crate::{colorpicker::DemoGraph, config::GraphKind};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TempUnit {
@@ -47,13 +47,15 @@ pub enum CpuVariant {
     Intel,
 }
 
-pub trait Sensor {
+use std::any::Any;
+pub trait Sensor: Default {
+    fn update_config(&mut self, config: &dyn Any, refresh_rate: u32);
     fn graph_kind(&self) -> GraphKind;
     fn set_graph_kind(&mut self, kind: GraphKind);
     fn update(&mut self);
-    fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph>;
+    fn demo_graph(&self) -> Box<dyn DemoGraph>;
     fn graph(&self) -> String;
-    fn settings_ui(&self, config: &MinimonConfig) -> Element<crate::app::Message>;
+    fn settings_ui(&self) -> Element<crate::app::Message>;
 }
 
 pub mod cpu;

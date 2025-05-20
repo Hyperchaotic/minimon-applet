@@ -5,7 +5,7 @@ use sysinfo::Networks;
 
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, GraphColors, GraphKind, MinimonConfig, NetworkVariant},
+    config::{ColorVariant, DeviceKind, GraphColors, GraphKind, NetworkConfig, NetworkVariant},
     fl,
     svg_graph::SvgColors,
 };
@@ -13,6 +13,7 @@ use crate::{
 use cosmic::widget;
 use cosmic::widget::settings;
 
+use crate::app::Message;
 use cosmic::{
     iced::{
         Alignment,
@@ -20,8 +21,7 @@ use cosmic::{
     },
     iced_widget::Row,
 };
-
-use crate::app::Message;
+use std::any::Any;
 
 use super::Sensor;
 
@@ -57,15 +57,6 @@ pub static COLOR_CHOICES_UL: LazyLock<[(&'static str, ColorVariant); 3]> = LazyL
     ]
 });
 
-macro_rules! network_select {
-    ($self:ident, $variant:expr) => {
-        match $variant {
-            NetworkVariant::Combined | NetworkVariant::Download => &$self.network1,
-            _ => &$self.network2,
-        }
-    };
-}
-
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum UnitVariant {
     Short,
@@ -78,11 +69,10 @@ pub struct Network {
     download: VecDeque<u64>,
     upload: VecDeque<u64>,
     max_y: Option<u64>,
-    colors: GraphColors,
     svg_colors: SvgColors,
-    pub variant: NetworkVariant,
-    kind: GraphKind,
     dropdown_options: Vec<&'static str>,
+    config: NetworkConfig,
+    refresh_rate: u32,
 }
 
 impl DemoGraph for Network {
@@ -90,7 +80,7 @@ impl DemoGraph for Network {
         let download = VecDeque::from(DL_DEMO);
         let upload = VecDeque::from(UL_DEMO);
 
-        match self.variant {
+        match self.config.variant {
             NetworkVariant::Combined => crate::svg_graph::double_line(
                 &download,
                 &upload,
@@ -110,16 +100,16 @@ impl DemoGraph for Network {
     }
 
     fn colors(&self) -> GraphColors {
-        self.colors
+        self.config.colors
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.colors = colors;
+        self.config.colors = colors;
         self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        match self.variant {
+        match self.config.variant {
             NetworkVariant::Combined => (*COLOR_CHOICES_COMBINED).into(),
             NetworkVariant::Download => (*COLOR_CHOICES_DL).into(),
             NetworkVariant::Upload => (*COLOR_CHOICES_UL).into(),
@@ -132,6 +122,24 @@ impl DemoGraph for Network {
 }
 
 impl Sensor for Network {
+    fn update_config(&mut self, config: &dyn Any, refresh_rate: u32) {
+        if let Some(cfg) = config.downcast_ref::<NetworkConfig>() {
+            self.config = cfg.clone();
+            self.svg_colors.set_colors(&cfg.colors);
+            self.refresh_rate = refresh_rate;
+
+            if cfg.adaptive {
+                self.max_y = None;
+            } else {
+                let unit = cfg.unit.unwrap_or(1).min(4); // ensure safe index
+                let multiplier = [1, 1_000, 1_000_000, 1_000_000_000, 1_000_000_000_000];
+                let sec_per_tic = refresh_rate as f64 / 1000.0;
+                let new_y = (cfg.bandwidth * multiplier[unit]) as f64 * sec_per_tic;
+                self.max_y = Some(new_y.round() as u64);
+            }
+        }
+    }
+
     fn graph_kind(&self) -> GraphKind {
         GraphKind::Line
     }
@@ -162,14 +170,14 @@ impl Sensor for Network {
         self.upload.push_back(ul);
     }
 
-    fn demo_graph(&self, colors: GraphColors) -> Box<dyn DemoGraph> {
-        let mut dmo = Network::new(self.variant, self.kind);
-        dmo.set_colors(colors);
+    fn demo_graph(&self) -> Box<dyn DemoGraph> {
+        let mut dmo = Network::default();
+        dmo.update_config(&self.config, self.refresh_rate);
         Box::new(dmo)
     }
 
     fn graph(&self) -> String {
-        match self.variant {
+        match self.config.variant {
             NetworkVariant::Combined => crate::svg_graph::double_line(
                 &self.download,
                 &self.upload,
@@ -191,12 +199,12 @@ impl Sensor for Network {
         }
     }
 
-    fn settings_ui(&self, mmconfig: &MinimonConfig) -> Element<crate::app::Message> {
+    fn settings_ui(&self) -> Element<crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
         let mut net_elements = Vec::new();
 
-        let sample_rate_ms = mmconfig.refresh_rate;
+        let sample_rate_ms = self.refresh_rate;
 
         let dlrate = format!(
             "↓ {}",
@@ -208,8 +216,8 @@ impl Sensor for Network {
             &self.upload_label(sample_rate_ms, UnitVariant::Long)
         );
 
-        let config = network_select!(mmconfig, self.variant);
-        let k = self.variant;
+        let config = &self.config;
+        let k = self.config.variant;
 
         let mut rate = column!(Element::from(
             widget::svg(widget::svg::Handle::from_memory(
@@ -221,7 +229,7 @@ impl Sensor for Network {
 
         rate = rate.push(Element::from(cosmic::widget::text::body("")));
 
-        match self.variant {
+        match self.config.variant {
             NetworkVariant::Combined => {
                 rate = rate.push(cosmic::widget::text::body(dlrate));
                 rate = rate.push(cosmic::widget::text::body(ulrate));
@@ -284,8 +292,8 @@ impl Sensor for Network {
             row!(
                 widget::horizontal_space(),
                 widget::button::standard(fl!("change-colors")).on_press(Message::ColorPickerOpen(
-                    DeviceKind::Network(self.variant),
-                    self.kind,
+                    DeviceKind::Network(self.config.variant),
+                    GraphKind::Line,
                     None
                 )),
                 widget::horizontal_space()
@@ -297,7 +305,7 @@ impl Sensor for Network {
 
         net_elements.push(Element::from(net_right_column.spacing(cosmic.space_xs())));
 
-        let title_content = match self.variant {
+        let title_content = match self.config.variant {
             NetworkVariant::Combined => fl!("net-title-combined"),
             NetworkVariant::Download => fl!("net-title-dl"),
             NetworkVariant::Upload => fl!("net-title-ul"),
@@ -313,27 +321,23 @@ impl Sensor for Network {
     }
 }
 
-impl Network {
-    pub fn new(variant: NetworkVariant, kind: GraphKind) -> Self {
+impl Default for Network {
+    fn default() -> Self {
         let networks = Networks::new_with_refreshed_list();
-        let colors = GraphColors::new(DeviceKind::Network(variant));
         Network {
             networks,
             download: VecDeque::from(vec![0; MAX_SAMPLES]),
             upload: VecDeque::from(vec![0; MAX_SAMPLES]),
             max_y: None,
-            colors,
-            variant,
-            kind,
             dropdown_options: ["b", "Kb", "Mb", "Gb", "Tb"].into(),
-            svg_colors: SvgColors::new(&colors),
+            svg_colors: SvgColors::new(&GraphColors::default()),
+            config: NetworkConfig::default(),
+            refresh_rate: 1000,
         }
     }
+}
 
-    pub fn set_max_y(&mut self, max: Option<u64>) {
-        self.max_y = max;
-    }
-
+impl Network {
     fn makestr(val: u64, format: UnitVariant) -> String {
         let mut value = val as f64;
         let mut unit_index = 0;

@@ -2,9 +2,9 @@ use cosmic::Element;
 use log::info;
 use std::{collections::VecDeque, fmt::Write};
 
+use crate::sensors::GpuConfig;
 use cosmic::widget::{self, Column};
 use cosmic::widget::{settings, toggler};
-
 use cosmic::{
     iced::{
         Alignment,
@@ -18,10 +18,11 @@ use crate::app::Message;
 use crate::colorpicker::DemoGraph;
 use crate::config::DeviceKind;
 use crate::{
-    config::{ColorVariant, GraphColors, GraphKind},
+    config::{ColorVariant, GpuTempConfig, GpuUsageConfig, GpuVramConfig, GraphColors, GraphKind},
     fl,
     svg_graph::SvgColors,
 };
+use std::any::Any;
 
 use super::gpu::amd::AmdGpu;
 use super::gpu::intel::IntelGpu;
@@ -37,11 +38,10 @@ pub struct GpuGraph {
     id: String,
     samples: VecDeque<f64>,
     graph_options: Vec<&'static str>,
-    kind: GraphKind,
-    colors: GraphColors,
     svg_colors: SvgColors,
     disabled: bool,
     disabled_colors: SvgColors,
+    config: GpuUsageConfig,
 }
 
 impl GpuGraph {
@@ -55,8 +55,6 @@ impl GpuGraph {
             id: id.to_owned(),
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
             graph_options: GRAPH_OPTIONS.to_vec(),
-            kind: GraphKind::Ring,
-            colors: GraphColors::default(),
             svg_colors: SvgColors::new(&GraphColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
@@ -65,6 +63,14 @@ impl GpuGraph {
                 color3: String::from("#727272FF"),
                 color4: String::from("#727272FF"),
             },
+            config: GpuUsageConfig::default(),
+        }
+    }
+
+    fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
+        if let Some(cfg) = config.downcast_ref::<GpuUsageConfig>() {
+            self.config = cfg.clone();
+            self.svg_colors = SvgColors::new(&cfg.colors);
         }
     }
 
@@ -75,7 +81,7 @@ impl GpuGraph {
     }
 
     pub fn graph(&self) -> String {
-        if self.kind == GraphKind::Ring {
+        if self.config.kind == GraphKind::Ring {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
@@ -121,16 +127,11 @@ impl GpuGraph {
     }
 
     pub fn graph_kind(&self) -> crate::config::GraphKind {
-        self.kind
+        self.config.kind
     }
 
     pub fn set_graph_kind(&mut self, kind: crate::config::GraphKind) {
-        self.kind = kind;
-    }
-
-    pub fn set_colors(&mut self, colors: GraphColors) {
-        self.colors = colors;
-        self.svg_colors.set_colors(&colors);
+        self.config.kind = kind;
     }
 
     pub fn update(&mut self, sample: u32) {
@@ -160,7 +161,7 @@ impl fmt::Display for GpuGraph {
 
 impl DemoGraph for GpuGraph {
     fn demo(&self) -> String {
-        match self.kind {
+        match self.config.kind {
             GraphKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
@@ -179,16 +180,16 @@ impl DemoGraph for GpuGraph {
     }
 
     fn colors(&self) -> GraphColors {
-        self.colors
+        self.config.colors
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.colors = colors;
+        self.config.colors = colors;
         self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        if self.kind == GraphKind::Line {
+        if self.config.kind == GraphKind::Line {
             (*super::COLOR_CHOICES_LINE).into()
         } else {
             (*super::COLOR_CHOICES_RING).into()
@@ -204,14 +205,11 @@ pub struct VramGraph {
     id: String,
     samples: VecDeque<f64>,
     graph_options: Vec<&'static str>,
-    kind: GraphKind,
-    max_val: f64,
-
-    //colors
-    colors: GraphColors,
+    total: f64,
     svg_colors: SvgColors,
     disabled: bool,
     disabled_colors: SvgColors,
+    config: GpuVramConfig,
 }
 
 impl VramGraph {
@@ -221,9 +219,7 @@ impl VramGraph {
             id: id.to_owned(),
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
             graph_options: GRAPH_OPTIONS.to_vec(),
-            kind: GraphKind::Ring,
-            max_val: total,
-            colors: GraphColors::default(),
+            total: total,
             svg_colors: SvgColors::new(&GraphColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
@@ -232,6 +228,14 @@ impl VramGraph {
                 color3: String::from("#727272FF"),
                 color4: String::from("#727272FF"),
             },
+            config: GpuVramConfig::default(),
+        }
+    }
+
+    fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
+        if let Some(cfg) = config.downcast_ref::<GpuVramConfig>() {
+            self.config = cfg.clone();
+            self.svg_colors = SvgColors::new(&cfg.colors);
         }
     }
 
@@ -242,7 +246,7 @@ impl VramGraph {
     }
 
     pub fn graph(&self) -> String {
-        if self.kind == GraphKind::Ring {
+        if self.config.kind == GraphKind::Ring {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
@@ -251,7 +255,7 @@ impl VramGraph {
                 _ = write!(percentage, "0");
                 _ = write!(value, "-");
             } else {
-                let pct: u64 = ((latest / self.max_val) * 100.0) as u64;
+                let pct: u64 = ((latest / self.total) * 100.0) as u64;
 
                 write!(percentage, "{pct}").unwrap();
 
@@ -275,7 +279,7 @@ impl VramGraph {
         } else {
             crate::svg_graph::line(
                 &self.samples,
-                self.max_val,
+                self.total,
                 if self.disabled {
                     &self.disabled_colors
                 } else {
@@ -290,16 +294,11 @@ impl VramGraph {
     }
 
     pub fn graph_kind(&self) -> crate::config::GraphKind {
-        self.kind
+        self.config.kind
     }
 
     pub fn set_graph_kind(&mut self, kind: crate::config::GraphKind) {
-        self.kind = kind;
-    }
-
-    pub fn set_colors(&mut self, colors: GraphColors) {
-        self.colors = colors;
-        self.svg_colors.set_colors(&colors);
+        self.config.kind = kind;
     }
 
     pub fn string(&self, vertical_panel: bool) -> String {
@@ -318,7 +317,7 @@ impl VramGraph {
     }
 
     pub fn total(&self) -> f64 {
-        self.max_val
+        self.total
     }
 
     pub fn update(&mut self, sample: u64) {
@@ -334,17 +333,13 @@ impl VramGraph {
 pub struct TempGraph {
     id: String,
     samples: VecDeque<f64>,
-    pub tempunit: TempUnit,
     unit_options: Vec<&'static str>,
     graph_options: Vec<&'static str>,
-    kind: GraphKind,
-    max_val: f64,
-
-    //colors
-    colors: GraphColors,
+    max_temp: f64,
     svg_colors: SvgColors,
     disabled: bool,
     disabled_colors: SvgColors,
+    config: GpuTempConfig,
 }
 
 impl TempGraph {
@@ -353,12 +348,9 @@ impl TempGraph {
         TempGraph {
             id: id.to_owned(),
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
-            tempunit: TempUnit::Celcius,
             unit_options: UNIT_OPTIONS.to_vec(),
             graph_options: TEMP_GRAPH_OPTIONS.to_vec(),
-            kind: GraphKind::Ring,
-            max_val: 100.0,
-            colors: GraphColors::default(),
+            max_temp: 100.0,
             svg_colors: SvgColors::new(&GraphColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
@@ -367,6 +359,14 @@ impl TempGraph {
                 color3: String::from("#727272FF"),
                 color4: String::from("#727272FF"),
             },
+            config: GpuTempConfig::default(),
+        }
+    }
+
+    fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
+        if let Some(cfg) = config.downcast_ref::<GpuTempConfig>() {
+            self.config = cfg.clone();
+            self.svg_colors = SvgColors::new(&cfg.colors);
         }
     }
 
@@ -377,7 +377,7 @@ impl TempGraph {
     }
 
     pub fn graph(&self) -> String {
-        match self.kind {
+        match self.config.kind {
             GraphKind::Ring => {
                 let latest = self.latest_sample();
                 let mut value = self.to_string();
@@ -402,7 +402,7 @@ impl TempGraph {
             }
             GraphKind::Line => crate::svg_graph::line(
                 &self.samples,
-                self.max_val,
+                self.max_temp,
                 if self.disabled {
                     &self.disabled_colors
                 } else {
@@ -410,7 +410,7 @@ impl TempGraph {
                 },
             ),
             GraphKind::Heat => {
-                crate::svg_graph::heat(&self.samples, self.max_val as u64, &self.svg_colors)
+                crate::svg_graph::heat(&self.samples, self.max_temp as u64, &self.svg_colors)
             }
         }
     }
@@ -420,16 +420,11 @@ impl TempGraph {
     }
 
     pub fn graph_kind(&self) -> crate::config::GraphKind {
-        self.kind
+        self.config.kind
     }
 
     pub fn set_graph_kind(&mut self, kind: crate::config::GraphKind) {
-        self.kind = kind;
-    }
-
-    pub fn set_colors(&mut self, colors: GraphColors) {
-        self.colors = colors;
-        self.svg_colors.set_colors(&colors);
+        self.config.kind = kind;
     }
 
     pub fn update(&mut self, sample: u32) {
@@ -443,7 +438,7 @@ impl TempGraph {
 
 impl DemoGraph for TempGraph {
     fn demo(&self) -> String {
-        match self.kind {
+        match self.config.kind {
             GraphKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
@@ -464,16 +459,16 @@ impl DemoGraph for TempGraph {
     }
 
     fn colors(&self) -> GraphColors {
-        self.colors
+        self.config.colors
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.colors = colors;
+        self.config.colors = colors;
         self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        match self.kind {
+        match self.config.kind {
             GraphKind::Line => (*super::COLOR_CHOICES_LINE).into(),
             GraphKind::Ring => (*super::COLOR_CHOICES_RING).into(),
             GraphKind::Heat => (*super::COLOR_CHOICES_HEAT).into(),
@@ -491,14 +486,14 @@ impl fmt::Display for TempGraph {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let current_val = self.latest_sample();
         if self.disabled || current_val <= 0.0 {
-            match self.tempunit {
+            match self.config.unit {
                 TempUnit::Celcius => write!(f, "--C"),
                 TempUnit::Farenheit => write!(f, "---F"),
                 TempUnit::Kelvin => write!(f, "---K"),
                 TempUnit::Rankine => write!(f, "---R"),
             }
         } else {
-            match self.tempunit {
+            match self.config.unit {
                 TempUnit::Celcius => write!(f, "{}C", current_val.trunc()),
                 TempUnit::Farenheit => write!(f, "{}F", (current_val * 9.0 / 5.0 + 32.0).trunc()),
                 TempUnit::Kelvin => write!(f, "{}K", (current_val + 273.15).trunc()),
@@ -510,7 +505,7 @@ impl fmt::Display for TempGraph {
 
 impl DemoGraph for VramGraph {
     fn demo(&self) -> String {
-        match self.kind {
+        match self.config.kind {
             GraphKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
@@ -529,16 +524,16 @@ impl DemoGraph for VramGraph {
     }
 
     fn colors(&self) -> GraphColors {
-        self.colors
+        self.config.colors
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.colors = colors;
+        self.config.colors = colors;
         self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        if self.kind == GraphKind::Line {
+        if self.config.kind == GraphKind::Line {
             (*super::COLOR_CHOICES_LINE).into()
         } else {
             (*super::COLOR_CHOICES_RING).into()
@@ -556,6 +551,7 @@ pub struct Gpu {
     pub vram: VramGraph,
     pub temp: TempGraph,
     is_laptop: bool,
+    config: GpuConfig,
 }
 
 impl Gpu {
@@ -569,6 +565,16 @@ impl Gpu {
             vram: VramGraph::new(&id, total as f64 / 1_073_741_824.0),
             temp: TempGraph::new(&id),
             is_laptop: false,
+            config: GpuConfig::default(),
+        }
+    }
+
+    pub fn update_config(&mut self, config: &dyn Any, refresh_rate: u32) {
+        if let Some(cfg) = config.downcast_ref::<GpuConfig>() {
+            self.config = cfg.clone();
+            self.gpu.update_config(&cfg.usage, refresh_rate);
+            self.vram.update_config(&cfg.vram, refresh_rate);
+            self.temp.update_config(&cfg.temp, refresh_rate);
         }
     }
 
@@ -584,24 +590,21 @@ impl Gpu {
         self.is_laptop = true;
     }
 
-    pub fn demo_graph(&self, colors: GraphColors, device: DeviceKind) -> Box<dyn DemoGraph> {
+    pub fn demo_graph(&self, device: DeviceKind) -> Box<dyn DemoGraph> {
         match device {
             DeviceKind::Gpu => {
                 let mut dmo = GpuGraph::new(&self.id());
-                dmo.set_colors(colors);
-                dmo.set_graph_kind(self.gpu.kind);
+                dmo.update_config(&self.gpu.config, 0);
                 Box::new(dmo)
             }
             DeviceKind::Vram => {
-                let mut dmo = VramGraph::new(&self.id(), self.vram.max_val);
-                dmo.set_colors(colors);
-                dmo.set_graph_kind(self.vram.kind);
+                let mut dmo = VramGraph::new(&self.id(), self.vram.total);
+                dmo.update_config(&self.vram.config, 0);
                 Box::new(dmo)
             }
             DeviceKind::GpuTemp => {
                 let mut dmo = TempGraph::new(&self.id());
-                dmo.set_colors(colors);
-                dmo.set_graph_kind(self.temp.kind);
+                dmo.update_config(&self.temp.config, 0);
                 Box::new(dmo)
             }
             _ => panic!("Gpu::demo_graph({device:?}) Wrong device kind"),
@@ -797,7 +800,7 @@ impl Gpu {
         ));
 
         let selected: Option<usize> = Some(self.temp.graph_kind().into());
-        let selected_unit: Option<usize> = Some(self.temp.tempunit.into());
+        let selected_unit: Option<usize> = Some(self.temp.config.unit.into());
         let temp_kind = self.temp.graph_kind();
         let id1 = self.id();
         let id2 = self.id();

@@ -21,7 +21,7 @@ use cosmic::{
 use theme::iced::Slider;
 
 use crate::app::Message;
-use crate::config::{ColorVariant, DeviceKind, GraphColors, GraphKind};
+use crate::config::{ColorVariant, DeviceKind, GraphColors};
 use crate::fl;
 use log::info;
 
@@ -128,9 +128,8 @@ pub trait DemoGraph {
 
 /// Data for managing the `ColorPicker` dialog
 pub struct ColorPicker {
-    demo_svg: Option<Box<dyn DemoGraph>>,
+    demo_chart: Option<Box<dyn DemoGraph>>,
     device: DeviceKind,
-    kind: GraphKind,
     // Current field being adjusted background/text/etc.
     color_variant: ColorVariant,
     ///Current slider values
@@ -140,12 +139,11 @@ pub struct ColorPicker {
     slider_alpha_val: u8,
 }
 
-impl ColorPicker {
-    pub fn new() -> Self {
+impl Default for ColorPicker {
+    fn default() -> Self {
         ColorPicker {
-            demo_svg: None,
+            demo_chart: None,
             device: DeviceKind::Cpu,
-            kind: GraphKind::Ring,
             color_variant: ColorVariant::Color1,
             slider_red_val: 0,
             slider_green_val: 0,
@@ -153,27 +151,30 @@ impl ColorPicker {
             slider_alpha_val: 0,
         }
     }
+}
 
-    pub fn kind(&self) -> (DeviceKind, GraphKind) {
-        (self.device, self.kind)
+impl ColorPicker {
+    pub fn device(&self) -> DeviceKind {
+        self.device
     }
 
     pub fn active(&self) -> bool {
-        self.demo_svg.is_some()
+        self.demo_chart.is_some()
     }
 
-    pub fn activate(&mut self, device: DeviceKind, kind: GraphKind, demo_svg: Box<dyn DemoGraph>) {
-        info!("colorpicker::activate({device:?}, {kind:?})");
+    pub fn activate(&mut self, device: DeviceKind, demo_chart: Box<dyn DemoGraph>) {
+        info!("colorpicker::activate({device:?})");
         self.device = device;
-        self.kind = kind;
         self.color_variant = ColorVariant::Color1;
-        self.demo_svg = Some(demo_svg);
+        self.demo_chart = Some(demo_chart);
     }
 
     pub fn deactivate(&mut self) {
-        self.demo_svg = None;
+        self.demo_chart = None;
     }
 
+    // This function is largely borrowed from the PixelDoted color picker:
+    // https://github.com/PixelDoted/cosmic-ext-color-picker
     fn color_slider<'b, Message>(
         value: u8,
         on_change: impl Fn(u8) -> Message + 'b,
@@ -267,20 +268,20 @@ impl ColorPicker {
     }
 
     pub fn demo(&self) -> String {
-        if let Some(d) = self.demo_svg.as_ref() {
+        if let Some(d) = self.demo_chart.as_ref() {
             let demo = d.demo();
             return demo;
         }
         ERROR.to_string()
     }
 
-    pub fn set_sliders(&mut self, color: Srgba<u8>) {
+    pub fn update_color(&mut self, color: Srgba<u8>) {
         self.slider_red_val = color.red;
         self.slider_green_val = color.green;
         self.slider_blue_val = color.blue;
         self.slider_alpha_val = color.alpha;
 
-        let dmo = self.demo_svg.as_mut().expect("ERROR: No demo svg!");
+        let dmo = self.demo_chart.as_mut().expect("ERROR: No demo svg!");
         let mut col = dmo.colors();
         col.set_color(color, self.color_variant);
         dmo.set_colors(col);
@@ -304,24 +305,24 @@ impl ColorPicker {
 
     pub fn default_colors(&mut self) {
         let colors = GraphColors::new(self.device);
-        let dmo = self.demo_svg.as_mut().expect("ERROR: No demo svg!");
+        let dmo = self.demo_chart.as_mut().expect("ERROR: No demo svg!");
         dmo.set_colors(colors);
-        self.set_sliders(colors.get_color(self.color_variant));
+        self.update_color(colors.get_color(self.color_variant));
     }
 
-    pub fn variant(&self) -> ColorVariant {
+    pub fn color_variant(&self) -> ColorVariant {
         self.color_variant
     }
 
-    pub fn set_variant(&mut self, variant: ColorVariant) {
-        let dmo = self.demo_svg.as_mut().expect("ERROR: No demo svg!");
+    pub fn set_color_variant(&mut self, variant: ColorVariant) {
+        let dmo = self.demo_chart.as_mut().expect("ERROR: No demo svg!");
         self.color_variant = variant;
         let color = dmo.colors().get_color(variant);
-        self.set_sliders(color);
+        self.update_color(color);
     }
 
     pub fn colors(&self) -> GraphColors {
-        let dmo = self.demo_svg.as_ref().expect("ERROR: No demo svg!");
+        let dmo = self.demo_chart.as_ref().expect("ERROR: No demo svg!");
         dmo.colors()
     }
 
@@ -331,13 +332,17 @@ impl ColorPicker {
 
         let mut children = Vec::new();
 
-        let dmo = self.demo_svg.as_ref().expect("ERROR: No demo svg!");
+        let dmo = self.demo_chart.as_ref().expect("ERROR: No demo svg!");
         children.push(widget::horizontal_space().into());
         for (s, c) in dmo.color_choices() {
             children.push(Element::from(widget::radio(
                 s,
                 c,
-                if self.variant() == c { Some(c) } else { None },
+                if self.color_variant() == c {
+                    Some(c)
+                } else {
+                    None
+                },
                 Message::ColorPickerSelectVariant,
             )));
             children.push(widget::horizontal_space().into());
