@@ -71,5 +71,5 @@ cpu-temp-amd = For AMD processors shows 'Tdie' (true die temperature) if found, 
 cpu-temp-intel = For Intel processors shows single highest temperature found across all sensors/cores.
 sensor-gpu-temp = GPU temperature
 cpu-no-decimals = Round to nearest integer
-inhibit-sleep = Inhibit system sleep:
+inhibit-sleep = Inhibit screen/system sleep:
 minutes-left = min left
