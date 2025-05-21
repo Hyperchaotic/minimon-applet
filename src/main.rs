@@ -7,6 +7,7 @@ mod colorpicker;
 mod config;
 mod i18n;
 mod sensors;
+mod sleepinhibitor;
 mod svg_graph;
 
 use log::info;

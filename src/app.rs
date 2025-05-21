@@ -41,6 +41,7 @@ use crate::sensors::gpus::{Gpu, list_gpus};
 use crate::sensors::memory::Memory;
 use crate::sensors::network::{self, Network};
 use crate::sensors::{Sensor, TempUnit};
+use crate::sleepinhibitor::SleepAndScreenInhibitor;
 use crate::{config::MinimonConfig, fl};
 use cosmic::widget::Id as WId;
 
@@ -169,6 +170,11 @@ pub struct Minimon {
 
     // Tracks whether any chart or label is showing on the panel
     data_is_visible: bool,
+
+    // Sleep inhibitor feature
+    sleep_inhibitor: Option<SleepAndScreenInhibitor>,
+    sleep_inhibitor_selection: usize,
+    sleep_inhibitor_timer: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -233,6 +239,9 @@ pub enum Message {
     ToggleDisableOnBattery(String, bool),
     ToggleSymbols(bool),
     SysmonSelect(usize),
+    SelectSleepInhibitorTime(usize),
+    ToggleSleepInhibitor(bool),
+    InhibitorTick,
 }
 
 const APP_ID_DOCK: &str = "io.github.cosmic-utils.cosmic-applet-minimon-dock";
@@ -266,6 +275,15 @@ impl cosmic::Application for Minimon {
             })
             .collect();
 
+        let sleep_inhibitor: Option<SleepAndScreenInhibitor> = SleepAndScreenInhibitor::new()
+            .map_or_else(
+                |e| {
+                    error!("Failed to create sleep inhibitor: {}", e);
+                    None
+                },
+                Some,
+            );
+
         let app = Minimon {
             core,
             cpu: Cpu::default(),
@@ -284,6 +302,9 @@ impl cosmic::Application for Minimon {
             is_laptop,
             on_ac: true,
             data_is_visible: false,
+            sleep_inhibitor,
+            sleep_inhibitor_selection: 3,
+            sleep_inhibitor_timer: u32::MAX,
         };
 
         (app, Task::none())
@@ -312,8 +333,13 @@ impl cosmic::Application for Minimon {
             iced::time::every(time::Duration::from_millis(4000))
         }
 
+        fn sleep_inhibitor_subscription() -> Subscription<time::Instant> {
+            iced::time::every(time::Duration::from_secs(60))
+        }
+
         let mut subs: Vec<Subscription<Message>> = vec![
             time_subscription(&self.refresh_rate).map(|_| Message::Tick),
+            sleep_inhibitor_subscription().map(|_| Message::InhibitorTick),
             self.core
                 .watch_config(match self.core.applet.panel_type {
                     PanelType::Panel => APP_ID_PANEL,
@@ -611,6 +637,40 @@ impl cosmic::Application for Minimon {
                 content = content.push(sensor_settings);
             }
 
+            if let Some(i) = &self.sleep_inhibitor {
+                let selection = if !i.is_inhibiting() {
+                    Element::from(
+                        row!(
+                            widget::dropdown(
+                                &crate::sleepinhibitor::INHIBITOR_OPTIONS,
+                                Some(self.sleep_inhibitor_selection),
+                                Message::SelectSleepInhibitorTime,
+                            )
+                            .padding(5)
+                            .width(30),
+                        )
+                        .width(80),
+                    )
+                } else {
+                    let str = if self.sleep_inhibitor_selection != 3 {
+                        format!("{} {}", self.sleep_inhibitor_timer, fl!("minutes-left"))
+                    } else {
+                        " Infinite ".to_string()
+                    };
+                    widget::text::body(str).width(80).into()
+                };
+
+                content = content.push(Element::from(
+                    row!(
+                        widget::horizontal_space(),
+                        text::body(fl!("inhibit-sleep")),
+                        widget::toggler(i.is_inhibiting()).on_toggle(Message::ToggleSleepInhibitor),
+                        selection,
+                    )
+                    .spacing(5),
+                ));
+            }
+
             content = content.padding(padding).spacing(padding);
 
             //let content = column!(sensor_settings);
@@ -662,6 +722,8 @@ impl cosmic::Application for Minimon {
                 }
             }
             Message::ColorPickerOpen(device, kind, id) => {
+                // colorpicker is only activated when the settings popup is already open
+                // so it takes it over
                 info!("Message::ColorPickerOpen({kind:?}, {id:?})");
                 match device {
                     DeviceKind::Cpu => {
@@ -1077,6 +1139,57 @@ impl cosmic::Application for Minimon {
                     self.save_config();
                 } else {
                     error!("ToggleDisableOnBattery: wrong id {id:?}");
+                }
+            }
+            Message::InhibitorTick => {
+                if let Some(i) = &mut self.sleep_inhibitor {
+                    if i.is_inhibiting() {
+                        if self.sleep_inhibitor_timer >= 1 {
+                            if self.sleep_inhibitor_selection != 3 {
+                                self.sleep_inhibitor_timer -= 1;
+                            }
+                            info!(
+                                "Message::InhibitorTick left: {}",
+                                self.sleep_inhibitor_timer
+                            );
+                        } else {
+                            info!("Canceling inhibitor");
+                            i.uninhibit();
+                        }
+                    }
+                }
+            }
+
+            Message::SelectSleepInhibitorTime(selection) => {
+                info!("Message::SelectSleepInhibitorTime({selection})");
+                self.sleep_inhibitor_selection = selection;
+            }
+
+            Message::ToggleSleepInhibitor(toggle) => {
+                info!("Message::ToggleSleepInhibitor");
+                if let Some(i) = &mut self.sleep_inhibitor {
+                    if toggle {
+                        match i.inhibit(env!("CARGO_PKG_NAME"), "Set by user") {
+                            Ok(_) => {
+                                match self.sleep_inhibitor_selection {
+                                    0 => self.sleep_inhibitor_timer = 15,
+                                    1 => self.sleep_inhibitor_timer = 30,
+                                    2 => self.sleep_inhibitor_timer = 60,
+                                    _ => self.sleep_inhibitor_timer = u32::MAX,
+                                }
+
+                                info!(
+                                    "Inhibiting sleep for {} minutes.",
+                                    self.sleep_inhibitor_timer
+                                )
+                            }
+                            Err(e) => error!("Failed to inhibit sleep: {e}"),
+                        }
+                    } else {
+                        i.uninhibit();
+                    }
+                } else {
+                    error!("No inhibitor instantiated.");
                 }
             }
         }
