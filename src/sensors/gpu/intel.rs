@@ -8,6 +8,7 @@ pub struct IntelGpu {
     pub id: String,
 }
 
+#[allow(dead_code)]
 impl IntelGpu {
     pub fn new(name: String, id: String) -> Self {
         IntelGpu { name, id }

@@ -4,6 +4,10 @@ version = "0.5.1"
 edition = "2024"
 license = "GPL-3.0"
 
+[features]
+default = []
+caffeine = []
+
 [profile.release]
 lto = "thin"
 opt-level = 3

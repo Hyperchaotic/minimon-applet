@@ -7,6 +7,7 @@ mod colorpicker;
 mod config;
 mod i18n;
 mod sensors;
+#[cfg(feature = "caffeine")]
 mod sleepinhibitor;
 mod svg_graph;
 
