@@ -129,7 +129,7 @@ pub fn double_line(
     let (indexed_string, indexed_string2) = samples
         .iter()
         .skip(start)
-        .zip(samples2.iter())
+        .zip(samples2.iter().skip(start))
         .enumerate()
         .fold(
             (
