@@ -1,15 +1,18 @@
-use cosmic::iced::mouse::Cursor;
 use cosmic::iced::Point;
-use cosmic::iced::Renderer;
-use cosmic::iced::{Rectangle, Size};
-use cosmic::iced_widget::canvas::Geometry;
+use cosmic::iced::Radians;
+use cosmic::iced::Rectangle;
+use cosmic::iced::mouse::Cursor;
+use cosmic::Renderer;
 use cosmic::theme;
 use cosmic::widget::canvas;
-use cosmic::iced::Radians;
-use cosmic::iced::widget::canvas::Text;
-use cosmic::iced::widget::canvas::Path;
+use cosmic::widget::canvas::Geometry;
+
+use cosmic::widget::canvas::Text;
+use cosmic::widget::canvas::Path;
 use cosmic::widget::canvas::path::Arc;
+
 use std::f32::consts::PI;
+
 use crate::config::GraphColors;
 use crate::app::Message;
 
@@ -49,7 +52,7 @@ impl canvas::Program<Message, theme::Theme> for RingChart {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
 
         /* 
-        // Not sure if wwe need to fill the canvas with transparency?
+        // Not sure if we need to fill the canvas with transparency?
         // don't for now
         frame.fill_rectangle(
             Point::ORIGIN,                         
@@ -57,20 +60,24 @@ impl canvas::Program<Message, theme::Theme> for RingChart {
             cosmic::iced::Color::from_rgba(0.0, 0.0, 0.0, 0.0), 
         );
         */
+
+        // The starting poing of the Ring graph, bottom/6pm
         let starting_point = PI / 2.0;
 
+        // Max height/width of chart/widget. Side lebgth in a square
         let limit = bounds.width.min(bounds.height);
+
+        // Width and radius of ring
         let stroke_width = 0.08*limit;
-        let full_radius = limit / 2.0;
-        let radius = full_radius - stroke_width / 2.0;
-
-        // circle
+        let radius = (limit / 2.0) - stroke_width / 2.0;
+        
         let center = Point::new(bounds.width / 2.0, bounds.height / 2.0);
-        //       let radius = limit * 0.4;
 
-        let inner_circle = Path::circle(center, radius - stroke_width * 0.5);
+        // Fill background color inside ring
+        let inner_circle = Path::circle(center, radius - stroke_width / 2.0 );
         frame.fill(&inner_circle, self.colors.color1);
 
+        // Draw ring segment showing status/percentage
         let start_angle = starting_point;
         let end_angle = starting_point + PI * 2.0 * (self.percent / 100.0);
 
@@ -92,6 +99,7 @@ impl canvas::Program<Message, theme::Theme> for RingChart {
             },
         );
 
+        // Fill unused ring segment
         if end_angle < 2.0 * PI {
             let start_angle = end_angle;
             let end_angle = starting_point + PI * 2.0;
