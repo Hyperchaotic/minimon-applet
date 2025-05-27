@@ -10,6 +10,7 @@ mod sensors;
 #[cfg(feature = "caffeine")]
 mod sleepinhibitor;
 mod svg_graph;
+mod charts;
 
 use log::info;
 

@@ -57,7 +57,6 @@ pub fn ring(value: &str, percentage: &str, color: &SvgColors) -> String {
     svg.push_str(RINGSVG_5);
     svg.push_str(value);
     svg.push_str(RINGSVG_6);
-
     svg
 }
 

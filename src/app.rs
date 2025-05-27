@@ -7,10 +7,10 @@ use std::collections::BTreeMap;
 use std::{fs, time};
 
 use cosmic::app::{Core, Task};
-use cosmic::iced::Limits;
 use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
 use cosmic::iced::window::Id;
 use cosmic::iced::{self, Subscription};
+use cosmic::iced::Limits;
 use cosmic::widget::{container, list, settings, spin_button, text};
 use cosmic::{Apply, Element};
 use cosmic::{widget, widget::autosize};
@@ -1452,6 +1452,19 @@ impl Minimon {
 
             // Add the CPU chart if needed
             if self.config.cputemp.chart {
+                /* Testing ring widget, no idea how to integrate it
+
+                                 let element1 = cosmic::widget::container(
+                                    cosmic::widget::canvas(crate::charts::ring::RingChart::new(
+                                        self.cputemp.latest_sample() as f32,
+                                        &self.cputemp.to_string(),
+                                        &self.config.cputemp.colors,
+                                    ))
+                                    .height(Length::Fill)
+                                    .width(Length::Fill),
+                                );
+                                elements.push(element1.width(40).height(40).into());
+                */
                 elements.push(button_from_sensor!(self, self.cputemp).into());
             }
         }
