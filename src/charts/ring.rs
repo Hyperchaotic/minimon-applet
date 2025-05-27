@@ -48,11 +48,15 @@ impl canvas::Program<Message, theme::Theme> for RingChart {
     ) -> Vec<Geometry<Renderer>> {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
 
+        /* 
+        // Not sure if wwe need to fill the canvas with transparency?
+        // don't for now
         frame.fill_rectangle(
-            Point::ORIGIN,                          // top-left corner (0, 0)
-            Size::new(bounds.width, bounds.height), // full canvas size
-            cosmic::iced::Color::from_rgba(0.0, 0.0, 0.0, 0.0),   // your green shade
+            Point::ORIGIN,                         
+            Size::new(bounds.width, bounds.height),
+            cosmic::iced::Color::from_rgba(0.0, 0.0, 0.0, 0.0), 
         );
+        */
         let starting_point = PI / 2.0;
 
         let limit = bounds.width.min(bounds.height);
