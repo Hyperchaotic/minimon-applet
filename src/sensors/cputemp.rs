@@ -135,7 +135,7 @@ impl HwmonTemp {
 #[derive(Debug)]
 pub struct CpuTemp {
     hwmon_temp: Option<HwmonTemp>,
-    samples: VecDeque<f64>,
+    pub samples: VecDeque<f64>,
     graph_options: Vec<&'static str>,
     unit_options: Vec<&'static str>,
     /// colors cached so we don't need to convert to string every time

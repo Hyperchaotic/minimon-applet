@@ -64,7 +64,7 @@ impl canvas::Program<Message, theme::Theme> for RingChart {
         // The starting poing of the Ring graph, bottom/6pm
         let starting_point = PI / 2.0;
 
-        // Max height/width of chart/widget. Side lebgth in a square
+        // Max height/width of chart/widget. Side length in a square
         let limit = bounds.width.min(bounds.height);
 
         // Width and radius of ring

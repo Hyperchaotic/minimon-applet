@@ -29,3 +29,4 @@ impl From<GraphColors> for GraphColorsIced {
 }
 
 pub mod ring;
+pub mod heat;

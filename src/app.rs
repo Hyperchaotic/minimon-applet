@@ -1455,19 +1455,6 @@ impl Minimon {
 
             // Add the CPU chart if needed
             if self.config.cputemp.chart {
-                /* Testing ring widget, no idea how to integrate it
-
-                let element1 = cosmic::widget::container(
-                    cosmic::widget::canvas(crate::charts::ring::RingChart::new(
-                        self.cputemp.latest_sample() as f32,
-                        &self.cputemp.to_string(),
-                        &self.config.cputemp.colors,
-                    ))
-                    .height(Length::Fill)
-                    .width(Length::Fill),
-                );
-                elements.push(element1.width(40).height(40).into());
-                               */
                 elements.push(button_from_sensor!(self, self.cputemp).into());
             }
         }
