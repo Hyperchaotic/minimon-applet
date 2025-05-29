@@ -73,9 +73,9 @@ impl canvas::Program<Message, theme::Theme> for HeatChart {
         let frame_color = self.colors.color2;
         let bg_color = self.colors.color1;
 
-        frame.fill_rectangle(Point { x: 1.5, y: 1.5 }, Size {
-            width: frame.size().width - 2.0,
-            height: frame.size().height - 2.0,
+        frame.fill_rectangle(Point { x: 0.5, y: 0.5 }, Size {
+            width: frame.size().width - 1.0,
+            height: frame.size().height - 1.0,
         }, bg_color);
 
         let step_length = scale.x / self.steps as f32;
