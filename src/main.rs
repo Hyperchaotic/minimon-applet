@@ -80,6 +80,9 @@ fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
 fn main() -> cosmic::iced::Result {
     setup_logger().expect("Failed to initialize logger");
 
+    #[cfg(not(debug_assertions))]
+	println!("In Release builds use 'journalctl SYSLOG_IDENTIFIER=cosmic-applet-minimon' to see logs");
+	
     info!("Application started");
 
     let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();
