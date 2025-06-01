@@ -3,6 +3,7 @@
 use app::Minimon;
 
 mod app;
+mod charts;
 mod colorpicker;
 mod config;
 mod i18n;
@@ -10,37 +11,67 @@ mod sensors;
 #[cfg(feature = "caffeine")]
 mod sleepinhibitor;
 mod svg_graph;
-mod charts;
-
-use log::info;
 
 use chrono::Local;
+use log::info;
 use std::io;
 
-/// Controls whether logging goes to stdout or a file.
-const LOG_TO_FILE: bool = false;
-
 fn setup_logger() -> Result<(), Box<dyn std::error::Error>> {
-    let base_config = fern::Dispatch::new()
-        //.level(log::LevelFilter::Debug)
-        .level(log::LevelFilter::Off)
-        .level_for("libcosmic", log::LevelFilter::Debug)
-        .level_for("cosmic_applet_minimon", log::LevelFilter::Debug)
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{} [{}] {}",
-                Local::now().format("%H:%M:%S"),
-                record.level(),
-                message
-            ));
-        });
-
-    if LOG_TO_FILE {
-        base_config
-            .chain(fern::log_file("/tmp/minimon.log")?)
+    #[cfg(debug_assertions)]
+    {
+        // Debug builds: use fern with stdout
+        fern::Dispatch::new()
+            .level(log::LevelFilter::Warn)
+            .level_for("cosmic_applet_minimon", log::LevelFilter::Debug)
+            .format(|out, message, record| {
+                out.finish(format_args!(
+                    "{} [{}] {}",
+                    Local::now().format("%H:%M:%S"),
+                    record.level(),
+                    message
+                ));
+            })
+            .chain(io::stdout())
             .apply()?;
-    } else {
-        base_config.chain(io::stdout()).apply()?;
+    }
+
+    // In release builds we log to the systemd journal with fern/stdout fallback
+    // To retrieve logs use "journalctl SYSLOG_IDENTIFIER=cosmic-applet-minimon"
+    #[cfg(not(debug_assertions))]
+    {
+        let dispatch = fern::Dispatch::new()
+            .level(log::LevelFilter::Warn)
+            .level_for("cosmic_applet_minimon", log::LevelFilter::Debug);
+
+        // Try to use systemd journal first
+        match systemd_journal_logger::JournalLog::new() {
+            Ok(journal_logger) => {
+                let journal_logger = journal_logger.with_extra_fields(vec![
+                    ("VERSION", env!("CARGO_PKG_VERSION")),
+                    ("APPLET", "cosmic_applet_minimon"),
+                ]);
+
+                dispatch
+                    .chain(Box::new(journal_logger) as Box<dyn log::Log>)
+                    .apply()?;
+            }
+            Err(_) => {
+                // Fallback to same fern logging as debug builds
+                fern::Dispatch::new()
+                    .level(log::LevelFilter::Warn)
+                    .level_for("cosmic_applet_minimon", log::LevelFilter::Debug)
+                    .format(|out, message, record| {
+                        out.finish(format_args!(
+                            "{} [{}] {}",
+                            Local::now().format("%H:%M:%S"),
+                            record.level(),
+                            message
+                        ));
+                    })
+                    .chain(io::stdout())
+                    .apply()?;
+            }
+        }
     }
 
     Ok(())
