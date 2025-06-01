@@ -60,3 +60,8 @@ sudo dpkg -i <name_of.deb>
 sudo dnf install <name_of.rpm>
 ```
 
+For checking logs:
+
+```
+journalctl SYSLOG_IDENTIFIER=cosmic-applet-minimon
+```
