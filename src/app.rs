@@ -1380,7 +1380,7 @@ impl Minimon {
             fl!("choose-sysmon"),
             row!(
                 widget::dropdown(
-                    &SYSMON_NAMES,
+                    &*SYSMON_NAMES,
                     Some(self.config.sysmon),
                     Message::SysmonSelect
                 )
