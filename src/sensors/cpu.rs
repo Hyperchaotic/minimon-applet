@@ -158,15 +158,14 @@ impl Sensor for Cpu {
 
             if self.config.no_decimals {
                 write!(value, "{}%", latest.round()).unwrap();
+            } else if latest < 10.0 {
+                write!(value, "{latest:.2}").unwrap()
+            } else if latest <= 99.9 {
+                write!(value, "{latest:.1}").unwrap();
             } else {
-                if latest < 10.0 {
-                    write!(value, "{latest:.2}").unwrap()
-                } else if latest <= 99.9 {
-                    write!(value, "{latest:.1}").unwrap();
-                } else {
-                    write!(value, "100").unwrap();
-                }
+                write!(value, "100").unwrap();
             }
+
             write!(percentage, "{latest}").unwrap();
 
             crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
@@ -404,14 +403,12 @@ impl fmt::Display for Cpu {
 
         if self.config.no_decimals {
             write!(f, "{}%", current_val.round())
+        } else if current_val < 10.0 {
+            write!(f, "{current_val:.2}%")
+        } else if current_val < 100.0 {
+            write!(f, "{current_val:.1}%")
         } else {
-            if current_val < 10.0 {
-                write!(f, "{current_val:.2}%")
-            } else if current_val < 100.0 {
-                write!(f, "{current_val:.1}%")
-            } else {
-                write!(f, "{current_val}%")
-            }
+            write!(f, "{current_val}%")
         }
     }
 }

@@ -126,7 +126,7 @@ impl Sensor for Memory {
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
 
-            let mut pct: u64 = ((latest / self.max_val as f64) * 100.0) as u64;
+            let mut pct: u64 = ((latest / self.max_val) * 100.0) as u64;
             if pct > 100 {
                 pct = 100;
             }

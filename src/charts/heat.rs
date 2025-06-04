@@ -137,7 +137,7 @@ impl canvas::Program<Message, theme::Theme> for HeatChart {
                 }
         */
 
-        if let Some(_) = previous_point {
+        if previous_point.is_some() {
             shade_builder.line_to(bottom_right);
         }
 

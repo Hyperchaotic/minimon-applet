@@ -73,8 +73,8 @@ impl canvas::Program<Message, theme::Theme> for RingChart {
         // Draw highlighted ring segment showing status/percentage
         let ring = Path::new(|p| {
             p.arc(Arc {
-                center: center,
-                radius: radius,
+                center,
+                radius,
                 start_angle: Radians::from(starting_point),
                 end_angle: Radians::from(starting_point + (PI * 2.0 * (self.percent / 100.0))),
             });
@@ -102,6 +102,6 @@ impl canvas::Program<Message, theme::Theme> for RingChart {
 
         frame.fill_text(text);
 
-        return vec![frame.into_geometry()];
+        vec![frame.into_geometry()]
     }
 }

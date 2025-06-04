@@ -219,7 +219,7 @@ impl VramGraph {
             id: id.to_owned(),
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
             graph_options: GRAPH_OPTIONS.to_vec(),
-            total: total,
+            total,
             svg_colors: SvgColors::new(&GraphColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
