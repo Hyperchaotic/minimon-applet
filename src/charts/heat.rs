@@ -48,6 +48,9 @@ impl canvas::Program<Message, theme::Theme> for HeatChart {
         bounds: Rectangle,
         _cursor: Cursor,
     ) -> Vec<Geometry<Renderer>> {
+
+        let frame_start = 1.5;
+
         let mut frame = canvas::Frame::new(renderer, bounds.size());
 
         let top_left = Point::new(
@@ -73,13 +76,13 @@ impl canvas::Program<Message, theme::Theme> for HeatChart {
         let frame_color = self.colors.color2;
         let bg_color = self.colors.color1;
 
-        frame.fill_rectangle(Point { x: 0.5, y: 0.5 }, Size {
-            width: frame.size().width - 1.0,
-            height: frame.size().height - 1.0,
+        frame.fill_rectangle(Point { x: frame_start, y: frame_start }, Size {
+            width: frame.size().width - 2.0,
+            height: frame.size().height - 2.0,
         }, bg_color);
 
         let step_length = scale.x / self.steps as f32;
-        let scaling = (scale.y - 0.5) as f64 / max_value;
+        let scaling = (scale.y - 1.0) as f64 / max_value;
 
         let mut builder = path::Builder::new();
         let mut shade_builder = path::Builder::new();
@@ -159,14 +162,14 @@ impl canvas::Program<Message, theme::Theme> for HeatChart {
         );
 
         let frame_size: Size = Size {
-            width: frame.size().width - 1.0,
-            height: frame.size().height - 1.0,
+            width: frame.size().width - 2.0,
+            height: frame.size().height - 2.0,
         };
 
         // Erase corners, with transparent pixels
         for i in 0..=corner_radius.trunc() as i32 {
             let mut square = path::Builder::new();
-            square.rounded_rectangle(Point { x: 0.5, y: 0.5 }, frame_size, i.into());
+            square.rounded_rectangle(Point { x: frame_start, y: frame_start }, frame_size, i.into());
             frame.stroke(
                 &square.build(),
                 Stroke {
@@ -179,7 +182,7 @@ impl canvas::Program<Message, theme::Theme> for HeatChart {
 
         // Draw background square
         let mut square = path::Builder::new();
-        square.rounded_rectangle(Point { x: 0.5, y: 0.5 }, frame_size, corner_radius.into());
+        square.rounded_rectangle(Point { x: frame_start, y: frame_start }, frame_size, corner_radius.into());
         frame.stroke(
             &square.build(),
             Stroke {

@@ -117,7 +117,7 @@ impl<T: SampleValue + 'static> canvas::Program<Message, theme::Theme> for LineCh
 
         let dual_graph = !self.samples2.is_empty();
 
-        let step_length = scale.x / self.steps as f32;
+        let step_length = scale.x / (self.steps-1) as f32;
         let scaling = (scale.y - 0.5) as f64 / max_value;
 
         let mut builder1 = path::Builder::new();
@@ -186,15 +186,18 @@ impl<T: SampleValue + 'static> canvas::Program<Message, theme::Theme> for LineCh
             );
         }
 
+        // Frame needs to be on mid-pixel, to avoid an anti-aliased outwashed double line
+        let frame_start = 1.5;
         let frame_size = Size {
-            width: frame.size().width - 1.0,
-            height: frame.size().height - 1.0,
+            width: frame.size().width - 2.0,
+            height: frame.size().height - 2.0,
         };
+
         let corner_radius = frame.size().width.min(frame.size().height) / 7.0;
 
         for i in 0..=corner_radius.trunc() as i32 {
             let mut square = path::Builder::new();
-            square.rounded_rectangle(Point { x: 0.5, y: 0.5 }, frame_size, i.into());
+            square.rounded_rectangle(Point { x: frame_start, y: frame_start }, frame_size, i.into());
             frame.stroke(
                 &square.build(),
                 Stroke {
@@ -206,7 +209,7 @@ impl<T: SampleValue + 'static> canvas::Program<Message, theme::Theme> for LineCh
         }
 
         let mut square = path::Builder::new();
-        square.rounded_rectangle(Point { x: 0.5, y: 0.5 }, frame_size, corner_radius.into());
+        square.rounded_rectangle(Point { x: frame_start, y: frame_start }, frame_size, corner_radius.into());
         frame.stroke(
             &square.build(),
             Stroke {
