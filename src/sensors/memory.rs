@@ -135,7 +135,7 @@ impl Sensor for Memory {
 
             // If set, convert to percentage
             if self.config.percentage {
-                latest = (latest * 100.0) / self.max_val as f64;
+                latest = (latest * 100.0) / self.max_val;
             }
 
             if latest < 10.0 {

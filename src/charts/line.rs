@@ -42,21 +42,18 @@ pub struct LineChart<T: SampleValue> {
     pub colors: GraphColorsIced,
 }
 
-// The new function clones the sampels and creates a new object.
-// Alternatively the sensor could have a LineChart member and access
-// the samples directly on update. But performance wise
-// it is a neglible impact to clone into a new object instance every second.
+
 impl<T: SampleValue> LineChart<T> {
     pub fn new(
         steps: usize,
-        samples: &VecDeque<T>,
+        samples1: &VecDeque<T>,
         samples2: &VecDeque<T>,
         max: Option<T>,
         colors: &GraphColors,
     ) -> Self {
         Self {
             steps,
-            samples1: samples.clone(),
+            samples1: samples1.clone(),
             samples2: samples2.clone(),
             max_y: max,
             colors: (*colors).into(),
@@ -64,6 +61,9 @@ impl<T: SampleValue> LineChart<T> {
     }
 }
 
+// The new(..) function clones the samples and creates a new object.
+// Alternatively the sensor could have a LineChart member and access
+// the samples directly on update. 
 impl<T: SampleValue + 'static> canvas::Program<Message, theme::Theme> for LineChart<T> {
     type State = ();
 
@@ -75,46 +75,6 @@ impl<T: SampleValue + 'static> canvas::Program<Message, theme::Theme> for LineCh
         bounds: Rectangle,
         _cursor: Cursor,
     ) -> Vec<Geometry<Renderer>> {
-        fn build_path_from_samples<T: SampleValue>(
-            builder: &mut path::Builder,
-            shade_builder: &mut path::Builder,
-            samples: &VecDeque<T>,
-            steps: usize,
-            max_value: f64,
-            top_left: Point,
-            bottom_right: Point,
-            scale_y: f32,
-            scaling: f64,
-            step_length: f32,
-        ) {
-            let total = samples.len();
-            let start_index = total.saturating_sub(steps);
-
-            let mut previous_point = None;
-
-            for (i, sample) in samples.iter().skip(start_index).take(steps).enumerate() {
-                let value = sample.to_f64().min(max_value);
-                let x = (top_left.x + step_length * i as f32).round();
-                let y = 0.5 + scale_y - (value * scaling) as f32;
-                let p = Point::new(x, y.round());
-
-                if i == 0 {
-                    builder.move_to(p);
-                    shade_builder.move_to(Point::new(top_left.x, bottom_right.y));
-                    shade_builder.line_to(p);
-                } else {
-                    builder.line_to(p);
-                    shade_builder.line_to(p);
-                }
-
-                previous_point = Some(p);
-            }
-
-            if previous_point.is_some() {
-                shade_builder.line_to(bottom_right);
-            }
-        }
-
         fn draw_graph(frame: &mut canvas::Frame, path: Path, shade: Path, mut color: Color) {
             frame.stroke(
                 &path,
@@ -155,55 +115,77 @@ impl<T: SampleValue + 'static> canvas::Program<Message, theme::Theme> for LineCh
             max1.max(max2).max(min)
         });
 
+        let dual_graph = !self.samples2.is_empty();
+
         let step_length = scale.x / self.steps as f32;
         let scaling = (scale.y - 0.5) as f64 / max_value;
 
-        let mut graph_path1 = path::Builder::new();
-        let mut graph_fill1 = path::Builder::new();
+        let mut builder1 = path::Builder::new();
+        let mut builder2 = path::Builder::new();
+        let mut shade1 = path::Builder::new();
+        let mut shade2 = path::Builder::new();
 
-        build_path_from_samples(
-            &mut graph_path1,
-            &mut graph_fill1,
-            &self.samples1,
-            self.steps,
-            max_value,
-            top_left,
-            bottom_right,
-            scale.y,
-            scaling,
-            step_length,
-        );
+        let len = self.samples1.len().min(self.steps);
+        let start_index1 = self.samples1.len().saturating_sub(len);
+        let start_index2 = self.samples2.len().saturating_sub(len);
+
+        let iter1 = self.samples1.iter().skip(start_index1).take(len);
+        let iter2 = self.samples2.iter().skip(start_index2).take(len);
+
+        let mut iter2_opt = dual_graph.then_some(iter2);
+
+        for (i, sample1) in iter1.enumerate() {
+            let x = (top_left.x + step_length * i as f32).round();
+            let y1 = 0.5 + scale.y - (sample1.to_f64().min(max_value) * scaling) as f32;
+            let p1 = Point::new(x, y1.round());
+
+            if i == 0 {
+                builder1.move_to(p1);
+                shade1.move_to(Point::new(top_left.x, bottom_right.y));
+                shade1.line_to(p1);
+            } else {
+                builder1.line_to(p1);
+                shade1.line_to(p1);
+            }
+
+            if let Some(iter2) = iter2_opt.as_mut() {
+                if let Some(sample2) = iter2.next() {
+                    let y2 = 0.5 + scale.y - (sample2.to_f64().min(max_value) * scaling) as f32;
+                    let p2 = Point::new(x, y2.round());
+
+                    if i == 0 {
+                        builder2.move_to(p2);
+                        shade2.move_to(Point::new(top_left.x, bottom_right.y));
+                        shade2.line_to(p2);
+                    } else {
+                        builder2.line_to(p2);
+                        shade2.line_to(p2);
+                    }
+                }
+            }
+        }
+
+        shade1.line_to(bottom_right);
+        if dual_graph {
+            shade2.line_to(bottom_right);
+        }
+
         draw_graph(
             &mut frame,
-            graph_path1.build(),
-            graph_fill1.build(),
+            builder1.build(),
+            shade1.build(),
             self.colors.color2,
         );
 
-        if !self.samples2.is_empty() {
-            let mut graph_fill2 = path::Builder::new();
-            let mut graph_path2 = path::Builder::new();
-            build_path_from_samples(
-                &mut graph_path2,
-                &mut graph_fill2,
-                &self.samples2,
-                self.steps,
-                max_value,
-                top_left,
-                bottom_right,
-                scale.y,
-                scaling,
-                step_length,
-            );
+        if dual_graph {
             draw_graph(
                 &mut frame,
-                graph_path2.build(),
-                graph_fill2.build(),
+                builder2.build(),
+                shade2.build(),
                 self.colors.color3,
             );
         }
 
-        // Erase corners and draw frame
         let frame_size = Size {
             width: frame.size().width - 1.0,
             height: frame.size().height - 1.0,
