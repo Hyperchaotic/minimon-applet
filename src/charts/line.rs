@@ -118,7 +118,7 @@ impl<T: SampleValue + 'static> canvas::Program<Message, theme::Theme> for LineCh
         let dual_graph = !self.samples2.is_empty();
 
         let step_length = scale.x / (self.steps-1) as f32;
-        let scaling = (scale.y - 0.5) as f64 / max_value;
+        let scaling = (scale.y - 1.0) as f64 / max_value;
 
         let mut builder1 = path::Builder::new();
         let mut builder2 = path::Builder::new();
