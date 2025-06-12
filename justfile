@@ -29,13 +29,16 @@ flatpak-bin-dst := flatpak-base-dir / 'bin' / name
 desktop := APPID + '.desktop'
 desktop-src := 'res' / desktop
 desktop-dst := clean(rootdir / prefix) / 'share' / 'applications' / desktop
+flatpak-desktop-dst := flatpak-base-dir / 'share' / 'applications' / desktop
 
 metainfo := APPID + '.metainfo.xml'
 metainfo-src := 'res' / metainfo
 metainfo-dst := clean(rootdir / prefix) / 'share' / 'metainfo' / metainfo
+flatpak-metainfo-dst := flatpak-base-dir / 'share' / 'metainfo' / metainfo
 
 icons-src := 'res' / 'icons'
 icons-dst := clean(rootdir / prefix) / 'share' / 'icons' / 'hicolor' / 'scalable'
+flatpak-icons-dst := flatpak-base-dir / 'share' / 'icons' / 'hicolor'
 
 default: build-release
 
@@ -90,9 +93,9 @@ install:
 
 # Installs files for flatpak
 flatpak-install:
-    install -Dm0755 {{bin-src}} {{fp-bin-dst}}
-    install -Dm0644 {{desktop-src}} {{fp-desktop-dst}}
-    install -Dm0644 {{metainfo-src}} {{fp-metainfo-dst}}
+    install -Dm0755 {{bin-src}} {{flatpak-bin-dst}}
+    install -Dm0644 {{desktop-src}} {{flatpak-desktop-dst}}
+    install -Dm0644 {{metainfo-src}} {{flatpak-metainfo-dst}}
     for svg in {{icons-src}}/apps/*.svg; do \
         install -Dm0644 "$svg" "{{icons-dst}}/apps/$(basename $svg)"; \
     done
