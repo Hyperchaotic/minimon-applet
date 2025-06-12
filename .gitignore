@@ -18,3 +18,4 @@ target/
 /.flatpak-builder
 /repo
 /flatpak-out
+cargo-sources.json
