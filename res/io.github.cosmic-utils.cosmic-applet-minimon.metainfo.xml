@@ -7,15 +7,43 @@
   <developer_name>hyperchaotic</developer_name>
   <update_contact>hyperchaotic@gmail.com</update_contact>
   <name>Minimon</name>
-  <summary>A System Monitor applet for COSMIC</summary>
+  <url type="homepage">https://github.com/cosmic-utils/minimon-applet</url>
+  <url type="bugtracker">https://github.com/cosmic-utils/minimon-applet/issues</url>
+  <url type="contribute">https://github.com/cosmic-utils/minimon-applet</url>
+  <url type="translate">https://github.com/cosmic-utils/minimon-applet/tree/main/i18n</url>
+  <content_rating type="oars-1.1" />
+  <branding>
+    <color type="primary" scheme_preference="light">#fffffe</color>
+    <color type="primary" scheme_preference="dark">#2b2b2b</color>
+  </branding>
+  <summary>A Customizable System Monitor applet for COSMIC</summary>
   <description>
-    <p>A lightweight hardware monitoring applet for the COSMIC desktop environment, supporting GPU, network, memory, and disk usage.</p>
+    <p>A lightweight hardware monitoring applet for the COSMIC desktop environment with UI for customization. Shows information on CPU, GPU, network, memory, and disk usage.</p>
   </description>
   <launchable type="desktop-id">io.github.cosmic-utils.cosmic-applet-minimon.desktop</launchable>
   <icon type="stock">io.github.cosmic-utils.cosmic-applet-minimon</icon>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/cosmic-utils/minimon-applet/main/res/screenshots/main_expanded_styled.png</image>
+      <caption>A styled instance of the applet with with the window view open.</caption>
+    </screenshot>
+  </screenshots>
   <provides>
     <binaries>
       <binary>cosmic-applet-minimon</binary>
     </binaries>
   </provides>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <recommends>
+    <internet>always</internet>
+  </recommends>
+  <releases>
+    <release version="0.5.2" data="2025-06-15">
+      <description>
+        <p>Official Flatpak release!</p>
+      </description>
+    </release>
+  </releases>
 </component>

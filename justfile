@@ -88,6 +88,15 @@ install:
         install -D "$svg" "{{icons-dst}}/apps/$(basename $svg)"; \
     done
 
+# Installs files for flatpak
+flatpak-install:
+    install -Dm0755 {{bin-src}} {{fp-bin-dst}}
+    install -Dm0644 {{desktop-src}} {{fp-desktop-dst}}
+    install -Dm0644 {{metainfo-src}} {{fp-metainfo-dst}}
+    for svg in {{icons-src}}/apps/*.svg; do \
+        install -Dm0644 "$svg" "{{icons-dst}}/apps/$(basename $svg)"; \
+    done
+
 # Uninstalls installed files
 uninstall:
     rm {{bin-dst}}
