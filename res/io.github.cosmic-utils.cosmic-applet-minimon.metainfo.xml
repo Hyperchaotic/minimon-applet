@@ -29,6 +29,7 @@
     </screenshot>
   </screenshots>
   <provides>
+    <id>com.system76.CosmicApplet</id>
     <binaries>
       <binary>cosmic-applet-minimon</binary>
     </binaries>
