@@ -1,12 +1,9 @@
 {
-  "id": "io.cosmicUtils.cosmicAppletMinimon",
+  "id": "io.github.cosmicUtils.cosmicAppletMinimon",
   "runtime": "org.freedesktop.Platform",
   "runtime-version": "24.08",
   "sdk": "org.freedesktop.Sdk",
-  "sdk-extensions": [
-    "org.freedesktop.Sdk.Extension.rust-stable",
-    "org.freedesktop.Sdk.Extension.llvm18"
-  ],
+  "sdk-extensions": ["org.freedesktop.Sdk.Extension.rust-stable"],
   "command": "cosmic-applet-minimon",
   "finish-args": [
     "--socket=wayland",
@@ -18,14 +15,10 @@
     "--device=all"
   ],
   "build-options": {
-    "append-path": "/usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/llvm18/bin",
+    "append-path": "/usr/lib/sdk/rust-stable/bin",
     "build-args": ["--share=network"],
     "env": {
-      "CARGO_HOME": "/run/build/cosmic-applet-minimon/cargo",
-      "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER": "clang",
-      "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS": "-C link-arg=-fuse-ld=/usr/lib/sdk/rust-stable/bin/mold",
-      "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER": "clang",
-      "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS": "-C link-arg=-fuse-ld=/usr/lib/sdk/rust-stable/bin/mold"
+      "CARGO_HOME": "/run/build/cosmic-applet-minimon/cargo"
     }
   },
   "modules": [
@@ -62,9 +55,11 @@
       ],
       "sources": [
         {
-          "type": "dir",
-          "path": "."
-        }
+          "type": "git",
+          "url": "https://github.com/cosmic-utils/minimon-applet.git",
+          "commit": "8d22a4fba6470c44f0cf719c99a8177d8275a55c"
+        },
+        "cargo-sources.json"
       ]
     }
   ]

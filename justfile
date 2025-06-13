@@ -102,7 +102,7 @@ flatpak-builder:
         --install-deps-from=flathub \
         --repo=repo \
         flatpak-out \
-        io.cosmicUtils.cosmicAppletMinimon.json
+        io.github.cosmicUtils.cosmicAppletMinimon.json
 
 # Update flatpak cargo-sources.json
 flatpak-cargo-sources:
