@@ -91,13 +91,30 @@ install:
         install -D "$svg" "{{icons-dst}}/apps/$(basename $svg)"; \
     done
 
+# Build flatpak locally
+flatpak-builder:
+    flatpak-builder \
+        --force-clean \
+        --verbose \
+        --ccache \
+        --user \
+        --install \
+        --install-deps-from=flathub \
+        --repo=repo \
+        flatpak-out \
+        io.cosmicUtils.cosmicAppletMinimon.json
+
+# Update flatpak cargo-sources.json
+flatpak-cargo-sources:
+    python3 ./flatpak/flatpak-cargo-generator.py ./Cargo.lock -o ./flatpak/cargo-sources.json
+
 # Installs files for flatpak
 flatpak-install:
     install -Dm0755 {{bin-src}} {{flatpak-bin-dst}}
     install -Dm0644 {{desktop-src}} {{flatpak-desktop-dst}}
     install -Dm0644 {{metainfo-src}} {{flatpak-metainfo-dst}}
     for svg in {{icons-src}}/apps/*.svg; do \
-        install -Dm0644 "$svg" "{{icons-dst}}/apps/$(basename $svg)"; \
+        install -Dm0644 "$svg" "{{flatpak-icons-dst}}/apps/$(basename $svg)"; \
     done
 
 # Uninstalls installed files

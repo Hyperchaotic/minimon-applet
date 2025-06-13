@@ -16,6 +16,7 @@
   ],
   "build-options": {
     "append-path": "/usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/llvm18/bin",
+    "build-args": ["--share=network"],
     "env": {
       "CARGO_HOME": "/run/build/cosmic-applet-minimon/cargo",
       "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER": "clang",
@@ -26,18 +27,41 @@
   },
   "modules": [
     {
+      "name": "just",
+      "buildsystem": "simple",
+      "build-commands": ["install -Dm0755 just /app/bin/just"],
+      "sources": [
+        {
+          "type": "archive",
+          "strip-components": 0,
+          "dest-filename": "just.tar.gz",
+          "url": "https://github.com/casey/just/releases/download/1.25.2/just-1.25.2-x86_64-unknown-linux-musl.tar.gz",
+          "sha256": "ad56bf1a804243b51ef2c2eec4b3a8177f970ccc414cbbee219c2e5c06f7bcc9",
+          "only_arches": ["x86_64"]
+        },
+        {
+          "type": "archive",
+          "strip-components": 0,
+          "dest-filename": "just.tar.gz",
+          "url": "https://github.com/casey/just/releases/download/1.25.2/just-1.25.2-aarch64-unknown-linux-musl.tar.gz",
+          "sha256": "049d624255d150f18b0f3a1257a163366b0dc22e16526214773903125145e515",
+          "only_arches": ["aarch64"]
+        }
+      ]
+    },
+    {
       "name": "cosmic-applet-minimon",
       "buildsystem": "simple",
       "build-commands": [
-        "cargo --offline build --release --verbose",
+        "just vendor",
+        "just build-vendored",
         "just flatpak-install"
       ],
       "sources": [
         {
           "type": "dir",
-          "path": "./"
-        },
-        "./cargo-sources.json"
+          "path": "."
+        }
       ]
     }
   ]
