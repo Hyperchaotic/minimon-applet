@@ -9,6 +9,9 @@
   ],
   "command": "cosmic-applet-minimon",
   "finish-args": [
+    "--socket=wayland",
+    "--filesystem=xdg-config/cosmic:ro",
+    "--talk-name=com.system76.CosmicSettingsDaemon",
     "--filesystem=/sys/class/hwmon:ro",
     "--filesystem=/sys/class/drm:ro",
     "--filesystem=/sys/devices:ro",
