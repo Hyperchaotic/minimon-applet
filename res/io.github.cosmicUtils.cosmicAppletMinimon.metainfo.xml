@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<component type="addon">
+<component type="desktop-application">
   <id>io.github.cosmicUtils.cosmicAppletMinimon</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-only</project_license>
@@ -21,7 +21,7 @@
     <p>A lightweight hardware monitoring applet for the COSMIC desktop environment with UI for customization. Shows information on CPU, GPU, network, memory, and disk usage.</p>
   </description>
   <launchable type="desktop-id">io.github.cosmicUtils.cosmicAppletMinimon.desktop</launchable>
-  <icon type="stock">io.github.cosmic-utils.cosmic-applet-minimon</icon>
+  <icon type="remote" height="256" width="256">https://raw.githubusercontent.com/cosmic-utils/minimon-applet/main/res/icons/apps/io.github.cosmic-utils.cosmic-applet-minimon.svg</icon>
   <screenshots>
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/cosmic-utils/minimon-applet/main/res/screenshots/main_expanded_styled.png</image>
@@ -41,9 +41,14 @@
     <internet>always</internet>
   </recommends>
   <releases>
-    <release version="0.5.2" data="2025-06-15">
+    <release version="0.5.2" date="2025-06-15">
+    <url type="details">https://github.com/cosmic-utils/minimon-applet/releases/tag/v0.5.2</url>
       <description>
         <p>Official Flatpak release!</p>
+        <ul>
+          <li>List of changes</li>
+          <li>List of changes</li>
+        </ul>
       </description>
     </release>
   </releases>
