@@ -20,7 +20,7 @@
   <description>
     <p>A lightweight hardware monitoring applet for the COSMIC desktop environment with UI for customization. Shows information on CPU, GPU, network, memory, and disk usage.</p>
   </description>
-  <launchable type="desktop-id">io.github.cosmic-utils.cosmic-applet-minimon.desktop</launchable>
+  <launchable type="desktop-id">io.github.cosmicUtils.cosmicAppletMinimon.desktop</launchable>
   <icon type="stock">io.github.cosmic-utils.cosmic-applet-minimon</icon>
   <screenshots>
     <screenshot type="default">
