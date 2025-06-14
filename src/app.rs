@@ -50,12 +50,12 @@ use cosmic::widget::Id as WId;
 
 static AUTOSIZE_MAIN_ID: LazyLock<WId> = std::sync::LazyLock::new(|| WId::new("autosize-main"));
 
-const ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon";
-const TEMP_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-temperature";
-const RAM_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-ram";
-const GPU_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-gpu";
-const NETWORK_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-network";
-const DISK_ICON: &str = "io.github.cosmic-utils.cosmic-applet-minimon-harddisk";
+const ICON: &str = "io.github.cosmicUtils.cosmicAppletMinimon";
+const TEMP_ICON: &str = "io.github.cosmicUtils.cosmicAppletMinimon-temperature";
+const RAM_ICON: &str = "io.github.cosmicUtils.cosmicAppletMinimon-ram";
+const GPU_ICON: &str = "io.github.cosmicUtils.cosmicAppletMinimon-gpu";
+const NETWORK_ICON: &str = "io.github.cosmicUtils.cosmicAppletMinimon-network";
+const DISK_ICON: &str = "io.github.cosmicUtils.cosmicAppletMinimon-harddisk";
 
 pub static SETTINGS_CPU_CHOICE: LazyLock<&'static str> =
     LazyLock::new(|| fl!("settings-cpu").leak());
@@ -253,9 +253,9 @@ pub enum Message {
     InhibitorTick,
 }
 
-const APP_ID_DOCK: &str = "io.github.cosmic-utils.cosmic-applet-minimon-dock";
-const APP_ID_PANEL: &str = "io.github.cosmic-utils.cosmic-applet-minimon-panel";
-const APP_ID_OTHER: &str = "io.github.cosmic-utils.cosmic-applet-minimon-other";
+const APP_ID_DOCK: &str = "io.github.cosmicUtils.cosmicAppletMinimon-dock";
+const APP_ID_PANEL: &str = "io.github.cosmicUtils.cosmicAppletMinimon-panel";
+const APP_ID_OTHER: &str = "io.github.cosmicUtils.cosmicAppletMinimon-other";
 
 impl cosmic::Application for Minimon {
     type Executor = cosmic::executor::Default;
@@ -264,7 +264,7 @@ impl cosmic::Application for Minimon {
 
     type Message = Message;
 
-    const APP_ID: &'static str = "io.github.cosmic-utils.cosmic-applet-minimon";
+    const APP_ID: &'static str = "io.github.cosmicUtils.cosmicAppletMinimon";
 
     fn init(core: Core, _flags: Self::Flags) -> (Self, Task<Self::Message>) {
         let is_laptop = Minimon::is_laptop();

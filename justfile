@@ -38,7 +38,7 @@ flatpak-metainfo-dst := flatpak-base-dir / 'share' / 'metainfo' / metainfo
 
 icons-src := 'res' / 'icons'
 icons-dst := clean(rootdir / prefix) / 'share' / 'icons' / 'hicolor' / 'scalable'
-flatpak-icons-dst := flatpak-base-dir / 'share' / 'icons' / 'hicolor'
+flatpak-icons-dst := flatpak-base-dir / 'share' / 'icons' / 'hicolor' / 'scalable'
 
 default: build-release
 
