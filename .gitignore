@@ -12,3 +12,10 @@ target/
 
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
+
+# Flatpak-related
+/flatpak-builder-tools
+/.flatpak-builder
+/repo
+/flatpak-out
+cargo-sources.json

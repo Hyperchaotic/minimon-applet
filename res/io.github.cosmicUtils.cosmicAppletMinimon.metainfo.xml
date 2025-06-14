@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.cosmicUtils.cosmicAppletMinimon</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <project_group>COSMIC</project_group>
+  <developer_name>hyperchaotic</developer_name>
+  <update_contact>hyperchaotic@gmail.com</update_contact>
+  <name>Minimon</name>
+  <url type="homepage">https://github.com/cosmic-utils/minimon-applet</url>
+  <url type="bugtracker">https://github.com/cosmic-utils/minimon-applet/issues</url>
+  <url type="contribute">https://github.com/cosmic-utils/minimon-applet</url>
+  <url type="translate">https://github.com/cosmic-utils/minimon-applet/tree/main/i18n</url>
+  <content_rating type="oars-1.1" />
+  <branding>
+    <color type="primary" scheme_preference="light">#fffffe</color>
+    <color type="primary" scheme_preference="dark">#2b2b2b</color>
+  </branding>
+  <summary>A Customizable System Monitor applet for COSMIC</summary>
+  <description>
+    <p>A lightweight hardware monitoring applet for the COSMIC desktop environment with UI for customization. Shows information on CPU, GPU, network, memory, and disk usage.</p>
+  </description>
+  <icon type="stock">io.github.cosmicUtils.cosmicAppletMinimon.svg</icon>
+  <launchable type="desktop-id">io.github.cosmicUtils.cosmicAppletMinimon.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/cosmic-utils/minimon-applet/main/res/screenshots/main_expanded_styled.png</image>
+      <caption>A styled instance of the applet with with the window view open.</caption>
+    </screenshot>
+  </screenshots>
+  <provides>
+    <id>com.system76.CosmicApplet</id>
+    <binaries>
+      <binary>cosmic-applet-minimon</binary>
+    </binaries>
+  </provides>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <recommends>
+    <internet>always</internet>
+  </recommends>
+  <releases>
+    <release version="0.5.2" date="2025-06-15">
+    <url type="details">https://github.com/cosmic-utils/minimon-applet/releases/tag/v0.5.2</url>
+      <description>
+        <p>Official Flatpak release!</p>
+        <ul>
+          <li>List of changes</li>
+          <li>List of changes</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>

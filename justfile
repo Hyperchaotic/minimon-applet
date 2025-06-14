@@ -29,13 +29,16 @@ flatpak-bin-dst := flatpak-base-dir / 'bin' / name
 desktop := APPID + '.desktop'
 desktop-src := 'res' / desktop
 desktop-dst := clean(rootdir / prefix) / 'share' / 'applications' / desktop
+flatpak-desktop-dst := flatpak-base-dir / 'share' / 'applications' / desktop
 
 metainfo := APPID + '.metainfo.xml'
 metainfo-src := 'res' / metainfo
 metainfo-dst := clean(rootdir / prefix) / 'share' / 'metainfo' / metainfo
+flatpak-metainfo-dst := flatpak-base-dir / 'share' / 'metainfo' / metainfo
 
 icons-src := 'res' / 'icons'
 icons-dst := clean(rootdir / prefix) / 'share' / 'icons' / 'hicolor' / 'scalable'
+flatpak-icons-dst := flatpak-base-dir / 'share' / 'icons' / 'hicolor' / 'scalable'
 
 default: build-release
 
@@ -86,6 +89,32 @@ install:
     install -Dm0644 {{metainfo-src}} {{metainfo-dst}}
     for svg in {{icons-src}}/apps/*.svg; do \
         install -D "$svg" "{{icons-dst}}/apps/$(basename $svg)"; \
+    done
+
+# Build flatpak locally
+flatpak-builder:
+    flatpak-builder \
+        --force-clean \
+        --verbose \
+        --ccache \
+        --user \
+        --install \
+        --install-deps-from=flathub \
+        --repo=repo \
+        flatpak-out \
+        io.github.cosmicUtils.cosmicAppletMinimon.json
+
+# Update flatpak cargo-sources.json
+flatpak-cargo-sources:
+    python3 ./flatpak/flatpak-cargo-generator.py ./Cargo.lock -o ./flatpak/cargo-sources.json
+
+# Installs files for flatpak
+flatpak-install:
+    install -Dm0755 {{bin-src}} {{flatpak-bin-dst}}
+    install -Dm0644 {{desktop-src}} {{flatpak-desktop-dst}}
+    install -Dm0644 {{metainfo-src}} {{flatpak-metainfo-dst}}
+    for svg in {{icons-src}}/apps/*.svg; do \
+        install -Dm0644 "$svg" "{{flatpak-icons-dst}}/apps/$(basename $svg)"; \
     done
 
 # Uninstalls installed files
