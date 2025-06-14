@@ -2,8 +2,8 @@ use cosmic::iced::mouse::Cursor;
 use cosmic::iced::{Color, Point, Renderer};
 use cosmic::iced::{Rectangle, Size};
 use cosmic::iced_widget::canvas::Geometry;
-use cosmic::theme;
 use cosmic::widget::canvas::{self, Path, Stroke, Style, path};
+use cosmic::theme;
 use std::collections::VecDeque;
 
 use crate::app::Message;
@@ -33,7 +33,7 @@ impl SampleValue for f64 {
 // * Can take u64 or f64.
 // * Can be adaptive or take a fixed max_y.
 // * If samples2.len() is 0, only draws samples1 graph.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LineChart<T: SampleValue> {
     pub steps: usize,
     pub samples1: VecDeque<T>,
@@ -41,7 +41,6 @@ pub struct LineChart<T: SampleValue> {
     pub max_y: Option<T>,
     pub colors: GraphColorsIced,
 }
-
 
 impl<T: SampleValue> LineChart<T> {
     pub fn new(
@@ -61,9 +60,6 @@ impl<T: SampleValue> LineChart<T> {
     }
 }
 
-// The new(..) function clones the samples and creates a new object.
-// Alternatively the sensor could have a LineChart member and access
-// the samples directly on update. 
 impl<T: SampleValue + 'static> canvas::Program<Message, theme::Theme> for LineChart<T> {
     type State = ();
 
@@ -106,7 +102,34 @@ impl<T: SampleValue + 'static> canvas::Program<Message, theme::Theme> for LineCh
             frame.center().x + frame.size().width / 2. - 1.,
             frame.center().y + frame.size().height / 2. - 1.,
         );
+        // Frame needs to be on mid-pixel, to avoid an anti-aliased outwashed double line
+        let frame_start = 1.5;
+        let frame_size = Size {
+            width: frame.size().width - 2.0,
+            height: frame.size().height - 2.0,
+        };
+
+        let corner_radius = frame.size().width.min(frame.size().height) / 7.0;
+
         let scale = bottom_right - top_left;
+
+        // Fill background
+        let mut square = path::Builder::new();
+        square.rounded_rectangle(
+            Point {
+                x: frame_start,
+                y: frame_start,
+            },
+            frame_size,
+            corner_radius.into(),
+        );
+        frame.fill(
+            &square.build(),
+            canvas::Fill {
+                style: Style::Solid(self.colors.color1),
+                ..Default::default()
+            },
+        );
 
         let min = scale.y as f64;
         let max_value = self.max_y.map(|v| v.to_f64()).unwrap_or_else(|| {
@@ -117,7 +140,7 @@ impl<T: SampleValue + 'static> canvas::Program<Message, theme::Theme> for LineCh
 
         let dual_graph = !self.samples2.is_empty();
 
-        let step_length = scale.x / (self.steps-1) as f32;
+        let step_length = scale.x / (self.steps - 1) as f32;
         let scaling = (scale.y - 1.0) as f64 / max_value;
 
         let mut builder1 = path::Builder::new();
@@ -174,7 +197,7 @@ impl<T: SampleValue + 'static> canvas::Program<Message, theme::Theme> for LineCh
             &mut frame,
             builder1.build(),
             shade1.build(),
-            self.colors.color2,
+            self.colors.color4,
         );
 
         if dual_graph {
@@ -186,18 +209,16 @@ impl<T: SampleValue + 'static> canvas::Program<Message, theme::Theme> for LineCh
             );
         }
 
-        // Frame needs to be on mid-pixel, to avoid an anti-aliased outwashed double line
-        let frame_start = 1.5;
-        let frame_size = Size {
-            width: frame.size().width - 2.0,
-            height: frame.size().height - 2.0,
-        };
-
-        let corner_radius = frame.size().width.min(frame.size().height) / 7.0;
-
         for i in 0..=corner_radius.trunc() as i32 {
             let mut square = path::Builder::new();
-            square.rounded_rectangle(Point { x: frame_start, y: frame_start }, frame_size, i.into());
+            square.rounded_rectangle(
+                Point {
+                    x: frame_start,
+                    y: frame_start,
+                },
+                frame_size,
+                i.into(),
+            );
             frame.stroke(
                 &square.build(),
                 Stroke {
@@ -209,11 +230,18 @@ impl<T: SampleValue + 'static> canvas::Program<Message, theme::Theme> for LineCh
         }
 
         let mut square = path::Builder::new();
-        square.rounded_rectangle(Point { x: frame_start, y: frame_start }, frame_size, corner_radius.into());
+        square.rounded_rectangle(
+            Point {
+                x: frame_start,
+                y: frame_start,
+            },
+            frame_size,
+            corner_radius.into(),
+        );
         frame.stroke(
             &square.build(),
             Stroke {
-                style: Style::Solid(self.colors.color4),
+                style: Style::Solid(self.colors.color2),
                 width: 1.0,
                 ..Default::default()
             },
