@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use cosmic::{Element, iced_widget::Column};
+use cosmic::{Element, iced_widget::Column, widget::Container};
 use sysinfo::Networks;
 
 use crate::{
@@ -176,8 +176,44 @@ impl Sensor for Network {
         Box::new(dmo)
     }
 
-    fn graph(&self) -> String {
+    #[cfg(feature = "lyon_charts")]
+    fn chart(
+        &self,
+    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         match self.config.variant {
+            NetworkVariant::Combined => chart_container!(crate::charts::line::LineChart::new(
+                GRAPH_SAMPLES,
+                &self.download,
+                &self.upload,
+                self.max_y,
+                &self.config.colors,
+            )),
+            NetworkVariant::Download => chart_container!(crate::charts::line::LineChart::new(
+                GRAPH_SAMPLES,
+                &self.download,
+                &VecDeque::new(),
+                self.max_y,
+                &self.config.colors,
+            )),
+            NetworkVariant::Upload => {
+                let mut cols = self.config.colors.clone();
+                cols.color2 = cols.color3.clone();
+                chart_container!(crate::charts::line::LineChart::new(
+                    GRAPH_SAMPLES,
+                    &self.upload,
+                    &VecDeque::new(),
+                    self.max_y,
+                    &cols,
+                ))
+            }
+        }
+    }
+
+    #[cfg(not(feature = "lyon_charts"))]
+    fn chart(
+        &self,
+    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
+        let svg = match self.config.variant {
             NetworkVariant::Combined => crate::svg_graph::double_line(
                 &self.download,
                 &self.upload,
@@ -196,7 +232,13 @@ impl Sensor for Network {
                 cols.color2 = cols.color3.clone();
                 crate::svg_graph::line_adaptive(&self.upload, GRAPH_SAMPLES, &cols, self.max_y)
             }
-        }
+        };
+        let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+        widget::Container::new(
+            icon.icon()
+                .height(cosmic::iced::Length::Fill)
+                .width(cosmic::iced::Length::Fill),
+        )
     }
 
     fn settings_ui(&self) -> Element<crate::app::Message> {
@@ -219,26 +261,40 @@ impl Sensor for Network {
         let config = &self.config;
         let k = self.config.variant;
 
-        let mut rate = column!(Element::from(
-            widget::svg(widget::svg::Handle::from_memory(
-                self.graph().as_bytes().to_owned(),
-            ))
-            .width(90)
-            .height(60)
-        ));
+        let mut rate = column!(
+            Container::new(self.chart().width(60).height(60))
+                .width(90)
+                .align_x(Alignment::Center)
+        );
 
         rate = rate.push(Element::from(cosmic::widget::text::body("")));
 
         match self.config.variant {
             NetworkVariant::Combined => {
-                rate = rate.push(cosmic::widget::text::body(dlrate));
-                rate = rate.push(cosmic::widget::text::body(ulrate));
+                rate = rate.push(
+                    cosmic::widget::text::body(dlrate)
+                        .width(90)
+                        .align_x(Alignment::Center),
+                );
+                rate = rate.push(
+                    cosmic::widget::text::body(ulrate)
+                        .width(90)
+                        .align_x(Alignment::Center),
+                );
             }
             NetworkVariant::Download => {
-                rate = rate.push(cosmic::widget::text::body(dlrate));
+                rate = rate.push(
+                    cosmic::widget::text::body(dlrate)
+                        .width(90)
+                        .align_x(Alignment::Center),
+                );
             }
             NetworkVariant::Upload => {
-                rate = rate.push(cosmic::widget::text::body(ulrate));
+                rate = rate.push(
+                    cosmic::widget::text::body(ulrate)
+                        .width(90)
+                        .align_x(Alignment::Center),
+                );
             }
         }
         net_elements.push(Element::from(rate));

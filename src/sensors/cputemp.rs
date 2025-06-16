@@ -4,7 +4,10 @@ use crate::{
     fl,
     svg_graph::SvgColors,
 };
-use cosmic::Element;
+use cosmic::{
+    Element,
+    widget::Container,
+};
 
 use cosmic::widget;
 use cosmic::widget::{settings, toggler};
@@ -224,12 +227,54 @@ impl Sensor for CpuTemp {
         Box::new(dmo)
     }
 
-    fn graph(&self) -> String {
+    #[cfg(feature = "lyon_charts")]
+    fn chart(
+        &self,
+    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         let mut max: f64 = 100.0;
         if let Some(hwmon) = &self.hwmon_temp {
             max = hwmon.crit_temp;
         }
         match self.config.kind {
+            GraphKind::Ring => {
+                let latest = self.latest_sample();
+                let mut value = self.to_string();
+
+                // remove the C/F/K unit if there's not enough space
+                if value.len() > 3 {
+                    let _ = value.pop();
+                }
+                chart_container!(crate::charts::ring::RingChart::new(
+                    latest as f32,
+                    &value,
+                    &self.config.colors,
+                ))
+            }
+            GraphKind::Line => chart_container!(crate::charts::line::LineChart::new(
+                MAX_SAMPLES,
+                &self.samples,
+                &VecDeque::new(),
+                Some(max),
+                &self.config.colors,
+            )),
+            GraphKind::Heat => chart_container!(crate::charts::heat::HeatChart::new(
+                MAX_SAMPLES,
+                &self.samples,
+                Some(max),
+                &self.config.colors,
+            )),
+        }
+    }
+
+    #[cfg(not(feature = "lyon_charts"))]
+    fn chart(
+        &self,
+    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
+        let mut max: f64 = 100.0;
+        if let Some(hwmon) = &self.hwmon_temp {
+            max = hwmon.crit_temp;
+        }
+        let svg = match self.config.kind {
             GraphKind::Ring => {
                 let latest = self.latest_sample();
                 let mut value = self.to_string();
@@ -246,7 +291,14 @@ impl Sensor for CpuTemp {
             }
             GraphKind::Line => crate::svg_graph::line(&self.samples, max, &self.svg_colors),
             GraphKind::Heat => crate::svg_graph::heat(&self.samples, max as u64, &self.svg_colors),
-        }
+        };
+
+        let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+        widget::Container::new(
+            icon.icon()
+                .height(cosmic::iced::Length::Fill)
+                .width(cosmic::iced::Length::Fill),
+        )
     }
 
     fn settings_ui(&self) -> Element<crate::app::Message> {
@@ -259,13 +311,13 @@ impl Sensor for CpuTemp {
 
         temp_elements.push(Element::from(
             column!(
-                widget::svg(widget::svg::Handle::from_memory(
-                    self.graph().as_bytes().to_owned(),
-                ))
-                .width(90)
-                .height(60),
-                cosmic::widget::text::body(temp),
-            )
+                 Container::new(self.chart().width(60).height(60))
+                    .width(90)
+                    .align_x(Alignment::Center),
+                cosmic::widget::text::body(temp.to_string())
+                    .width(90)
+                    .align_x(Alignment::Center)
+           )
             .padding(5)
             .align_x(Alignment::Center),
         ));

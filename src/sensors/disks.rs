@@ -9,7 +9,10 @@ use crate::{
     svg_graph::SvgColors,
 };
 
-use cosmic::{Element, widget::Column};
+use cosmic::{
+    Element,
+    widget::{Column, Container},
+};
 
 use cosmic::widget;
 use cosmic::widget::settings;
@@ -166,8 +169,44 @@ impl Sensor for Disks {
         Box::new(dmo)
     }
 
-    fn graph(&self) -> String {
+    #[cfg(feature = "lyon_charts")]
+    fn chart(
+        &self,
+    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         match self.config.variant {
+            DisksVariant::Combined => chart_container!(crate::charts::line::LineChart::new(
+                GRAPH_SAMPLES,
+                &self.write,
+                &self.read,
+                self.max_y,
+                &self.config.colors,
+            )),
+            DisksVariant::Write => chart_container!(crate::charts::line::LineChart::new(
+                GRAPH_SAMPLES,
+                &self.write,
+                &VecDeque::new(),
+                self.max_y,
+                &self.config.colors,
+            )),
+            DisksVariant::Read => {
+                let mut cols = self.config.colors.clone();
+                cols.color2 = cols.color3.clone();
+                chart_container!(crate::charts::line::LineChart::new(
+                    GRAPH_SAMPLES,
+                    &self.read,
+                    &VecDeque::new(),
+                    self.max_y,
+                    &cols,
+                ))
+            }
+        }
+    }
+
+    #[cfg(not(feature = "lyon_charts"))]
+    fn chart(
+        &self,
+    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
+        let svg = match self.config.variant {
             DisksVariant::Combined => crate::svg_graph::double_line(
                 &self.write,
                 &self.read,
@@ -186,7 +225,13 @@ impl Sensor for Disks {
                 cols.color2 = cols.color3.clone();
                 crate::svg_graph::line_adaptive(&self.read, GRAPH_SAMPLES, &cols, self.max_y)
             }
-        }
+        };
+        let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+        widget::Container::new(
+            icon.icon()
+                .height(cosmic::iced::Length::Fill)
+                .width(cosmic::iced::Length::Fill),
+        )
     }
 
     fn settings_ui(&self) -> Element<crate::app::Message> {
@@ -203,26 +248,40 @@ impl Sensor for Disks {
         let config = &self.config;
         let k = self.config.variant;
 
-        let mut rate = column!(Element::from(
-            widget::svg(widget::svg::Handle::from_memory(
-                self.graph().as_bytes().to_owned(),
-            ))
-            .width(90)
-            .height(60)
-        ));
+        let mut rate = column!(
+            Container::new(self.chart().width(60).height(60))
+                .width(90)
+                .align_x(Alignment::Center)
+        );
 
         rate = rate.push(Element::from(cosmic::widget::text::body("")));
 
         match self.config.variant {
             DisksVariant::Combined => {
-                rate = rate.push(cosmic::widget::text::body(wrrate));
-                rate = rate.push(cosmic::widget::text::body(rdrate));
+                rate = rate.push(
+                    cosmic::widget::text::body(wrrate)
+                        .width(90)
+                        .align_x(Alignment::Center),
+                );
+                rate = rate.push(
+                    cosmic::widget::text::body(rdrate)
+                        .width(90)
+                        .align_x(Alignment::Center),
+                );
             }
             DisksVariant::Write => {
-                rate = rate.push(cosmic::widget::text::body(wrrate));
+                rate = rate.push(
+                    cosmic::widget::text::body(wrrate)
+                        .width(90)
+                        .align_x(Alignment::Center),
+                );
             }
             DisksVariant::Read => {
-                rate = rate.push(cosmic::widget::text::body(rdrate));
+                rate = rate.push(
+                    cosmic::widget::text::body(rdrate)
+                        .width(90)
+                        .align_x(Alignment::Center),
+                );
             }
         }
         disk_elements.push(Element::from(rate));

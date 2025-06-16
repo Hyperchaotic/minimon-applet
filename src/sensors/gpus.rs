@@ -1,9 +1,9 @@
-use cosmic::Element;
+use cosmic::{Element, Renderer, Theme};
 use log::info;
 use std::{collections::VecDeque, fmt::Write};
 
 use crate::sensors::GpuConfig;
-use cosmic::widget::{self, Column};
+use cosmic::widget::{self, Column, Container};
 use cosmic::widget::{settings, toggler};
 use cosmic::{
     iced::{
@@ -33,6 +33,16 @@ const TEMP_GRAPH_OPTIONS: [&str; 3] = ["Ring", "Line", "Heat"];
 const UNIT_OPTIONS: [&str; 4] = ["Celcius", "Farenheit", "Kelvin", "Rankine"];
 
 const MAX_SAMPLES: usize = 21;
+
+#[cfg(feature = "lyon_charts")]
+use std::sync::LazyLock;
+#[cfg(feature = "lyon_charts")]
+static DISABLED_COLORS: LazyLock<GraphColors> = LazyLock::new(|| GraphColors {
+    color1: cosmic::cosmic_theme::palette::Srgba::from_components((0xFF, 0xFF, 0xFF, 0x20)),
+    color2: cosmic::cosmic_theme::palette::Srgba::from_components((0x72, 0x72, 0x72, 0xFF)),
+    color3: cosmic::cosmic_theme::palette::Srgba::from_components((0x72, 0x72, 0x72, 0xFF)),
+    color4: cosmic::cosmic_theme::palette::Srgba::from_components((0x72, 0x72, 0x72, 0xFF)),
+});
 
 pub struct GpuGraph {
     id: String,
@@ -80,8 +90,49 @@ impl GpuGraph {
         }
     }
 
-    pub fn graph(&self) -> String {
+    #[cfg(feature = "lyon_charts")]
+    pub fn chart<'a>(&self) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
         if self.config.kind == GraphKind::Ring {
+            let mut latest = self.latest_sample();
+            let mut text = String::with_capacity(10);
+            let mut percentage = String::with_capacity(10);
+            if latest > 100.0 {
+                latest = 100.0;
+            }
+            if self.disabled {
+                _ = write!(percentage, "0");
+                _ = write!(text, "-");
+            } else {
+                if latest < 10.0 {
+                    write!(text, "{latest:.2}").unwrap();
+                } else if latest < 100.0 {
+                    write!(text, "{latest:.1}").unwrap();
+                } else {
+                    write!(text, "{latest}").unwrap();
+                }
+                write!(percentage, "{latest}").unwrap();
+            }
+            chart_container!(crate::charts::ring::RingChart::new(
+                latest as f32,
+                &text,
+                &self.config.colors,
+            ))
+        } else {
+            chart_container!(crate::charts::line::LineChart::new(
+                MAX_SAMPLES,
+                &self.samples,
+                &VecDeque::new(),
+                Some(100.0),
+                &self.config.colors,
+            ))
+        }
+    }
+
+    #[cfg(not(feature = "lyon_charts"))]
+    pub fn chart(
+        &self,
+    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
+        let svg = if self.config.kind == GraphKind::Ring {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
@@ -119,7 +170,14 @@ impl GpuGraph {
                     &self.svg_colors
                 },
             )
-        }
+        };
+
+        widget::Container::new(
+            cosmic::widget::icon::from_svg_bytes(svg.into_bytes())
+                .icon()
+                .height(cosmic::iced::Length::Fill)
+                .width(cosmic::iced::Length::Fill),
+        )
     }
 
     pub fn latest_sample(&self) -> f64 {
@@ -245,8 +303,53 @@ impl VramGraph {
         }
     }
 
-    pub fn graph(&self) -> String {
+    #[cfg(feature = "lyon_charts")]
+    pub fn chart<'a>(
+        &self,
+    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         if self.config.kind == GraphKind::Ring {
+            let latest = self.latest_sample();
+            let mut text = String::with_capacity(10);
+            let mut percentage = String::with_capacity(10);
+
+            let mut pct: f32 = 0.0;
+            if self.disabled {
+                _ = write!(percentage, "0");
+                _ = write!(text, "-");
+            } else {
+                pct = ((latest / self.total) * 100.0) as f32;
+                if pct > 100.0 {
+                    pct = 100.0;
+                }
+
+                if latest < 10.0 {
+                    write!(text, "{latest:.2}").unwrap();
+                } else if latest < 100.0 {
+                    write!(text, "{latest:.1}").unwrap();
+                } else {
+                    write!(text, "{latest}").unwrap();
+                }
+            }
+
+            chart_container!(crate::charts::ring::RingChart::new(
+                pct,
+                &text,
+                &self.config.colors,
+            ))
+        } else {
+            chart_container!(crate::charts::line::LineChart::new(
+                MAX_SAMPLES,
+                &self.samples,
+                &VecDeque::new(),
+                Some(self.total),
+                &self.config.colors,
+            ))
+        }
+    }
+
+    #[cfg(not(feature = "lyon_charts"))]
+    pub fn chart(&self) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
+        let svg = if self.config.kind == GraphKind::Ring {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
@@ -286,7 +389,13 @@ impl VramGraph {
                     &self.svg_colors
                 },
             )
-        }
+        };
+        let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+        Container::new(
+            icon.icon()
+                .height(cosmic::iced::Length::Fill)
+                .width(cosmic::iced::Length::Fill),
+        )
     }
 
     pub fn latest_sample(&self) -> f64 {
@@ -376,8 +485,64 @@ impl TempGraph {
         }
     }
 
-    pub fn graph(&self) -> String {
+    #[cfg(feature = "lyon_charts")]
+    pub fn chart(
+        &self,
+    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         match self.config.kind {
+            GraphKind::Ring => {
+                let mut latest = self.latest_sample();
+                let mut text = self.to_string();
+
+                // remove the C/F/K unit if there's not enough space
+                if text.len() > 3 {
+                    let _ = text.pop();
+                }
+                let mut percentage = String::with_capacity(10);
+
+                write!(percentage, "{latest}").unwrap();
+
+                if latest > 100.0 {
+                    latest = 100.0;
+                }
+
+                chart_container!(crate::charts::ring::RingChart::new(
+                    latest as f32,
+                    &text,
+                    if self.disabled {
+                        &*DISABLED_COLORS
+                    } else {
+                        &self.config.colors
+                    },
+                ))
+            }
+            GraphKind::Line => chart_container!(crate::charts::line::LineChart::new(
+                MAX_SAMPLES,
+                &self.samples,
+                &VecDeque::new(),
+                Some(self.max_temp),
+                if self.disabled {
+                    &*DISABLED_COLORS
+                } else {
+                    &self.config.colors
+                },
+            )),
+            GraphKind::Heat => chart_container!(crate::charts::heat::HeatChart::new(
+                MAX_SAMPLES,
+                &self.samples,
+                Some(self.max_temp),
+                if self.disabled {
+                    &*DISABLED_COLORS
+                } else {
+                    &self.config.colors
+                },
+            )),
+        }
+    }
+
+    #[cfg(not(feature = "lyon_charts"))]
+    pub fn chart(&self) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
+        let svg = match self.config.kind {
             GraphKind::Ring => {
                 let latest = self.latest_sample();
                 let mut value = self.to_string();
@@ -412,7 +577,14 @@ impl TempGraph {
             GraphKind::Heat => {
                 crate::svg_graph::heat(&self.samples, self.max_temp as u64, &self.svg_colors)
             }
-        }
+        };
+        let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+
+        Container::new(
+            icon.icon()
+                .height(cosmic::iced::Length::Fill)
+                .width(cosmic::iced::Length::Fill),
+        )
     }
 
     pub fn latest_sample(&self) -> f64 {
@@ -660,12 +832,12 @@ impl Gpu {
         let usage = self.gpu.to_string();
         gpu_elements.push(Element::from(
             column!(
-                widget::svg(widget::svg::Handle::from_memory(
-                    self.gpu.graph().as_bytes().to_owned(),
-                ))
-                .width(90)
-                .height(60),
-                cosmic::widget::text::body(usage),
+                Container::new(self.gpu.chart().width(60).height(60))
+                    .width(90)
+                    .align_x(Alignment::Center),
+                cosmic::widget::text::body(usage.to_string())
+                    .width(90)
+                    .align_x(Alignment::Center)
             )
             .padding(cosmic::theme::spacing().space_xs)
             .align_x(Alignment::Center),
@@ -724,12 +896,12 @@ impl Gpu {
         let vram = self.vram.string(false);
         vram_elements.push(Element::from(
             column!(
-                widget::svg(widget::svg::Handle::from_memory(
-                    self.vram.graph().as_bytes().to_owned(),
-                ))
-                .width(90)
-                .height(60),
-                cosmic::widget::text::body(vram),
+                Container::new(self.vram.chart().width(60).height(60))
+                    .width(90)
+                    .align_x(Alignment::Center),
+                cosmic::widget::text::body(vram.to_string())
+                    .width(90)
+                    .align_x(Alignment::Center)
             )
             .padding(cosmic::theme::spacing().space_xs)
             .align_x(Alignment::Center),
@@ -788,12 +960,12 @@ impl Gpu {
         let temp = self.temp.to_string();
         temp_elements.push(Element::from(
             column!(
-                widget::svg(widget::svg::Handle::from_memory(
-                    self.temp.graph().as_bytes().to_owned(),
-                ))
-                .width(90)
-                .height(60),
-                cosmic::widget::text::body(temp),
+                Container::new(self.temp.chart().width(60).height(60))
+                    .width(90)
+                    .align_x(Alignment::Center),
+                cosmic::widget::text::body(temp.to_string())
+                    .width(90)
+                    .align_x(Alignment::Center)
             )
             .padding(cosmic::theme::spacing().space_xs)
             .align_x(Alignment::Center),

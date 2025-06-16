@@ -4,7 +4,7 @@ use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::cosmic_theme::palette::bool_mask::BoolMask;
 use cosmic::cosmic_theme::palette::{FromColor, WithAlpha};
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::{fs, time};
 
 use cosmic::app::{Core, Task};
@@ -417,9 +417,9 @@ impl cosmic::Application for Minimon {
         }
 
         let spacing = if self.config.tight_spacing {
-            0
+            cosmic.space_xxxs()
         } else {
-            cosmic.space_xxs()
+            cosmic.space_xs()
         };
 
         // Layout horizontally or vertically
@@ -1216,17 +1216,6 @@ impl cosmic::Application for Minimon {
     }
 }
 
-macro_rules! button_from_sensor {
-    ($self:ident, $svg:expr) => {
-        $self
-            .core
-            .applet
-            .icon_button_from_handle(cosmic::widget::icon::from_svg_bytes(
-                $svg.graph().into_bytes(),
-            ))
-    };
-}
-
 impl Minimon {
     fn config_changed(&mut self, config: &MinimonConfig) {
         self.config = config.clone();
@@ -1401,13 +1390,33 @@ impl Minimon {
         .into()
     }
 
-    fn cpu_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
-        let mut elements: Vec<Element<Message>> = Vec::new();
+    fn push_symbolic_icon(
+        &self,
+        elements: &mut VecDeque<Element<crate::app::Message>>,
+        icon_name: &str,
+        at_start: bool,
+    ) {
+        let size = self.core.applet.suggested_size(true);
+        let icon = widget::icon::from_name(icon_name)
+            .symbolic(true)
+            .size(size.1)
+            .into();
+
+        if at_start {
+            elements.push_front(icon);
+        } else {
+            elements.push_back(icon);
+        }
+    }
+
+    fn cpu_panel_ui(&self, horizontal: bool) -> VecDeque<Element<crate::app::Message>> {
+        let size = self.core.applet.suggested_size(false);
+
+        let mut elements: VecDeque<Element<Message>> = VecDeque::new();
 
         // Handle the symbols button if needed
         if self.config.symbols && (self.config.cpu.label || self.config.cpu.chart) {
-            let btn = self.core.applet.icon_button(CPU_ICON);
-            elements.push(btn.into());
+            self.push_symbolic_icon(&mut elements, CPU_ICON, false);
         }
 
         let cpu_usage = self.cpu.latest_sample();
@@ -1426,68 +1435,71 @@ impl Minimon {
 
         // Add the CPU label if needed
         if self.config.cpu.label {
-            elements.push(self.figure_label(formatted_cpu).into());
+            elements.push_back(self.figure_label(formatted_cpu).into());
         }
 
         // Add the CPU chart if needed
         if self.config.cpu.chart {
-            elements.push(button_from_sensor!(self, self.cpu).into());
+            elements.push_back(self.cpu.chart().height(size.0).width(size.1).into());
         }
-
         elements
     }
 
-    fn cpu_temp_panel_ui(&self, _horizontal: bool) -> Vec<Element<crate::app::Message>> {
-        let mut elements: Vec<Element<Message>> = Vec::new();
+    fn cpu_temp_panel_ui(&self, _horizontal: bool) -> VecDeque<Element<crate::app::Message>> {
+        let size = self.core.applet.suggested_size(false);
+
+        let mut elements: VecDeque<Element<Message>> = VecDeque::new();
 
         if self.cputemp.is_found() {
             // Handle the symbols button if needed
             if self.config.symbols && (self.config.cputemp.label || self.config.cputemp.chart) {
-                let btn = self.core.applet.icon_button(TEMP_ICON);
-                elements.push(btn.into());
+                self.push_symbolic_icon(&mut elements, TEMP_ICON, false);
             }
 
             // Add the CPU label if needed
             if self.config.cputemp.label {
-                elements.push(self.figure_label(self.cputemp.to_string()).into());
+                elements.push_back(self.figure_label(self.cputemp.to_string()).into());
             }
 
             // Add the CPU chart if needed
             if self.config.cputemp.chart {
-                elements.push(button_from_sensor!(self, self.cputemp).into());
+                elements.push_back(self.cputemp.chart().height(size.0).width(size.1).into());
             }
         }
 
         elements
     }
 
-    fn memory_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
-        let mut elements: Vec<Element<Message>> = Vec::new();
+    fn memory_panel_ui(&self, horizontal: bool) -> VecDeque<Element<crate::app::Message>> {
+        let size = self.core.applet.suggested_size(false);
+
+        let mut elements: VecDeque<Element<Message>> = VecDeque::new();
 
         // Handle the symbols button if needed
         if self.config.symbols && (self.config.memory.label || self.config.memory.chart) {
-            let btn = self.core.applet.icon_button(RAM_ICON);
-            elements.push(btn.into());
+            self.push_symbolic_icon(&mut elements, RAM_ICON, false);
         }
 
         // Label section
         if self.config.memory.label {
             let formatted_mem = self.memory.to_string(!horizontal);
-            elements.push(self.figure_label(formatted_mem).into());
+            elements.push_back(self.figure_label(formatted_mem).into());
         }
 
         // Chart section
         if self.config.memory.chart {
-            elements.push(button_from_sensor!(self, self.memory).into());
+            elements.push_back(self.memory.chart().height(size.0).width(size.1).into());
         }
 
         elements
     }
 
-    fn network_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
+    fn network_panel_ui(&self, horizontal: bool) -> VecDeque<Element<crate::app::Message>> {
+        let size = self.core.applet.suggested_size(false);
+
         let nw_combined = self.config.network1.variant == NetworkVariant::Combined;
         let sample_rate_ms = self.config.refresh_rate;
-        let mut elements: Vec<Element<Message>> = Vec::new();
+        let mut elements: VecDeque<Element<Message>> = VecDeque::new();
 
         let format_label = |text: String| self.figure_label(text);
 
@@ -1526,11 +1538,11 @@ impl Minimon {
                 network_labels.push(widget::vertical_space().into());
             }
 
-            elements.push(Column::from_vec(network_labels).into());
+            elements.push_back(Column::from_vec(network_labels).into());
         }
 
         if self.config.network1.chart {
-            elements.push(button_from_sensor!(self, self.network1).into());
+            elements.push_back(self.network1.chart().height(size.0).width(size.1).into());
         }
 
         if self.config.network2.label && !nw_combined {
@@ -1548,25 +1560,26 @@ impl Minimon {
             };
             network_labels.push(format_label(ul_text).into());
 
-            elements.push(Column::from_vec(network_labels).into());
+            elements.push_back(Column::from_vec(network_labels).into());
         }
 
         if self.config.network2.chart && !nw_combined {
-            elements.push(button_from_sensor!(self, self.network2).into());
+            elements.push_back(self.network2.chart().height(size.0).width(size.1).into());
         }
 
         if self.config.symbols && !elements.is_empty() {
-            let btn = self.core.applet.icon_button(NETWORK_ICON);
-            elements.insert(0, btn.into());
+            self.push_symbolic_icon(&mut elements, NETWORK_ICON, true);
         }
 
         elements
     }
 
-    fn disks_panel_ui(&self, horizontal: bool) -> Vec<Element<crate::app::Message>> {
+    fn disks_panel_ui(&self, horizontal: bool) -> VecDeque<Element<crate::app::Message>> {
+        let size = self.core.applet.suggested_size(false);
+
         let disks_combined = self.config.disks1.variant == DisksVariant::Combined;
         let sample_rate_ms = self.config.refresh_rate;
-        let mut elements: Vec<Element<Message>> = Vec::new();
+        let mut elements: VecDeque<Element<Message>> = VecDeque::new();
 
         let format_label = |text: String| self.figure_label(text);
 
@@ -1605,11 +1618,11 @@ impl Minimon {
                 disks_labels.push(widget::vertical_space().into());
             }
 
-            elements.push(Column::from_vec(disks_labels).into());
+            elements.push_back(Column::from_vec(disks_labels).into());
         }
 
         if self.config.disks1.chart {
-            elements.push(button_from_sensor!(self, self.disks1).into());
+            elements.push_back(self.disks1.chart().height(size.0).width(size.1).into());
         }
 
         if self.config.disks2.label && !disks_combined {
@@ -1627,23 +1640,28 @@ impl Minimon {
             };
             disks_labels.push(format_label(read_text).into());
 
-            elements.push(Column::from_vec(disks_labels).into());
+            elements.push_back(Column::from_vec(disks_labels).into());
         }
 
         if self.config.disks2.chart && !disks_combined {
-            elements.push(button_from_sensor!(self, self.disks2).into());
+            elements.push_back(self.disks2.chart().height(size.0).width(size.1).into());
         }
 
         if self.config.symbols && !elements.is_empty() {
-            let btn = self.core.applet.icon_button(DISK_ICON);
-            elements.insert(0, btn.into());
+            self.push_symbolic_icon(&mut elements, DISK_ICON, true);
         }
 
         elements
     }
 
-    fn gpu_panel_ui(&self, gpu: &Gpu, horizontal: bool) -> Vec<Element<crate::app::Message>> {
-        let mut elements: Vec<Element<Message>> = Vec::new();
+    fn gpu_panel_ui<'a>(
+        &'a self,
+        gpu: &'a Gpu,
+        horizontal: bool,
+    ) -> VecDeque<Element<'a, crate::app::Message>> {
+        let size = self.core.applet.suggested_size(false);
+
+        let mut elements: VecDeque<Element<Message>> = VecDeque::new();
 
         if let Some(config) = self.config.gpus.get(&gpu.id()) {
             let formatted_gpu = gpu.gpu.to_string();
@@ -1657,34 +1675,33 @@ impl Minimon {
                     self.figure_label(formatted_vram.clone()).into(),
                     widget::vertical_space().into(),
                 ];
-                elements.push(Column::from_vec(gpu_labels).into());
+                elements.push_back(Column::from_vec(gpu_labels).into());
             } else if config.usage.label {
-                elements.push(self.figure_label(formatted_gpu).into());
+                elements.push_back(self.figure_label(formatted_gpu).into());
             }
 
             if config.usage.chart {
-                elements.push(button_from_sensor!(self, gpu.gpu).into());
+                elements.push_back(gpu.gpu.chart().height(size.0).width(size.1).into());
             }
 
             if config.vram.label && !stacked_labels {
-                elements.push(self.figure_label(formatted_vram).into());
+                elements.push_back(self.figure_label(formatted_vram).into());
             }
 
             if config.vram.chart {
-                elements.push(button_from_sensor!(self, gpu.vram).into());
+                elements.push_back(gpu.vram.chart().height(size.0).width(size.1).into());
             }
 
             if config.temp.label {
-                elements.push(self.figure_label(gpu.temp.to_string()).into());
+                elements.push_back(self.figure_label(gpu.temp.to_string()).into());
             }
             if config.temp.chart {
-                elements.push(button_from_sensor!(self, gpu.temp).into());
+                elements.push_back(gpu.temp.chart().height(size.0).width(size.1).into());
             }
         }
 
         if self.config.symbols && !elements.is_empty() {
-            let btn = self.core.applet.icon_button(GPU_ICON);
-            elements.insert(0, btn.into());
+            self.push_symbolic_icon(&mut elements, GPU_ICON, true);
         }
 
         elements

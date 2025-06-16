@@ -7,6 +7,7 @@ license = "GPL-3.0"
 [features]
 default = []
 caffeine = []
+lyon_charts = []
 
 [profile.release]
 lto = "thin"

@@ -3,14 +3,16 @@
 use app::Minimon;
 
 mod app;
-mod charts;
 mod colorpicker;
 mod config;
 mod i18n;
 mod sensors;
+mod svg_graph;
+
+#[cfg(feature = "lyon_charts")]
+mod charts;
 #[cfg(feature = "caffeine")]
 mod sleepinhibitor;
-mod svg_graph;
 
 use chrono::Local;
 use log::info;
@@ -81,8 +83,10 @@ fn main() -> cosmic::iced::Result {
     setup_logger().expect("Failed to initialize logger");
 
     #[cfg(not(debug_assertions))]
-	println!("In Release builds use 'journalctl SYSLOG_IDENTIFIER=cosmic-applet-minimon' to see logs");
-	
+    println!(
+        "In Release builds use 'journalctl SYSLOG_IDENTIFIER=cosmic-applet-minimon' to see logs"
+    );
+
     info!("Application started");
 
     let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();

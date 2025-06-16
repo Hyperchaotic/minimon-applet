@@ -7,6 +7,13 @@ use crate::{
     fl,
 };
 
+#[cfg(feature = "lyon_charts")]
+macro_rules! chart_container {
+    ($chart:expr) => {
+        Container::new(cosmic::widget::Canvas::new($chart))
+    };
+}
+
 pub static COLOR_CHOICES_RING: LazyLock<[(&'static str, ColorVariant); 4]> = LazyLock::new(|| {
     [
         (fl!("graph-ring-r1").leak(), ColorVariant::Color4),
@@ -54,7 +61,7 @@ pub trait Sensor: Default {
     fn set_graph_kind(&mut self, kind: GraphKind);
     fn update(&mut self);
     fn demo_graph(&self) -> Box<dyn DemoGraph>;
-    fn graph(&self) -> String;
+    fn chart(&self) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer>;
     fn settings_ui(&self) -> Element<crate::app::Message>;
 }
 

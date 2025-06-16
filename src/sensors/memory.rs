@@ -1,4 +1,4 @@
-use cosmic::Element;
+use cosmic::{Element, widget::Container};
 use sysinfo::{MemoryRefreshKind, System};
 
 use crate::{
@@ -46,8 +46,8 @@ impl DemoGraph for Memory {
         match self.config.kind {
             GraphKind::Ring => {
                 // show a number of 40% of max
-                let val = self.max_val * 0.4;
-                let percentage: u64 = ((val / self.max_val) * 100.0) as u64;
+                let val = 40;
+                let percentage = 40.0;
                 crate::svg_graph::ring(
                     &format!("{val}"),
                     &format!("{percentage}"),
@@ -120,8 +120,53 @@ impl Sensor for Memory {
         Box::new(dmo)
     }
 
-    fn graph(&self) -> String {
+    #[cfg(feature = "lyon_charts")]
+    fn chart<'a>(
+        &self,
+    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         if self.config.kind == GraphKind::Ring {
+            let mut latest = self.latest_sample();
+            let mut text = String::with_capacity(10);
+
+            let mut pct: u64 = ((latest / self.max_val) * 100.0) as u64;
+            if pct > 100 {
+                pct = 100;
+            }
+
+            // If set, convert to percentage
+            if self.config.percentage {
+                latest = (latest * 100.0) / self.max_val;
+            }
+
+            if latest < 10.0 {
+                write!(text, "{latest:.2}").unwrap();
+            } else if latest <= 99.9 {
+                write!(text, "{latest:.1}").unwrap();
+            } else {
+                write!(text, "100").unwrap();
+            }
+
+            chart_container!(crate::charts::ring::RingChart::new(
+                latest as f32,
+                &text,
+                &self.config.colors,
+            ))
+        } else {
+            chart_container!(crate::charts::line::LineChart::new(
+                MAX_SAMPLES,
+                &self.samples,
+                &VecDeque::new(),
+                Some(100.0),
+                &self.config.colors,
+            ))
+        }
+    }
+
+    #[cfg(not(feature = "lyon_charts"))]
+    fn chart(
+        &self,
+    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
+        let svg = if self.config.kind == GraphKind::Ring {
             let mut latest = self.latest_sample();
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
@@ -149,7 +194,14 @@ impl Sensor for Memory {
             crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
         } else {
             crate::svg_graph::line(&self.samples, self.max_val, &self.svg_colors)
-        }
+        };
+
+        let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+        widget::Container::new(
+            icon.icon()
+                .height(cosmic::iced::Length::Fill)
+                .width(cosmic::iced::Length::Fill),
+        )
     }
 
     fn settings_ui(&self) -> Element<crate::app::Message> {
@@ -160,12 +212,12 @@ impl Sensor for Memory {
         let mem = self.to_string(false);
         mem_elements.push(Element::from(
             column!(
-                widget::svg(widget::svg::Handle::from_memory(
-                    self.graph().as_bytes().to_owned(),
-                ))
-                .width(90)
-                .height(60),
-                cosmic::widget::text::body(mem),
+                Container::new(self.chart().width(60).height(60))
+                    .width(90)
+                    .align_x(Alignment::Center),
+                cosmic::widget::text::body(mem.to_string())
+                    .width(90)
+                    .align_x(Alignment::Center)
             )
             .padding(5)
             .align_x(Alignment::Center),

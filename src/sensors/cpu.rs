@@ -4,7 +4,7 @@ use crate::{
     fl,
     svg_graph::SvgColors,
 };
-use cosmic::Element;
+use cosmic::{Element, Renderer, Theme, widget::Container};
 use std::any::Any;
 
 use cosmic::widget;
@@ -150,8 +150,40 @@ impl Sensor for Cpu {
         Box::new(dmo)
     }
 
-    fn graph(&self) -> String {
+    #[cfg(feature = "lyon_charts")]
+    fn chart<'a>(&self) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
         if self.config.kind == GraphKind::Ring {
+            let latest = self.latest_sample();
+            let mut value = String::with_capacity(10);
+
+            if self.config.no_decimals {
+                write!(value, "{}%", latest.round()).unwrap();
+            } else if latest < 10.0 {
+                write!(value, "{latest:.2}").unwrap()
+            } else if latest <= 99.9 {
+                write!(value, "{latest:.1}").unwrap();
+            } else {
+                write!(value, "100").unwrap();
+            }
+            chart_container!(crate::charts::ring::RingChart::new(
+                latest as f32,
+                &value,
+                &self.config.colors,
+            ))
+        } else {
+            chart_container!(crate::charts::line::LineChart::new(
+                MAX_SAMPLES,
+                &self.samples_sum,
+                &VecDeque::new(),
+                Some(100.0),
+                &self.config.colors,
+            ))
+        }
+    }
+
+    #[cfg(not(feature = "lyon_charts"))]
+    fn chart(&self) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
+        let svg = if self.config.kind == GraphKind::Ring {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
@@ -171,7 +203,13 @@ impl Sensor for Cpu {
             crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
         } else {
             crate::svg_graph::line(&self.samples_sum, 100.0, &self.svg_colors)
-        }
+        };
+        let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
+        Container::new(
+            icon.icon()
+                .height(cosmic::iced::Length::Fill)
+                .width(cosmic::iced::Length::Fill),
+        )
     }
 
     fn settings_ui(&self) -> Element<crate::app::Message> {
@@ -183,12 +221,12 @@ impl Sensor for Cpu {
         let cpu = self.to_string();
         cpu_elements.push(Element::from(
             column!(
-                widget::svg(widget::svg::Handle::from_memory(
-                    self.graph().as_bytes().to_owned(),
-                ))
-                .width(90)
-                .height(60),
-                cosmic::widget::text::body(cpu),
+                Container::new(self.chart().width(60).height(60))
+                    .width(90)
+                    .align_x(Alignment::Center),
+                cosmic::widget::text::body(cpu.to_string())
+                    .width(90)
+                    .align_x(Alignment::Center)
             )
             .padding(5)
             .align_x(Alignment::Center),
