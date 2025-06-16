@@ -1,11 +1,11 @@
 [Desktop Entry]
-Name=io.github.cosmicUtils.cosmicAppletMinimon
+Name=Minimon
 Exec=cosmic-applet-minimon
 Terminal=false
 Type=Application
 StartupNotify=true
 NoDisplay=true
-Icon=io.github.cosmicUtils.cosmicAppletMinimon-symbolic
+Icon=io.github.cosmicUtils.cosmicAppletMinimon
 Categories=COSMIC
 Keywords=Monitor;System;CPU;GPU;Memory;Network;Disk;
 X-CosmicApplet=true

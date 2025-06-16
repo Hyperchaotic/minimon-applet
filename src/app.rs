@@ -51,6 +51,7 @@ use cosmic::widget::Id as WId;
 static AUTOSIZE_MAIN_ID: LazyLock<WId> = std::sync::LazyLock::new(|| WId::new("autosize-main"));
 
 const ICON: &str = "io.github.cosmicUtils.cosmicAppletMinimon";
+const CPU_ICON: &str = "io.github.cosmicUtils.cosmicAppletMinimon-cpu";
 const TEMP_ICON: &str = "io.github.cosmicUtils.cosmicAppletMinimon-temperature";
 const RAM_ICON: &str = "io.github.cosmicUtils.cosmicAppletMinimon-ram";
 const GPU_ICON: &str = "io.github.cosmicUtils.cosmicAppletMinimon-gpu";
@@ -1405,7 +1406,7 @@ impl Minimon {
 
         // Handle the symbols button if needed
         if self.config.symbols && (self.config.cpu.label || self.config.cpu.chart) {
-            let btn = self.core.applet.icon_button(ICON);
+            let btn = self.core.applet.icon_button(CPU_ICON);
             elements.push(btn.into());
         }
 
