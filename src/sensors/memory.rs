@@ -156,7 +156,7 @@ impl Sensor for Memory {
                 MAX_SAMPLES,
                 &self.samples,
                 &VecDeque::new(),
-                Some(100.0),
+                Some(self.max_val),
                 &self.config.colors,
             ))
         }
