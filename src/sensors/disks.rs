@@ -173,30 +173,41 @@ impl Sensor for Disks {
     fn chart(
         &self,
     ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
+        //A bit awkward, but to maintain compatibility with the SVG charts
+        let mut colors = self.config.colors;
         match self.config.variant {
-            DisksVariant::Combined => chart_container!(crate::charts::line::LineChart::new(
-                GRAPH_SAMPLES,
-                &self.write,
-                &self.read,
-                self.max_y,
-                &self.config.colors,
-            )),
-            DisksVariant::Write => chart_container!(crate::charts::line::LineChart::new(
-                GRAPH_SAMPLES,
-                &self.write,
-                &VecDeque::new(),
-                self.max_y,
-                &self.config.colors,
-            )),
+            DisksVariant::Combined => {
+                colors.color4 = self.config.colors.color2;
+                colors.color2 = self.config.colors.color4;
+                chart_container!(crate::charts::line::LineChart::new(
+                    GRAPH_SAMPLES,
+                    &self.write,
+                    &self.read,
+                    self.max_y,
+                    &colors,
+                ))
+            }
+            DisksVariant::Write => {
+                colors.color4 = self.config.colors.color2;
+                colors.color2 = self.config.colors.color4;
+                chart_container!(crate::charts::line::LineChart::new(
+                    GRAPH_SAMPLES,
+                    &self.write,
+                    &VecDeque::new(),
+                    self.max_y,
+                    &colors,
+                ))
+            }
             DisksVariant::Read => {
-                let mut cols = self.config.colors.clone();
-                cols.color2 = cols.color3.clone();
+                //A bit awkward, but to maintain compatibility with the SVG charts
+                colors.color4 = self.config.colors.color3;
+                colors.color2 = self.config.colors.color4;
                 chart_container!(crate::charts::line::LineChart::new(
                     GRAPH_SAMPLES,
                     &self.read,
                     &VecDeque::new(),
                     self.max_y,
-                    &cols,
+                    &colors,
                 ))
             }
         }

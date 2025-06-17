@@ -180,30 +180,42 @@ impl Sensor for Network {
     fn chart(
         &self,
     ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
+        let mut colors = self.config.colors;
         match self.config.variant {
-            NetworkVariant::Combined => chart_container!(crate::charts::line::LineChart::new(
-                GRAPH_SAMPLES,
-                &self.download,
-                &self.upload,
-                self.max_y,
-                &self.config.colors,
-            )),
-            NetworkVariant::Download => chart_container!(crate::charts::line::LineChart::new(
-                GRAPH_SAMPLES,
-                &self.download,
-                &VecDeque::new(),
-                self.max_y,
-                &self.config.colors,
-            )),
+            NetworkVariant::Combined => {
+                //A bit awkward, but to maintain compatibility with the SVG charts
+                colors.color4 = self.config.colors.color2;
+                colors.color2 = self.config.colors.color4;
+                chart_container!(crate::charts::line::LineChart::new(
+                    GRAPH_SAMPLES,
+                    &self.download,
+                    &self.upload,
+                    self.max_y,
+                    &colors,
+                ))
+            }
+            NetworkVariant::Download => {
+                //A bit awkward, but to maintain compatibility with the SVG charts
+                colors.color4 = self.config.colors.color2;
+                colors.color2 = self.config.colors.color4;
+                chart_container!(crate::charts::line::LineChart::new(
+                    GRAPH_SAMPLES,
+                    &self.download,
+                    &VecDeque::new(),
+                    self.max_y,
+                    &colors,
+                ))
+            }
             NetworkVariant::Upload => {
-                let mut cols = self.config.colors.clone();
-                cols.color2 = cols.color3.clone();
+                //A bit awkward, but to maintain compatibility with the SVG charts
+                colors.color4 = self.config.colors.color3;
+                colors.color2 = self.config.colors.color4;
                 chart_container!(crate::charts::line::LineChart::new(
                     GRAPH_SAMPLES,
                     &self.upload,
                     &VecDeque::new(),
                     self.max_y,
-                    &cols,
+                    &colors,
                 ))
             }
         }
