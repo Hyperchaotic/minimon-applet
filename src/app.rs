@@ -1683,6 +1683,13 @@ impl Minimon {
             if config.usage.chart {
                 elements.push_back(gpu.gpu.chart().height(size.0).width(size.1).into());
             }
+            if config.temp.label {
+                elements.push_back(self.figure_label(gpu.temp.to_string()).into());
+            }
+            
+            if config.temp.chart {
+                elements.push_back(gpu.temp.chart().height(size.0).width(size.1).into());
+            }
 
             if config.vram.label && !stacked_labels {
                 elements.push_back(self.figure_label(formatted_vram).into());
@@ -1692,12 +1699,6 @@ impl Minimon {
                 elements.push_back(gpu.vram.chart().height(size.0).width(size.1).into());
             }
 
-            if config.temp.label {
-                elements.push_back(self.figure_label(gpu.temp.to_string()).into());
-            }
-            if config.temp.chart {
-                elements.push_back(gpu.temp.chart().height(size.0).width(size.1).into());
-            }
         }
 
         if self.config.symbols && !elements.is_empty() {

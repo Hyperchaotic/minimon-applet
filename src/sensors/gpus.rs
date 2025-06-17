@@ -1062,9 +1062,9 @@ impl Gpu {
         Column::new()
             .push_maybe(battery_disable)
             .push(usage)
+            .push(temp)
             .push(vram)
             .push_maybe(stacked)
-            .push(temp)
             .spacing(cosmic::theme::spacing().space_xs)
             .into()
     }
