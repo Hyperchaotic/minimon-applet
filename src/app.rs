@@ -233,7 +233,7 @@ pub enum Message {
     RefreshRateChanged(f64),
     LabelSizeChanged(u16),
     ToggleMonospaceLabels(bool),
-    ToggleTightSpacing(bool),
+    PanelSpacing(u16),
     SelectCpuTempUnit(TempUnit),
 
     Settings(Option<SettingsVariant>),
@@ -416,10 +416,17 @@ impl cosmic::Application for Minimon {
             elements.extend(self.gpu_panel_ui(gpu, horizontal));
         }
 
-        let spacing = if self.config.tight_spacing {
-            cosmic.space_xxxs()
-        } else {
-            cosmic.space_xs()
+        let spacing = match self.config.panel_spacing {
+            1 => cosmic.space_xxxs(),
+            2 => cosmic.space_xxs(),
+            3 => cosmic.space_xs(),
+            4 => cosmic.space_s(),
+            5 => cosmic.space_m(),
+            6 => cosmic.space_l(),
+            _ => {
+                error!("Invalid spacing selected");
+                cosmic.space_xs()
+            }
         };
 
         // Layout horizontally or vertically
@@ -1061,9 +1068,9 @@ impl cosmic::Application for Minimon {
                 self.save_config();
             }
 
-            Message::ToggleTightSpacing(toggle) => {
-                info!("Message::ToggleTightSpacing({toggle:?})");
-                self.config.tight_spacing = toggle;
+            Message::PanelSpacing(spacing) => {
+                info!("Message::PanelSpacing({spacing})");
+                self.config.panel_spacing = spacing;
                 self.save_config();
             }
 
@@ -1360,8 +1367,13 @@ impl Minimon {
         );
 
         let spacing_row = settings::item(
-            fl!("settings-tight-spacing"),
-            widget::toggler(self.config.tight_spacing).on_toggle(Message::ToggleTightSpacing),
+            fl!("settings-panel-spacing"),
+            widget::row::with_children(vec![
+                text::body(fl!("settings-small")).into(),
+                widget::slider(1..=6, self.config.panel_spacing, Message::PanelSpacing).into(),
+                text::body(fl!("settings-large")).into(),
+            ]).align_y(Alignment::Center)
+                    .spacing(8),
         );
 
         let sysmon_row = settings::item(
@@ -1686,7 +1698,7 @@ impl Minimon {
             if config.temp.label {
                 elements.push_back(self.figure_label(gpu.temp.to_string()).into());
             }
-            
+
             if config.temp.chart {
                 elements.push_back(gpu.temp.chart().height(size.0).width(size.1).into());
             }
@@ -1698,7 +1710,6 @@ impl Minimon {
             if config.vram.chart {
                 elements.push_back(gpu.vram.chart().height(size.0).width(size.1).into());
             }
-
         }
 
         if self.config.symbols && !elements.is_empty() {
