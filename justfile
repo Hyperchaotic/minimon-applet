@@ -57,9 +57,6 @@ clean-dist: clean clean-vendor
 build-debug *args:
     cargo build {{args}}
 
-# Compiles with release profile and caffeine feature
-build-caffeine *args: (build-debug '--release --features caffeine' args)
-
 # Compiles with release profile
 build-release *args: (build-debug '--release' args)
 

@@ -11,8 +11,6 @@ mod svg_graph;
 
 #[cfg(feature = "lyon_charts")]
 mod charts;
-#[cfg(feature = "caffeine")]
-mod sleepinhibitor;
 
 use chrono::Local;
 use log::info;
