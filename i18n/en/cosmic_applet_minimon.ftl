@@ -75,4 +75,4 @@ inhibit-sleep = Inhibit screen/system sleep:
 minutes-left = min left
 settings-small = Small
 settings-large = Large
-content-order = content order
+content-order = Content order
