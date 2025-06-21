@@ -1307,28 +1307,30 @@ impl Minimon {
                 };
 
                 let item_row = row!(
-                    button::icon(
-                        widget::icon::from_name("pan-up-symbolic")
-                            .symbolic(true)
-                            .size(5)
-                    )
-                    .on_press(Message::ChangeContentOrder(
-                        ContentOrderChange {
-                            current_index: index,
-                            new_index: index - 1
-                        }
-                    )),
-                    button::icon(
-                        widget::icon::from_name("pan-down-symbolic")
-                            .symbolic(true)
-                            .size(5)
-                    )
-                    .on_press(Message::ChangeContentOrder(
-                        ContentOrderChange {
-                            current_index: index,
-                            new_index: index + 1
-                        }
-                    )),
+                    row!(
+                        button::icon(
+                            widget::icon::from_name("pan-up-symbolic")
+                                .symbolic(true)
+                                .size(5)
+                        )
+                        .on_press(Message::ChangeContentOrder(
+                            ContentOrderChange {
+                                current_index: index,
+                                new_index: index - 1
+                            }
+                        )),
+                        button::icon(
+                            widget::icon::from_name("pan-down-symbolic")
+                                .symbolic(true)
+                                .size(5)
+                        )
+                        .on_press(Message::ChangeContentOrder(
+                            ContentOrderChange {
+                                current_index: index,
+                                new_index: index + 1
+                            }
+                        )),
+                    ),
                     item
                 )
                 .spacing(cosmic::theme::spacing().space_xxs)
