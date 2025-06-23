@@ -41,8 +41,8 @@
     <internet>always</internet>
   </recommends>
   <releases>
-    <release version="0.5.2" date="2025-06-15">
-    <url type="details">https://github.com/cosmic-utils/minimon-applet/releases/tag/v0.5.2</url>
+    <release version="0.6.0" date="2025-06-23">
+    <url type="details">https://github.com/cosmic-utils/minimon-applet/releases/tag/v0.6.0</url>
       <description>
         <p>Official Flatpak release!</p>
       </description>
