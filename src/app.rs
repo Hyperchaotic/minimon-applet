@@ -1117,6 +1117,10 @@ impl cosmic::Application for Minimon {
                 }
             }
             Message::ChangeContentOrder(order_change) => {
+                if order_change.new_index == order_change.current_index || order_change.new_index >= self.config.content_order.order.len() {
+                    return Task::none()
+                }
+                
                 self.config
                     .content_order
                     .order
@@ -1316,7 +1320,7 @@ impl Minimon {
                         .on_press(Message::ChangeContentOrder(
                             ContentOrderChange {
                                 current_index: index,
-                                new_index: index - 1
+                                new_index: index.saturating_sub(1)
                             }
                         )),
                         button::icon(
@@ -1327,7 +1331,7 @@ impl Minimon {
                         .on_press(Message::ChangeContentOrder(
                             ContentOrderChange {
                                 current_index: index,
-                                new_index: index + 1
+                                new_index: index.saturating_add(1)
                             }
                         )),
                     ),
