@@ -1244,7 +1244,7 @@ impl Minimon {
                 refresh_rate,
                 0.250,
                 0.250,
-                2.00,
+                15.00,
                 Message::RefreshRateChanged,
             ),
         );
@@ -1314,7 +1314,6 @@ impl Minimon {
                     row!(
                         button::icon(
                             widget::icon::from_name("pan-up-symbolic")
-                                .symbolic(true)
                                 .size(5)
                         )
                         .on_press(Message::ChangeContentOrder(
@@ -1325,7 +1324,6 @@ impl Minimon {
                         )),
                         button::icon(
                             widget::icon::from_name("pan-down-symbolic")
-                                .symbolic(true)
                                 .size(5)
                         )
                         .on_press(Message::ChangeContentOrder(
