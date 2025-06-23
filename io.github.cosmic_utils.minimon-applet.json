@@ -30,7 +30,13 @@
         "install -Dm0755 ./target/release/cosmic-applet-minimon /app/bin/cosmic-applet-minimon",
         "install -Dm0644 ./res/io.github.cosmic_utils.minimon-applet.desktop /app/share/applications/io.github.cosmic_utils.minimon-applet.desktop",
         "install -Dm0644 ./res/io.github.cosmic_utils.minimon-applet.metainfo.xml /app/share/metainfo/io.github.cosmic_utils.minimon-applet.metainfo.xml",
-        "install -Dm0644 ./res/icons/apps/io.github.cosmic_utils.minimon-applet.svg /app/share/icons/hicolor/scalable/apps/io.github.cosmic_utils.minimon-applet.svg"
+        "install -Dm0644 ./res/icons/apps/io.github.cosmic_utils.minimon-applet.svg /app/share/icons/hicolor/scalable/apps/io.github.cosmic_utils.minimon-applet.svg",
+        "install -Dm0644 ./res/icons/apps/io.github.cosmic_utils.minimon-applet-cpu.svg /app/share/icons/hicolor/scalable/apps/io.github.cosmic_utils.minimon-applet-cpu.svg",
+        "install -Dm0644 ./res/icons/apps/io.github.cosmic_utils.minimon-applet-gpu.svg /app/share/icons/hicolor/scalable/apps/io.github.cosmic_utils.minimon-applet-gpu.svg",
+        "install -Dm0644 ./res/icons/apps/io.github.cosmic_utils.minimon-applet-harddisk.svg /app/share/icons/hicolor/scalable/apps/io.github.cosmic_utils.minimon-applet-harddisk.svg",
+        "install -Dm0644 ./res/icons/apps/io.github.cosmic_utils.minimon-applet-network.svg /app/share/icons/hicolor/scalable/apps/io.github.cosmic_utils.minimon-applet-network.svg",
+        "install -Dm0644 ./res/icons/apps/io.github.cosmic_utils.minimon-applet-ram.svg /app/share/icons/hicolor/scalable/apps/io.github.cosmic_utils.minimon-applet-ram.svg",
+        "install -Dm0644 ./res/icons/apps/io.github.cosmic_utils.minimon-applet-temperature.svg /app/share/icons/hicolor/scalable/apps/io.github.cosmic_utils.minimon-applet-temperature.svg"
       ],
       "sources": [
         {
