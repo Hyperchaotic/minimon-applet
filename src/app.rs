@@ -1278,7 +1278,7 @@ impl Minimon {
             fl!("settings-panel-spacing"),
             widget::row::with_children(vec![
                 text::body(fl!("settings-small")).into(),
-                widget::slider(1..=6, self.config.panel_spacing, Message::PanelSpacing).into(),
+                widget::slider(1..=6, self.config.panel_spacing, Message::PanelSpacing).width(100).into(),
                 text::body(fl!("settings-large")).into(),
             ])
             .align_y(Alignment::Center)
