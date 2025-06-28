@@ -382,6 +382,10 @@ impl cosmic::Application for Minimon {
                     elements.extend(self.cpu_panel_ui(horizontal));
                 }
                 ContentType::CpuTemp => {
+                    if !self.cputemp.is_found() {
+                        continue;
+                    }
+
                     elements.extend(self.cpu_temp_panel_ui(horizontal));
                 }
                 ContentType::MemoryUsage => {
@@ -394,6 +398,10 @@ impl cosmic::Application for Minimon {
                     elements.extend(self.disks_panel_ui(horizontal));
                 }
                 ContentType::GpuInfo => {
+                    if self.gpus.is_empty() {
+                        continue;
+                    }
+
                     for gpu in self.gpus.values() {
                         elements.extend(self.gpu_panel_ui(gpu, horizontal));
                     }
@@ -1117,10 +1125,12 @@ impl cosmic::Application for Minimon {
                 }
             }
             Message::ChangeContentOrder(order_change) => {
-                if order_change.new_index == order_change.current_index || order_change.new_index >= self.config.content_order.order.len() {
-                    return Task::none()
+                if order_change.new_index == order_change.current_index
+                    || order_change.new_index >= self.config.content_order.order.len()
+                {
+                    return Task::none();
                 }
-                
+
                 self.config
                     .content_order
                     .order
@@ -1278,7 +1288,9 @@ impl Minimon {
             fl!("settings-panel-spacing"),
             widget::row::with_children(vec![
                 text::body(fl!("settings-small")).into(),
-                widget::slider(1..=6, self.config.panel_spacing, Message::PanelSpacing).width(100).into(),
+                widget::slider(1..=6, self.config.panel_spacing, Message::PanelSpacing)
+                    .width(100)
+                    .into(),
                 text::body(fl!("settings-large")).into(),
             ])
             .align_y(Alignment::Center)
@@ -1312,26 +1324,17 @@ impl Minimon {
 
                 let item_row = row!(
                     row!(
-                        button::icon(
-                            widget::icon::from_name("pan-up-symbolic")
-                                .size(5)
-                        )
-                        .on_press(Message::ChangeContentOrder(
-                            ContentOrderChange {
+                        button::icon(widget::icon::from_name("pan-up-symbolic").size(5)).on_press(
+                            Message::ChangeContentOrder(ContentOrderChange {
                                 current_index: index,
                                 new_index: index.saturating_sub(1)
-                            }
-                        )),
-                        button::icon(
-                            widget::icon::from_name("pan-down-symbolic")
-                                .size(5)
-                        )
-                        .on_press(Message::ChangeContentOrder(
-                            ContentOrderChange {
+                            })
+                        ),
+                        button::icon(widget::icon::from_name("pan-down-symbolic").size(5))
+                            .on_press(Message::ChangeContentOrder(ContentOrderChange {
                                 current_index: index,
                                 new_index: index.saturating_add(1)
-                            }
-                        )),
+                            })),
                     ),
                     item
                 )
