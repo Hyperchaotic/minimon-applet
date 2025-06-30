@@ -382,10 +382,6 @@ impl cosmic::Application for Minimon {
                     elements.extend(self.cpu_panel_ui(horizontal));
                 }
                 ContentType::CpuTemp => {
-                    if !self.cputemp.is_found() {
-                        continue;
-                    }
-
                     elements.extend(self.cpu_temp_panel_ui(horizontal));
                 }
                 ContentType::MemoryUsage => {
@@ -398,10 +394,6 @@ impl cosmic::Application for Minimon {
                     elements.extend(self.disks_panel_ui(horizontal));
                 }
                 ContentType::GpuInfo => {
-                    if self.gpus.is_empty() {
-                        continue;
-                    }
-
                     for gpu in self.gpus.values() {
                         elements.extend(self.gpu_panel_ui(gpu, horizontal));
                     }
@@ -1315,11 +1307,21 @@ impl Minimon {
             for (index, content) in self.config.content_order.order.iter().enumerate() {
                 let item = match content {
                     ContentType::CpuUsage => text(fl!("settings-cpu")),
-                    ContentType::CpuTemp => text(fl!("settings-cpu-temperature")),
+                    ContentType::CpuTemp => {
+                        if !self.cputemp.is_found() {
+                            continue;
+                        }
+                        text(fl!("settings-cpu-temperature"))
+                    }
                     ContentType::MemoryUsage => text(fl!("settings-memory")),
                     ContentType::NetworkUsage => text(fl!("settings-network")),
                     ContentType::DiskUsage => text(fl!("settings-disks")),
-                    ContentType::GpuInfo => text(fl!("settings-gpu")),
+                    ContentType::GpuInfo => {
+                        if self.gpus.is_empty() {
+                            continue;
+                        }
+                        text(fl!("settings-gpu"))
+                    }
                 };
 
                 let item_row = row!(
