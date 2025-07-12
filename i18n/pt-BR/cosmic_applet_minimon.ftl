@@ -80,3 +80,4 @@ settings-gpu-stack-labels = Se as legendas de GPU e VRAM estiverem habilitadas, 
 settings-tight-spacing = Espaçamento compacto
 cpu-temp-amd = Para processadores AMD, mostrar 'Tdie' (true die temperature) se encontrado, caso contrário, mostrar 'Tctl' (uma temperatura com um deslocamento definido pela AMD).
 cpu-temp-intel = Para processadores Intel, mostrar a temperatura mais alta encontrada em todos os sensores/núcleos.
+content-order = Ordem do conteúdo
