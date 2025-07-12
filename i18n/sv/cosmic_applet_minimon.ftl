@@ -80,3 +80,4 @@ enable-symbols = Visa symboler
 enable-disks-chart = Visa disk diagram
 enable-disks-label = Visa disk etikett
 enable-disks-combined = Kombinera disk skrivning och läs
+content-order = Innehållsordning
