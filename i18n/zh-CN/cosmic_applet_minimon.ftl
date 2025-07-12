@@ -75,3 +75,4 @@ inhibit-sleep = 阻止屏幕/系统休眠：
 minutes-left = 剩余分钟数
 settings-small = 小
 settings-large = 大
+content-order = 内容顺序
