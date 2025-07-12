@@ -80,3 +80,4 @@ settings-gpu-stack-labels = GPU- en VRAM-labels verticaal weergeven, indien van 
 settings-tight-spacing = Compacte weergave
 cpu-temp-amd = Indien beschikbaar geeft dit de 'Tdie' (echte die-temperatuur) weer voor AMD-processoren, en anders de 'Tctl' (de temperatuur met een offset ingesteld door AMD).
 cpu-temp-intel = Toont voor Intel-processoren de hoogste temperatuur gemeten bij alle sensoren/cores.
+content-order = Inhoudsvolgorde
