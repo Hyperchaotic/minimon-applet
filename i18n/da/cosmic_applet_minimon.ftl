@@ -58,3 +58,4 @@ settings-cpu = CPU
 settings-memory = Hukommelse
 settings-network = Netværk
 settings-disks = Disk
+content-order = Indholdsrækkefølge
