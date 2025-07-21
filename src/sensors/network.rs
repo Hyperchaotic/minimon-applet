@@ -29,6 +29,9 @@ const MAX_SAMPLES: usize = 30;
 const GRAPH_SAMPLES: usize = 21;
 const UNITS_SHORT: [&str; 5] = ["b", "K", "M", "G", "T"];
 const UNITS_LONG: [&str; 5] = ["bps", "Kbps", "Mbps", "Gbps", "Tbps"];
+const UNITS_SHORT_BYTES: [&str; 5] = ["B", "K", "M", "G", "T"];
+const UNITS_LONG_BYTES: [&str; 5] = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s"];
+
 use std::sync::LazyLock;
 
 pub static COLOR_CHOICES_COMBINED: LazyLock<[(&'static str, ColorVariant); 4]> =
@@ -127,6 +130,12 @@ impl Sensor for Network {
             self.config = cfg.clone();
             self.svg_colors.set_colors(&cfg.colors);
             self.refresh_rate = refresh_rate;
+
+            if self.config.show_bytes {
+                self.dropdown_options = ["b", "Kb", "Mb", "Gb", "Tb"].into();
+            } else {
+                self.dropdown_options = ["B", "KB", "MB", "GB", "TB"].into();
+            };
 
             if cfg.adaptive {
                 self.max_y = None;
@@ -373,11 +382,15 @@ impl Sensor for Network {
 
         net_elements.push(Element::from(net_right_column.spacing(cosmic.space_xs())));
 
-        let title_content = match self.config.variant {
-            NetworkVariant::Combined => fl!("net-title-combined"),
-            NetworkVariant::Download => fl!("net-title-dl"),
-            NetworkVariant::Upload => fl!("net-title-ul"),
+        let title_content = match (config.show_bytes, self.config.variant) {
+            (true, NetworkVariant::Combined) => fl!("net-title-combined-bytes"),
+            (true, NetworkVariant::Download) => fl!("net-title-dl-bytes"),
+            (true, NetworkVariant::Upload) => fl!("net-title-ul-bytes"),
+            (false, NetworkVariant::Combined) => fl!("net-title-combined"),
+            (false, NetworkVariant::Download) => fl!("net-title-dl"),
+            (false, NetworkVariant::Upload) => fl!("net-title-ul"),
         };
+
         let title = widget::text::heading(title_content);
 
         column![
@@ -406,18 +419,25 @@ impl Default for Network {
 }
 
 impl Network {
-    fn makestr(val: u64, format: UnitVariant) -> String {
+    fn makestr(val: u64, format: UnitVariant, show_bytes: bool) -> String {
         let mut value = val as f64;
+
+        if show_bytes {
+            value = value / 8.0;
+        }
+
         let mut unit_index = 0;
 
-        let units = match format {
-            UnitVariant::Short => UNITS_SHORT,
-            UnitVariant::Long => UNITS_LONG,
+        let units = match (show_bytes, format) {
+            (false, UnitVariant::Short) => UNITS_SHORT,
+            (false, UnitVariant::Long) => UNITS_LONG,
+            (true, UnitVariant::Short) => UNITS_SHORT_BYTES,
+            (true, UnitVariant::Long) => UNITS_LONG_BYTES,
         };
 
         // Scale the value to the appropriate unit
         while value >= 999.0 && unit_index < units.len() - 1 {
-            value /= 1024.0;
+            value /= 1000.0;
             unit_index += 1;
         }
 
@@ -485,13 +505,13 @@ impl Network {
     // Get bits per second
     pub fn download_label(&self, sample_interval_ms: u32, format: UnitVariant) -> String {
         let rate = Network::last_second_bitrate(&self.download, sample_interval_ms);
-        Network::makestr(rate, format)
+        Network::makestr(rate, format, self.config.show_bytes)
     }
 
     // Get bits per second
     pub fn upload_label(&self, sample_interval_ms: u32, format: UnitVariant) -> String {
         let rate = Network::last_second_bitrate(&self.upload, sample_interval_ms);
-        Network::makestr(rate, format)
+        Network::makestr(rate, format, self.config.show_bytes)
     }
 }
 

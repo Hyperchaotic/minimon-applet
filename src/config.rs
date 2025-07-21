@@ -250,6 +250,7 @@ pub struct NetworkConfig {
     pub unit: Option<usize>,
     pub colors: GraphColors,
     pub variant: NetworkVariant,
+    pub show_bytes: bool,
 }
 
 impl NetworkConfig {
@@ -268,6 +269,7 @@ impl Default for NetworkConfig {
             unit: Some(0),
             colors: GraphColors::new(DeviceKind::Network(NetworkVariant::Combined)),
             variant: NetworkVariant::Combined,
+            show_bytes: false,
         }
     }
 }

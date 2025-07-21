@@ -200,6 +200,7 @@ pub enum Message {
     ColorTextInputBlueChanged(String),
     ColorTextInputAlphaChanged(String),
 
+    ToggleNetBytes(bool),
     ToggleNetCombined(bool),
     ToggleNetChart(NetworkVariant, bool),
     ToggleNetLabel(NetworkVariant, bool),
@@ -498,6 +499,13 @@ impl cosmic::Application for Minimon {
                             )
                             .on_toggle(Message::ToggleNetCombined),
                         ));
+                        content = content.push(settings::item(
+                            fl!("net-use-bytes"),
+                            widget::toggler(
+                                self.config.network1.show_bytes,
+                            )
+                            .on_toggle(Message::ToggleNetBytes),
+                        ));
                         content = content.push(self.network1.settings_ui());
                         if self.config.network1.variant == NetworkVariant::Download {
                             content = content.push(self.network2.settings_ui());
@@ -787,6 +795,13 @@ impl cosmic::Application for Minimon {
 
             Message::ColorPickerSelectVariant(variant) => {
                 self.colorpicker.set_color_variant(variant);
+            }
+
+            Message::ToggleNetBytes(toggle) => {
+                info!("Message::ToggleNetBytes({toggle})");
+                self.config.network1.show_bytes = toggle;
+                self.config.network2.show_bytes = toggle;
+                self.save_config();
             }
 
             Message::ToggleNetCombined(toggle) => {
