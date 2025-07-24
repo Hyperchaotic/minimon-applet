@@ -423,7 +423,7 @@ impl Network {
         let mut value = val as f64;
 
         if show_bytes {
-            value = value / 8.0;
+            value /= 8.0;
         }
 
         let mut unit_index = 0;

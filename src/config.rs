@@ -465,7 +465,7 @@ pub struct MinimonConfig {
 
     pub gpus: HashMap<String, GpuConfig>,
 
-    pub sysmon: usize,
+    pub sysmon: Option<String>,
 
     pub symbols: bool,
     pub panel_spacing: u16,
@@ -499,7 +499,7 @@ impl Default for MinimonConfig {
                 ..Default::default()
             },
             gpus: HashMap::new(),
-            sysmon: 0,
+            sysmon: None,
             symbols: false,
             panel_spacing: 3, // Slider setting for cosmic.space_xs()
             content_order: ContentOrder::default(),

@@ -43,7 +43,9 @@ use crate::sensors::gpus::{Gpu, list_gpus};
 use crate::sensors::memory::Memory;
 use crate::sensors::network::{self, Network};
 use crate::sensors::{Sensor, TempUnit};
+use crate::system_monitors;
 use crate::{config::MinimonConfig, fl};
+
 use cosmic::widget::Id as WId;
 
 static AUTOSIZE_MAIN_ID: LazyLock<WId> = std::sync::LazyLock::new(|| WId::new("autosize-main"));
@@ -55,6 +57,8 @@ const RAM_ICON: &str = "io.github.cosmic_utils.minimon-applet-ram";
 const GPU_ICON: &str = "io.github.cosmic_utils.minimon-applet-gpu";
 const NETWORK_ICON: &str = "io.github.cosmic_utils.minimon-applet-network";
 const DISK_ICON: &str = "io.github.cosmic_utils.minimon-applet-harddisk";
+
+const DEFAULT_MONITOR: &str = "GNOME System Monitor";
 
 pub static SETTINGS_CPU_CHOICE: LazyLock<&'static str> =
     LazyLock::new(|| fl!("settings-cpu").leak());
@@ -85,11 +89,11 @@ pub static SETTINGS_DISKS_HEADING: LazyLock<&'static str> =
 pub static SETTINGS_GPU_HEADING: LazyLock<&'static str> = LazyLock::new(|| fl!("gpu-title").leak());
 
 // The UI requires static lifetime of dropdown items
-pub static SYSMON_LIST: LazyLock<Vec<(String, String)>> =
-    LazyLock::new(|| Minimon::get_sysmon_list());
+pub static SYSMON_LIST: LazyLock<BTreeMap<String, system_monitors::DesktopApp>> =
+    LazyLock::new(|| system_monitors::get_desktop_applications());
 
 pub static SYSMON_NAMES: LazyLock<Vec<&'static str>> =
-    LazyLock::new(|| SYSMON_LIST.iter().map(|(_, name)| name.as_str()).collect());
+    LazyLock::new(|| SYSMON_LIST.values().map(|app| app.name.as_str()).collect());
 
 macro_rules! network_select {
     ($self:ident, $variant:expr) => {
@@ -226,7 +230,7 @@ pub enum Message {
     ToggleMemoryLabel(bool),
     ToggleMemoryPercentage(bool),
     ConfigChanged(Box<MinimonConfig>),
-    LaunchSystemMonitor(),
+    LaunchSystemMonitor(&'static system_monitors::DesktopApp),
     RefreshRateChanged(f64),
     LabelSizeChanged(u16),
     ToggleMonospaceLabels(bool),
@@ -444,6 +448,21 @@ impl cosmic::Application for Minimon {
 
     // Settings popup, can be list overview, individual page or colorpicker
     fn view_window(&self, _id: Id) -> Element<Self::Message> {
+        // Get configured system monitor, else the DEFAULT one, else first one in the map, else None.
+        fn get_sysmon(name: &Option<String>) -> Option<&'static system_monitors::DesktopApp> {
+            match &name {
+                Some(key) if SYSMON_LIST.contains_key(key.as_str()) => {
+                    SYSMON_LIST.get(key.as_str())
+                }
+                _ => {
+                    if SYSMON_LIST.contains_key(DEFAULT_MONITOR) {
+                        SYSMON_LIST.get(DEFAULT_MONITOR)
+                    } else {
+                        SYSMON_LIST.values().next()
+                    }
+                }
+            }
+        }
         // Colorpicker
         if self.colorpicker.active() {
             let limits = Limits::NONE
@@ -501,10 +520,8 @@ impl cosmic::Application for Minimon {
                         ));
                         content = content.push(settings::item(
                             fl!("net-use-bytes"),
-                            widget::toggler(
-                                self.config.network1.show_bytes,
-                            )
-                            .on_toggle(Message::ToggleNetBytes),
+                            widget::toggler(self.config.network1.show_bytes)
+                                .on_toggle(Message::ToggleNetBytes),
                         ));
                         content = content.push(self.network1.settings_ui());
                         if self.config.network1.variant == NetworkVariant::Download {
@@ -548,19 +565,11 @@ impl cosmic::Application for Minimon {
 
             // List settings overview
             } else {
-                if !SYSMON_LIST.is_empty() {
-                    let list = &*SYSMON_NAMES;
-                    let safe_index = if self.config.sysmon < list.len() {
-                        self.config.sysmon
-                    } else {
-                        0
-                    };
-                    let name = list[safe_index];
-
+                if let Some(sysmon) = get_sysmon(&self.config.sysmon) {
                     content = content.push(Element::from(row!(
                         widget::horizontal_space(),
-                        widget::button::standard(name)
-                            .on_press(Message::LaunchSystemMonitor())
+                        widget::button::standard(sysmon.name.to_owned())
+                            .on_press(Message::LaunchSystemMonitor(sysmon))
                             .trailing_icon(widget::button::link::icon()),
                         widget::horizontal_space()
                     )));
@@ -1010,9 +1019,9 @@ impl cosmic::Application for Minimon {
                 self.colorpicker.update_color(col);
             }
 
-            Message::LaunchSystemMonitor() => {
-                info!("Message::LaunchSystemMonitor()");
-                Minimon::spawn_sysmon_by_index(self.config.sysmon);
+            Message::LaunchSystemMonitor(desktop_app) => {
+                info!("Message::LaunchSystemMonitor() {}", desktop_app.name);
+                system_monitors::launch_desktop_app(desktop_app);
             }
 
             Message::RefreshRateChanged(rate) => {
@@ -1049,9 +1058,10 @@ impl cosmic::Application for Minimon {
                 info!("Message::Settings({setting:?})");
                 self.settings_page = setting;
             }
-            Message::SysmonSelect(sysmon) => {
-                info!("Message::SysmonSelect({sysmon:?})");
-                self.config.sysmon = sysmon;
+            Message::SysmonSelect(idx) => {
+                let name: Option<String> = SYSMON_NAMES.get(idx).map(|s| s.to_string());
+                info!("Message::SysmonSelect({idx})->{name:?}");
+                self.config.sysmon = name;
                 self.save_config();
             }
             Message::GpuToggleChart(id, device, toggled) => {
@@ -1304,12 +1314,18 @@ impl Minimon {
             .spacing(8),
         );
 
+        let idx = self
+            .config
+            .sysmon
+            .as_ref()
+            .and_then(|n| SYSMON_NAMES.iter().position(|&app_name| app_name == n));
+
         let sysmon_row = settings::item(
             fl!("choose-sysmon"),
             row!(
                 widget::dropdown(
                     &*SYSMON_NAMES,
-                    Some(self.config.sysmon),
+                    idx,
                     Message::SysmonSelect
                 )
                 .width(220)
@@ -1424,9 +1440,9 @@ impl Minimon {
                 format!("{}%", cpu_usage.round())
             }
         } else if cpu_usage < 10.0 && horizontal {
-            format!("{:.2}%", cpu_usage)
+            format!("{cpu_usage:.2}%")
         } else {
-            format!("{:.1}%", cpu_usage)
+            format!("{cpu_usage:.1}%")
         };
 
         // Add the CPU label if needed
@@ -1837,61 +1853,6 @@ impl Minimon {
                 }
             }
         }
-    }
-
-    fn spawn_sysmon_by_index(index: usize) {
-        let list = &*SYSMON_LIST;
-        let safe_index = if index < list.len() { index } else { 0 };
-        let (command, _) = &list[safe_index];
-
-        let _ = std::process::Command::new("sh")
-            .arg("-c")
-            .arg(command)
-            .spawn();
-    }
-
-    fn get_sysmon_list() -> Vec<(String, String)> {
-        let mut found: Vec<(String, String)> = Vec::new();
-
-        // Native system monitors
-        let native_monitors = vec![
-            ("observatory", "COSMIC Observatory"),
-            ("gnome-system-monitor", "GNOME System Monitor"),
-            ("xfce4-taskmanager", "XFCE Task Manager"),
-            ("plasma-systemmonitor", "Plasma System Monitor"),
-            ("mate-system-monitor", "MATE System Monitor"),
-            ("lxqt-taskmanager", "LXQt Task Manager"),
-        ];
-
-        for (command, name) in native_monitors {
-            if let Ok(output) = std::process::Command::new("which").arg(command).output() {
-                if output.status.success() && !output.stdout.is_empty() {
-                    found.push((command.to_string(), name.to_string()));
-                }
-            }
-        }
-
-        // Flatpak-based system monitors
-        let flatpak_monitors = vec![
-            ("net.nokyan.Resources", "Resources"),
-            ("com.github.gi_r.Usage", "Usage"),
-            ("org.gnome.SystemMonitor", "GNOME System Monitor (Flatpak)"),
-            ("io.missioncenter.MissionCenter", "Mission Center"),
-        ];
-
-        for (flatpak_id, name) in flatpak_monitors {
-            if std::process::Command::new("flatpak")
-                .arg("info")
-                .arg(flatpak_id)
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false)
-            {
-                found.push((format!("flatpak run {flatpak_id}"), name.to_string()));
-            }
-        }
-
-        found
     }
 
     fn figure_label<'a>(&self, text: String) -> widget::Text<'a, cosmic::Theme> {
