@@ -22,7 +22,7 @@ serde = "1.0.197"
 nvml-wrapper = "0.10.0"
 log = "0.4.27"
 anyhow = { version = "1.0.97", features = ["backtrace"] }
-zbus = { version = "5.7.1" }
+zbus = { version = "5" }
 zvariant = "5"
 fern = "0.7"
 chrono = "0.4"
