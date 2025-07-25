@@ -1,4 +1,3 @@
-
 use log::{error, info};
 use std::collections::BTreeMap;
 use std::env;
@@ -139,7 +138,7 @@ fn parse_desktop_file(
     let mut categories = Vec::new();
     let mut keywords = Vec::new();
     let mut in_desktop_entry = false;
-
+    
     for line in content.lines() {
         let line = line.trim();
 
@@ -157,24 +156,33 @@ fn parse_desktop_file(
             continue;
         }
 
-        if let Some(_value) = line.strip_prefix("X-CosmicApplet=true") {
-            return Err("Applet not app".into());
-        } else if let Some(value) = line.strip_prefix("Name=") {
-            name = value.to_string();
-        } else if let Some(value) = line.strip_prefix("Exec=") {
-            exec = value.to_string();
-        } else if let Some(value) = line.strip_prefix("Categories=") {
-            categories = value
-                .split(';')
-                .map(|s| s.trim().to_string().to_lowercase())
-                .filter(|s| !s.is_empty())
-                .collect();
-        } else if let Some(value) = line.strip_prefix("Keywords=") {
-            keywords = value
-                .split(';')
-                .map(|s| s.trim().to_string().to_lowercase())
-                .filter(|s| !s.is_empty())
-                .collect();
+        // Split at the first '=' and trim
+        if let Some((key, value)) = line.split_once('=') {
+            let key = key.trim();
+            let value = value.trim();
+
+            match key {
+                "X-CosmicApplet" if value.eq_ignore_ascii_case("true") => {
+                    return Err("Applet not app".into());
+                }
+                "Name" => name = value.to_string(),
+                "Exec" => exec = value.to_string(),
+                "Categories" => {
+                    categories = value
+                        .split(';')
+                        .map(|s| s.trim().to_string().to_lowercase())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                }
+                "Keywords" => {
+                    keywords = value
+                        .split(';')
+                        .map(|s| s.trim().to_string().to_lowercase())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                }
+                _ => {}
+            }
         }
     }
 
