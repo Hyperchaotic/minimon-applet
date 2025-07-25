@@ -249,6 +249,8 @@ pub enum Message {
     SysmonSelect(usize),
 
     ChangeContentOrder(ContentOrderChange),
+
+    Tip,
 }
 
 const APP_ID_DOCK: &str = "io.github.cosmic_utils.minimon-applet-dock";
@@ -1153,6 +1155,9 @@ impl cosmic::Application for Minimon {
                     .order
                     .swap(order_change.current_index, order_change.new_index);
             }
+            Message::Tip => {
+                Self::open_tipping_page_in_browser();
+            }
         }
         Task::none()
     }
@@ -1259,10 +1264,19 @@ impl Minimon {
     fn general_settings_ui(&self) -> Element<crate::app::Message> {
         let refresh_rate = f64::from(self.config.refresh_rate) / 1000.0;
 
-        let version_row = text::heading(format!(
-            "Minimon version {} for COSMIC.",
-            env!("CARGO_PKG_VERSION")
-        ));
+        let heart = button::custom(
+            widget::svg(widget::svg::Handle::from_memory(HEART.as_bytes()))
+                .width(15)
+                .height(15),
+        );
+        let version_row = row!(
+            text::heading(format!(
+                "Minimon version {} for COSMIC.",
+                env!("CARGO_PKG_VERSION")
+            )),
+            horizontal_space(),
+            heart.on_press(Message::Tip)
+        );
         // Create settings rows
         let refresh_row = settings::item(
             fl!("refresh-rate"),
@@ -1322,14 +1336,7 @@ impl Minimon {
 
         let sysmon_row = settings::item(
             fl!("choose-sysmon"),
-            row!(
-                widget::dropdown(
-                    &*SYSMON_NAMES,
-                    idx,
-                    Message::SysmonSelect
-                )
-                .width(220)
-            ),
+            row!(widget::dropdown(&*SYSMON_NAMES, idx, Message::SysmonSelect).width(220)),
         );
 
         let content_items = Column::from_vec({
@@ -1957,4 +1964,29 @@ impl Minimon {
             }
         }
     }
+
+    fn open_tipping_page_in_browser() {
+
+        let url="https://ko-fi.com/hyperchaotic";
+        let in_flatpak = std::env::var("FLATPAK_ID").is_ok();
+
+        let result = if in_flatpak {
+            // Use flatpak-spawn to run xdg-open on the host
+            std::process::Command::new("flatpak-spawn")
+                .args(["--host", "xdg-open", url])
+                .spawn()
+        } else {
+            // Native: directly call xdg-open
+            std::process::Command::new("xdg-open").arg(url).spawn()
+        };
+
+        if let Err(e) = result {
+            error!("Failed to launch browser: {}", e);
+        }
+    }
 }
+
+const HEART: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="red" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="icon icon-tabler icons-tabler-outline icon-tabler-heart">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="m20.288 12.653-8.28 8.269-8.278-8.27a5.52 5.566 0 1 1 8.279-7.308 5.52 5.566 0 1 1 8.279 7.315" style="stroke-width:2.21706"/>
+</svg>"#;
