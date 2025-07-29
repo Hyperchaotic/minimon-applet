@@ -246,9 +246,8 @@ impl Sensor for Cpu {
                 crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
             }
             GraphKind::Line => crate::svg_graph::line(&self.samples_sum, 100.0, &self.svg_colors),
-            GraphKind::StackedBars => {
-                StackedBarSvg::default().generate_svg(&self.core_loads, &self.svg_colors)
-            }
+            GraphKind::StackedBars => StackedBarSvg::new(self.config.bar_width, 24)
+                .generate_svg(&self.core_loads, &self.svg_colors),
             GraphKind::Heat => panic!("Heat not supported!"),
         };
 
@@ -283,8 +282,10 @@ impl Sensor for Cpu {
             ));
         } else {
             let factor = 60_f64 / 24.0;
-            let width =
-                (StackedBarSvg::default().width(self.core_count()) as f64 * factor).round() as u16;
+            let width = (StackedBarSvg::new(self.config.bar_width, 60).width(self.core_count())
+                as f64
+                * factor)
+                .round() as u16;
             cpu_column.push(Element::from(row!(
                 widget::horizontal_space(),
                 self.chart().height(60).width(width),
@@ -310,6 +311,24 @@ impl Sensor for Cpu {
             )
             .into(),
         );
+
+        if self.graph_kind() == GraphKind::StackedBars {
+            cpu_column.push(
+                settings::item(
+                    fl!("graph-bar-width"),
+                    widget::spin_button(
+                        self.config.bar_width.to_string(),
+                        self.config.bar_width,
+                        1,
+                        1,
+                        16,
+                        Message::CpuBarSizeChanged,
+                    ),
+                )
+                .into(),
+            );
+        }
+
         cpu_column.push(
             settings::item(
                 fl!("enable-label"),
@@ -579,15 +598,22 @@ pub struct StackedBarSvg {
 
 impl Default for StackedBarSvg {
     fn default() -> Self {
-        Self::new(4, 22, 1, 1)
+        StackedBarSvg {
+            core_width: 4,
+            core_height: 22, // image height will be core_height+(2*padding)
+            spacing: 1,
+            padding: 1,
+        }
     }
 }
 
 impl StackedBarSvg {
-    pub fn new(core_width: u16, core_height: u16, spacing: u16, padding: u16) -> Self {
+    pub fn new(bar_width: u16, chart_height: u16) -> Self {
+        let padding = 1;
+        let spacing = 1;
         Self {
-            core_width,
-            core_height,
+            core_width: bar_width,
+            core_height: chart_height - (padding * 2),
             spacing,
             padding,
         }
@@ -699,7 +725,6 @@ impl StackedBarSvg {
 }
 
 impl StackedBarSvg {
-
     // Calculate the total width needed for a given number of cores
     fn width(&self, core_count: usize) -> u16 {
         if core_count == 0 {

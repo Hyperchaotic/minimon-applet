@@ -226,6 +226,7 @@ pub enum Message {
     ToggleCpuTempChart(bool),
     ToggleCpuTempLabel(bool),
     ToggleCpuNoDecimals(bool),
+    CpuBarSizeChanged(u16),
     ToggleMemoryChart(bool),
     ToggleMemoryLabel(bool),
     ToggleMemoryPercentage(bool),
@@ -949,6 +950,12 @@ impl cosmic::Application for Minimon {
                 self.save_config();
             }
 
+            Message::CpuBarSizeChanged(width) => {
+                info!("Message::CpuBarSizeChanged({width})");
+                self.config.cpu.bar_width = width;
+                self.save_config();
+            }
+
             Message::ToggleMemoryChart(toggled) => {
                 info!("Message::ToggleMemoryChart({toggled:?})");
                 self.config.memory.chart = toggled;
@@ -1462,11 +1469,17 @@ impl Minimon {
         // Add the CPU chart if needed
         if self.config.cpu.chart {
             let width = if self.config.cpu.kind == GraphKind::StackedBars {
-                (size.0 as f64 * 
-                crate::sensors::cpu::StackedBarSvg::default().aspect_ratio(self.cpu.core_count())).round() as u16
+                (size.0 as f64
+                    * crate::sensors::cpu::StackedBarSvg::new(self.config.cpu.bar_width, 24)
+                        .aspect_ratio(self.cpu.core_count()))
+                .round() as u16
             } else {
                 size.1
             };
+
+            //println!("CPU UI: width: {}, height: {}, aspect ratio: {}, elem width: {}, ele height: {}",
+
+            //        );
 
             elements.push_back(self.cpu.chart().height(size.0).width(width).into());
         }

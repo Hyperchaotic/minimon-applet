@@ -159,6 +159,7 @@ pub struct CpuConfig {
     pub kind: GraphKind,
     pub colors: GraphColors,
     pub no_decimals: bool,
+    pub bar_width: u16, 
 }
 
 impl Default for CpuConfig {
@@ -169,6 +170,7 @@ impl Default for CpuConfig {
             kind: GraphKind::Ring,
             colors: GraphColors::new(DeviceKind::Cpu),
             no_decimals: false,
+            bar_width: 4,
         }
     }
 }
