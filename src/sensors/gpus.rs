@@ -233,7 +233,8 @@ impl DemoGraph for GpuGraph {
             GraphKind::Line => {
                 crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100.0, &self.svg_colors)
             }
-            GraphKind::Heat => panic!("Wrong graph choice!"),
+            GraphKind::Heat => panic!("Heat not supported for GpuGraph!"),
+            GraphKind::StackedBars => panic!("StackedBars not supported for GpuGraph!"),
         }
     }
 
@@ -577,6 +578,7 @@ impl TempGraph {
             GraphKind::Heat => {
                 crate::svg_graph::heat(&self.samples, self.max_temp as u64, &self.svg_colors)
             }
+            GraphKind::StackedBars => panic!("StackedBars not supported for GpuTemp"),
         };
         let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
 
@@ -627,6 +629,7 @@ impl DemoGraph for TempGraph {
             GraphKind::Heat => {
                 crate::svg_graph::heat(&VecDeque::from(HEAT_DEMO_SAMPLES), 100, &self.svg_colors)
             }
+            GraphKind::StackedBars => panic!("StackedBars not supported for GpuTemp"),
         }
     }
 
@@ -644,6 +647,7 @@ impl DemoGraph for TempGraph {
             GraphKind::Line => (*super::COLOR_CHOICES_LINE).into(),
             GraphKind::Ring => (*super::COLOR_CHOICES_RING).into(),
             GraphKind::Heat => (*super::COLOR_CHOICES_HEAT).into(),
+            GraphKind::StackedBars => panic!("StackedBars not supported for GpuTemp"),
         }
     }
 
@@ -691,7 +695,8 @@ impl DemoGraph for VramGraph {
             GraphKind::Line => {
                 crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 32.0, &self.svg_colors)
             }
-            GraphKind::Heat => panic!("Wrong graph choice!"),
+            GraphKind::Heat => panic!("Heat not supported for GpuTemp!"),
+            GraphKind::StackedBars => panic!("StackedBars not supported for GpuTemp"),
         }
     }
 

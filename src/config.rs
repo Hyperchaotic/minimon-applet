@@ -21,6 +21,7 @@ pub enum GraphKind {
     Ring,
     Line,
     Heat,
+    StackedBars,
 }
 
 impl From<usize> for GraphKind {
@@ -40,6 +41,7 @@ impl From<GraphKind> for usize {
             GraphKind::Ring => 0,
             GraphKind::Line => 1,
             GraphKind::Heat => 2,
+            GraphKind::StackedBars => 3,
         }
     }
 }

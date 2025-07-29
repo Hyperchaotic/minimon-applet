@@ -4,8 +4,8 @@ use crate::{
     fl,
     svg_graph::SvgColors,
 };
-use cosmic::{Element, Renderer, Theme, widget::Container};
-use std::any::Any;
+use cosmic::{Element, Renderer, Theme, iced_widget::Column, widget::Container};
+use std::{any::Any, sync::LazyLock};
 
 use cosmic::widget;
 use cosmic::widget::{settings, toggler};
@@ -32,7 +32,14 @@ use super::Sensor;
 
 const MAX_SAMPLES: usize = 21;
 
-const GRAPH_OPTIONS: [&str; 2] = ["Ring", "Line"];
+pub static COLOR_CHOICES_BARS: LazyLock<[(&'static str, ColorVariant); 4]> = LazyLock::new(|| {
+    [
+        (fl!("graph-bars-system").leak(), ColorVariant::Color4),
+        (fl!("graph-bars-user").leak(), ColorVariant::Color3),
+        (fl!("graph-line-back").leak(), ColorVariant::Color1),
+        (fl!("graph-line-frame").leak(), ColorVariant::Color2),
+    ]
+});
 
 #[derive(Debug)]
 struct CpuTimes {
@@ -87,6 +94,38 @@ impl DemoGraph for Cpu {
                 crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100.0, &self.svg_colors)
             }
             GraphKind::Heat => panic!("Wrong graph choice!"),
+            GraphKind::StackedBars => {
+                let mut map = HashMap::new();
+                map.insert(
+                    0,
+                    CpuLoad {
+                        user_pct: 15.5,
+                        system_pct: 8.2,
+                    },
+                );
+                map.insert(
+                    1,
+                    CpuLoad {
+                        user_pct: 42.1,
+                        system_pct: 12.7,
+                    },
+                );
+                map.insert(
+                    2,
+                    CpuLoad {
+                        user_pct: 78.9,
+                        system_pct: 18.3,
+                    },
+                );
+                map.insert(
+                    3,
+                    CpuLoad {
+                        user_pct: 25.6,
+                        system_pct: 5.4,
+                    },
+                );
+                StackedBarSvg::default().generate_svg(&map, &self.svg_colors)
+            }
         }
     }
 
@@ -100,10 +139,11 @@ impl DemoGraph for Cpu {
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        if self.config.kind == GraphKind::Line {
-            (*super::COLOR_CHOICES_LINE).into()
-        } else {
-            (*super::COLOR_CHOICES_RING).into()
+        match self.config.kind {
+            GraphKind::Line => (*super::COLOR_CHOICES_LINE).into(),
+            GraphKind::Ring => (*super::COLOR_CHOICES_RING).into(),
+            GraphKind::StackedBars => (*COLOR_CHOICES_BARS).into(),
+            _ => panic!("CPU color_choices {:?} wrong chart type!", self.config.kind),
         }
     }
 
@@ -125,7 +165,9 @@ impl Sensor for Cpu {
     }
 
     fn set_graph_kind(&mut self, kind: GraphKind) {
-        assert!(kind == GraphKind::Line || kind == GraphKind::Ring);
+        assert!(
+            kind == GraphKind::Line || kind == GraphKind::Ring || kind == GraphKind::StackedBars
+        );
         self.config.kind = kind;
     }
 
@@ -145,7 +187,7 @@ impl Sensor for Cpu {
     }
 
     fn demo_graph(&self) -> Box<dyn DemoGraph> {
-        let mut dmo = Cpu::default();
+        let mut dmo = Cpu::new(true);
         dmo.update_config(&self.config, 0);
         Box::new(dmo)
     }
@@ -183,27 +225,33 @@ impl Sensor for Cpu {
 
     #[cfg(not(feature = "lyon_charts"))]
     fn chart(&self) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
-        let svg = if self.config.kind == GraphKind::Ring {
-            let latest = self.latest_sample();
-            let mut value = String::with_capacity(10);
-            let mut percentage = String::with_capacity(10);
+        let svg = match self.config.kind {
+            GraphKind::Ring => {
+                let latest = self.latest_sample();
+                let mut value = String::with_capacity(10);
+                let mut percentage = String::with_capacity(10);
 
-            if self.config.no_decimals {
-                write!(value, "{}%", latest.round()).unwrap();
-            } else if latest < 10.0 {
-                write!(value, "{latest:.2}").unwrap()
-            } else if latest <= 99.9 {
-                write!(value, "{latest:.1}").unwrap();
-            } else {
-                write!(value, "100").unwrap();
+                if self.config.no_decimals {
+                    write!(value, "{}%", latest.round()).unwrap();
+                } else if latest < 10.0 {
+                    write!(value, "{latest:.2}").unwrap()
+                } else if latest <= 99.9 {
+                    write!(value, "{latest:.1}").unwrap();
+                } else {
+                    write!(value, "100").unwrap();
+                }
+
+                write!(percentage, "{latest}").unwrap();
+
+                crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
             }
-
-            write!(percentage, "{latest}").unwrap();
-
-            crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
-        } else {
-            crate::svg_graph::line(&self.samples_sum, 100.0, &self.svg_colors)
+            GraphKind::Line => crate::svg_graph::line(&self.samples_sum, 100.0, &self.svg_colors),
+            GraphKind::StackedBars => {
+                StackedBarSvg::default().generate_svg(&self.core_loads, &self.svg_colors)
+            }
+            GraphKind::Heat => panic!("Heat not supported!"),
         };
+
         let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
         Container::new(
             icon.icon()
@@ -217,53 +265,92 @@ impl Sensor for Cpu {
         let cosmic = theme.cosmic();
 
         let mut cpu_elements = Vec::new();
+        let mut cpu_column = Vec::new();
 
-        let cpu = self.to_string();
-        cpu_elements.push(Element::from(
-            column!(
-                Container::new(self.chart().width(60).height(60))
-                    .width(90)
-                    .align_x(Alignment::Center),
-                cosmic::widget::text::body(cpu.to_string())
-                    .width(90)
-                    .align_x(Alignment::Center)
-            )
-            .padding(5)
-            .align_x(Alignment::Center),
-        ));
+        if self.graph_kind() != GraphKind::StackedBars {
+            let cpu = self.to_string();
+            cpu_elements.push(Element::from(
+                column!(
+                    Container::new(self.chart().width(60).height(60))
+                        .width(90)
+                        .align_x(Alignment::Center),
+                    cosmic::widget::text::body(cpu.to_string())
+                        .width(90)
+                        .align_x(Alignment::Center)
+                )
+                .padding(5)
+                .align_x(Alignment::Center),
+            ));
+        } else {
+            let factor = 60_f64 / 24.0;
+            let width =
+                (StackedBarSvg::default().width(self.core_count()) as f64 * factor).round() as u16;
+            cpu_column.push(Element::from(row!(
+                widget::horizontal_space(),
+                self.chart().height(60).width(width),
+                widget::horizontal_space()
+            )));
+        };
 
-        let selected: Option<usize> = Some(self.graph_kind().into());
+        // A bit ugly and error prone, the Heat type is not supported here so bars takes its place
+        // in numbering for the dropdown
+        let selected: Option<usize> = if self.graph_kind() == GraphKind::StackedBars {
+            Some(2)
+        } else {
+            Some(self.graph_kind().into())
+        };
 
         let config = &self.config;
         let cpu_kind = self.graph_kind();
-        cpu_elements.push(Element::from(
-            column!(
-                settings::item(
-                    fl!("enable-chart"),
-                    toggler(config.chart).on_toggle(|value| { Message::ToggleCpuChart(value) }),
-                ),
-                settings::item(
-                    fl!("enable-label"),
-                    toggler(config.label).on_toggle(|value| { Message::ToggleCpuLabel(value) }),
-                ),
+
+        cpu_column.push(
+            settings::item(
+                fl!("enable-chart"),
+                toggler(config.chart).on_toggle(Message::ToggleCpuChart),
+            )
+            .into(),
+        );
+        cpu_column.push(
+            settings::item(
+                fl!("enable-label"),
+                toggler(config.label).on_toggle(Message::ToggleCpuLabel),
+            )
+            .into(),
+        );
+        if self.graph_kind() != GraphKind::StackedBars {
+            cpu_column.push(
                 settings::item(
                     fl!("cpu-no-decimals"),
                     row!(
                         widget::checkbox("", config.no_decimals)
                             .on_toggle(Message::ToggleCpuNoDecimals)
                     ),
-                ),
-                row!(
-                    widget::dropdown(&self.graph_options, selected, move |m| {
-                        Message::SelectGraphType(DeviceKind::Cpu, m.into())
-                    },)
-                    .width(70),
-                    widget::horizontal_space(),
-                    widget::button::standard(fl!("change-colors"))
-                        .on_press(Message::ColorPickerOpen(DeviceKind::Cpu, cpu_kind, None)),
                 )
+                .into(),
+            );
+        }
+        cpu_column.push(
+            row!(
+                widget::dropdown(&self.graph_options, selected, move |m| {
+                    let mut choice: GraphKind = m.into();
+                    if choice != GraphKind::Ring && choice != GraphKind::Line {
+                        choice = GraphKind::StackedBars
+                    };
+                    Message::SelectGraphType(DeviceKind::Cpu, choice)
+                },)
+                .width(70),
+                widget::horizontal_space(),
+                widget::button::standard(fl!("change-colors")).on_press(Message::ColorPickerOpen(
+                    DeviceKind::Cpu,
+                    cpu_kind,
+                    None
+                )),
             )
-            .spacing(cosmic.space_xs()),
+            .into(),
+        );
+
+        cpu_elements.push(Element::from(
+            Column::with_children(cpu_column).spacing(cosmic.space_xs()),
         ));
 
         Row::with_children(cpu_elements)
@@ -273,14 +360,20 @@ impl Sensor for Cpu {
     }
 }
 
-impl Default for Cpu {
-    fn default() -> Self {
+impl Cpu {
+    pub fn new(is_horizontal: bool) -> Self {
         // value and percentage are pre-allocated and reused as they're changed often.
         let mut percentage = String::with_capacity(6);
         write!(percentage, "0").unwrap();
 
         let mut value = String::with_capacity(6);
         write!(value, "0").unwrap();
+
+        let graph_opts: Vec<&'static str> = if is_horizontal {
+            ["Ring", "Line", "Bars"].into()
+        } else {
+            ["Ring", "Line"].into()
+        };
 
         let mut cpu = Cpu {
             total_cpu_load: CpuLoad {
@@ -297,18 +390,20 @@ impl Default for Cpu {
                 };
                 MAX_SAMPLES
             ]),
-            graph_options: GRAPH_OPTIONS.to_vec(),
+            graph_options: graph_opts.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
             config: CpuConfig::default(),
         };
         cpu.set_colors(GraphColors::default());
         cpu
     }
-}
 
-impl Cpu {
     pub fn latest_sample(&self) -> f64 {
         *self.samples_sum.back().unwrap_or(&0f64)
+    }
+
+    pub fn core_count(&self) -> usize {
+        self.core_loads.len()
     }
 
     // Read CPU statistics from /proc/stat
@@ -474,3 +569,153 @@ const DEMO_SAMPLES: [f64; 21] = [
     14.496528625488281,
     13.892818450927734,
 ];
+
+pub struct StackedBarSvg {
+    core_width: u16,
+    core_height: u16,
+    spacing: u16,
+    padding: u16,
+}
+
+impl Default for StackedBarSvg {
+    fn default() -> Self {
+        Self::new(4, 22, 1, 1)
+    }
+}
+
+impl StackedBarSvg {
+    pub fn new(core_width: u16, core_height: u16, spacing: u16, padding: u16) -> Self {
+        Self {
+            core_width,
+            core_height,
+            spacing,
+            padding,
+        }
+    }
+
+    fn generate_svg(&self, cores: &HashMap<usize, CpuLoad>, colors: &SvgColors) -> String {
+        // Calculate total width based on number of cores
+        // Formula: (num_cores * core_width) + ((num_cores - 1) * spacing) + (2 * padding)
+        let total_width = self.width(cores.len());
+        let total_height = self.height();
+
+        let mut svg = String::new();
+
+        // SVG header with COSMIC-friendly dark theme - width adapts to core count
+        writeln!(svg, r#"<svg width="{total_width}" height="{total_height}" viewBox="0 0 {total_width} {total_height}" xmlns="http://www.w3.org/2000/svg">"#).unwrap();
+
+        // CSS styles with configurable colors
+        writeln!(
+            svg,
+            r#"  <defs>
+    <style>
+      .background {{ fill: {}; stroke: {}; stroke-width: 1; }}
+      .user-load {{ fill: {}; }}
+      .system-load {{ fill: {}; }}
+      .separator {{ fill: {}; }}
+    </style>
+    <clipPath id="rounded-clip">
+    <rect x="0" y="0" width="{total_width}" height="{total_height}" rx="4" ry="4"/>
+  </clipPath>
+  </defs>"#,
+            colors.color1, colors.color2, colors.color3, colors.color4, colors.color1,
+        )
+        .unwrap();
+
+        // Background with adaptive width
+        writeln!(
+            svg,
+            r#"  <g clip-path="url(#rounded-clip)"><rect class="background" width="{total_width}" height="{total_height}" rx="3" ry="3"/>"#)
+        .unwrap();
+
+        for i in 0..cores.len() {
+            if let Some(core) = cores.get(&i) {
+                let x_offset = self.padding + (i as u16 * (self.core_width + self.spacing));
+                self.generate_core_bar(&mut svg, x_offset, core, i);
+
+                // Add 1px separator after each bar (except the last one)
+                if i < cores.len() - 1 {
+                    let separator_x = x_offset + self.core_width;
+                    writeln!(
+                        svg,
+                        r#"  <rect class="separator" x="{}" y="{}" width="1" height="{}"/>"#,
+                        separator_x, self.padding, self.core_height
+                    )
+                    .unwrap();
+                }
+            }
+        }
+
+        writeln!(svg, "</g></svg>").unwrap();
+        svg
+    }
+
+    fn generate_core_bar(
+        &self,
+        svg: &mut String,
+        x_offset: u16,
+        core: &CpuLoad,
+        _core_index: usize,
+    ) {
+        let available_height = self.core_height as f64;
+
+        // Calculate heights (clamp to 0-100%)
+        let user_percent = core.user_pct.clamp(0.0, 100.0);
+        let system_percent = core.system_pct.clamp(0.0, 100.0);
+        let total_percent = (user_percent + system_percent).min(100.0);
+
+        let user_height = (available_height * user_percent / 100.0) as u16;
+        let system_height = (available_height * system_percent / 100.0) as u16;
+
+        // Calculate positions (bars grow upward from bottom)
+        let user_y = self.padding + self.core_height - user_height;
+        let system_y = if total_percent <= 100.0 {
+            user_y.saturating_sub(system_height)
+        } else {
+            // If total > 100%, prioritize system time visibility
+            self.padding
+        };
+
+        // Generate user load bar (bottom)
+        if user_height > 0 {
+            writeln!(
+                svg,
+                r#"  <rect class="user-load" x="{}" y="{}" width="{}" height="{}"/>"#,
+                x_offset, user_y, self.core_width, user_height
+            )
+            .unwrap();
+        }
+
+        // Generate system load bar (top)
+        if system_height > 0 {
+            writeln!(
+                svg,
+                r#"  <rect class="system-load" x="{}" y="{}" width="{}" height="{}"/>"#,
+                x_offset, system_y, self.core_width, system_height
+            )
+            .unwrap();
+        }
+    }
+}
+
+impl StackedBarSvg {
+
+    // Calculate the total width needed for a given number of cores
+    fn width(&self, core_count: usize) -> u16 {
+        if core_count == 0 {
+            (self.padding * 2) + self.core_width // Minimum width
+        } else {
+            (core_count as u16 * self.core_width)
+                + ((core_count.saturating_sub(1)) as u16 * self.spacing)
+                + (self.padding * 2)
+        }
+    }
+
+    fn height(&self) -> u16 {
+        self.core_height + (self.padding * 2)
+    }
+
+    pub fn aspect_ratio(&self, core_count: usize) -> f64 {
+        self.width(core_count) as f64 / self.height() as f64
+    }
+}

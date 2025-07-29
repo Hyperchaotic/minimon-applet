@@ -165,6 +165,7 @@ impl DemoGraph for CpuTemp {
             GraphKind::Heat => {
                 crate::svg_graph::heat(&VecDeque::from(DEMO_SAMPLES), 100, &self.svg_colors)
             }
+            GraphKind::StackedBars => panic!("StackedBars not supported for CpuTemp"),
         }
     }
 
@@ -182,6 +183,7 @@ impl DemoGraph for CpuTemp {
             GraphKind::Line => (*super::COLOR_CHOICES_LINE).into(),
             GraphKind::Ring => (*super::COLOR_CHOICES_RING).into(),
             GraphKind::Heat => (*super::COLOR_CHOICES_HEAT).into(),
+            GraphKind::StackedBars => panic!("StackedBars not supported for CpuTemp"),
         }
     }
 
@@ -291,6 +293,7 @@ impl Sensor for CpuTemp {
             }
             GraphKind::Line => crate::svg_graph::line(&self.samples, max, &self.svg_colors),
             GraphKind::Heat => crate::svg_graph::heat(&self.samples, max as u64, &self.svg_colors),
+            GraphKind::StackedBars => panic!("StackedBars not supported for CpuTemp"),
         };
 
         let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());

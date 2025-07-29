@@ -55,7 +55,7 @@ pub enum CpuVariant {
 }
 
 use std::any::Any;
-pub trait Sensor: Default {
+pub trait Sensor {
     fn update_config(&mut self, config: &dyn Any, refresh_rate: u32);
     fn graph_kind(&self) -> GraphKind;
     fn set_graph_kind(&mut self, kind: GraphKind);

@@ -59,7 +59,8 @@ impl DemoGraph for Memory {
                 self.max_val,
                 &self.svg_colors,
             ),
-            GraphKind::Heat => panic!("Wrong graph choice!"),
+            GraphKind::Heat => panic!("heat not supported for Memory!"),
+            GraphKind::StackedBars => panic!("StackedBars not supported for Memory"),
         }
     }
 

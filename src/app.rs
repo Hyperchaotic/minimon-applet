@@ -284,9 +284,11 @@ impl cosmic::Application for Minimon {
             })
             .collect();
 
+        let is_horizontal = core.applet.is_horizontal();
+
         let app = Minimon {
             core,
-            cpu: Cpu::default(),
+            cpu: Cpu::new(is_horizontal),
             cputemp: CpuTemp::default(),
             memory: Memory::default(),
             network1: Network::default(),
@@ -1459,7 +1461,14 @@ impl Minimon {
 
         // Add the CPU chart if needed
         if self.config.cpu.chart {
-            elements.push_back(self.cpu.chart().height(size.0).width(size.1).into());
+            let width = if self.config.cpu.kind == GraphKind::StackedBars {
+                (size.0 as f64 * 
+                crate::sensors::cpu::StackedBarSvg::default().aspect_ratio(self.cpu.core_count())).round() as u16
+            } else {
+                size.1
+            };
+
+            elements.push_back(self.cpu.chart().height(size.0).width(width).into());
         }
         elements
     }
@@ -1966,8 +1975,7 @@ impl Minimon {
     }
 
     fn open_tipping_page_in_browser() {
-
-        let url="https://ko-fi.com/hyperchaotic";
+        let url = "https://ko-fi.com/hyperchaotic";
         let in_flatpak = std::env::var("FLATPAK_ID").is_ok();
 
         let result = if in_flatpak {
@@ -1981,7 +1989,7 @@ impl Minimon {
         };
 
         if let Err(e) = result {
-            error!("Failed to launch browser: {}", e);
+            error!("Failed to launch browser: {e:?}");
         }
     }
 }
