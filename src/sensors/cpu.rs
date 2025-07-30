@@ -1,4 +1,5 @@
 use crate::{
+    barchart::StackedBarSvg,
     colorpicker::DemoGraph,
     config::{ColorVariant, CpuConfig, DeviceKind, GraphColors, GraphKind},
     fl,
@@ -54,9 +55,9 @@ struct CpuTimes {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct CpuLoad {
-    user_pct: f64,
-    system_pct: f64,
+pub struct CpuLoad {
+    pub user_pct: f64,
+    pub system_pct: f64,
 }
 
 #[derive(Debug)]
@@ -124,7 +125,7 @@ impl DemoGraph for Cpu {
                         system_pct: 5.4,
                     },
                 );
-                StackedBarSvg::default().generate_svg(&map, &self.svg_colors)
+                StackedBarSvg::default().svg(&map, &self.svg_colors)
             }
         }
     }
@@ -246,8 +247,8 @@ impl Sensor for Cpu {
                 crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
             }
             GraphKind::Line => crate::svg_graph::line(&self.samples_sum, 100.0, &self.svg_colors),
-            GraphKind::StackedBars => StackedBarSvg::new(self.config.bar_width, 24)
-                .generate_svg(&self.core_loads, &self.svg_colors),
+            GraphKind::StackedBars => StackedBarSvg::new(self.config.bar_width, 24, self.config.bar_spacing)
+                .svg(&self.core_loads, &self.svg_colors),
             GraphKind::Heat => panic!("Heat not supported!"),
         };
 
@@ -282,7 +283,7 @@ impl Sensor for Cpu {
             ));
         } else {
             let factor = 60_f64 / 24.0;
-            let width = (StackedBarSvg::new(self.config.bar_width, 60).width(self.core_count())
+            let width = (StackedBarSvg::new(self.config.bar_width, 60, self.config.bar_spacing).width(self.core_count())
                 as f64
                 * factor)
                 .round() as u16;
@@ -324,6 +325,15 @@ impl Sensor for Cpu {
                         16,
                         Message::CpuBarSizeChanged,
                     ),
+                )
+                .into(),
+            );
+
+            let narrow = if config.bar_spacing == 0 { true } else { false };
+            cpu_column.push(
+                settings::item(
+                    fl!("graph-bar-spacing"),
+                    toggler(narrow).on_toggle(Message::CpuNarrowBarSpacing),
                 )
                 .into(),
             );
@@ -425,7 +435,25 @@ impl Cpu {
         self.core_loads.len()
     }
 
-    // Read CPU statistics from /proc/stat
+    /* Simulated Threadripper
+    fn read_cpu_stats() -> HashMap<usize, CpuTimes> {
+        let mut combined_stats = HashMap::new();
+
+        for batch in 0..5 {
+            let batch_stats = Self::read_cpu_stats2();
+
+            // Offset the core IDs by batch * 20 to avoid conflicts
+            for (core_id, cpu_times) in batch_stats {
+                let new_core_id = core_id + (batch * 20);
+                combined_stats.insert(new_core_id, cpu_times);
+            }
+        }
+
+        combined_stats
+    }
+        // Read CPU statistics from /proc/stat
+        fn read_cpu_stats2() -> HashMap<usize, CpuTimes> {
+    */
     fn read_cpu_stats() -> HashMap<usize, CpuTimes> {
         let mut cpu_stats = HashMap::new();
 
@@ -588,159 +616,3 @@ const DEMO_SAMPLES: [f64; 21] = [
     14.496528625488281,
     13.892818450927734,
 ];
-
-pub struct StackedBarSvg {
-    core_width: u16,
-    core_height: u16,
-    spacing: u16,
-    padding: u16,
-}
-
-impl Default for StackedBarSvg {
-    fn default() -> Self {
-        StackedBarSvg {
-            core_width: 4,
-            core_height: 22, // image height will be core_height+(2*padding)
-            spacing: 1,
-            padding: 1,
-        }
-    }
-}
-
-impl StackedBarSvg {
-    pub fn new(bar_width: u16, chart_height: u16) -> Self {
-        let padding = 1;
-        let spacing = 1;
-        Self {
-            core_width: bar_width,
-            core_height: chart_height - (padding * 2),
-            spacing,
-            padding,
-        }
-    }
-
-    fn generate_svg(&self, cores: &HashMap<usize, CpuLoad>, colors: &SvgColors) -> String {
-        // Calculate total width based on number of cores
-        // Formula: (num_cores * core_width) + ((num_cores - 1) * spacing) + (2 * padding)
-        let total_width = self.width(cores.len());
-        let total_height = self.height();
-
-        let mut svg = String::new();
-
-        // SVG header with COSMIC-friendly dark theme - width adapts to core count
-        writeln!(svg, r#"<svg width="{total_width}" height="{total_height}" viewBox="0 0 {total_width} {total_height}" xmlns="http://www.w3.org/2000/svg">"#).unwrap();
-
-        // CSS styles with configurable colors
-        writeln!(
-            svg,
-            r#"  <defs>
-    <style>
-      .background {{ fill: {}; stroke: {}; stroke-width: 1; }}
-      .user-load {{ fill: {}; }}
-      .system-load {{ fill: {}; }}
-      .separator {{ fill: {}; }}
-    </style>
-    <clipPath id="rounded-clip">
-    <rect x="0" y="0" width="{total_width}" height="{total_height}" rx="4" ry="4"/>
-  </clipPath>
-  </defs>"#,
-            colors.color1, colors.color2, colors.color3, colors.color4, colors.color1,
-        )
-        .unwrap();
-
-        // Background with adaptive width
-        writeln!(
-            svg,
-            r#"  <g clip-path="url(#rounded-clip)"><rect class="background" width="{total_width}" height="{total_height}" rx="3" ry="3"/>"#)
-        .unwrap();
-
-        for i in 0..cores.len() {
-            if let Some(core) = cores.get(&i) {
-                let x_offset = self.padding + (i as u16 * (self.core_width + self.spacing));
-                self.generate_core_bar(&mut svg, x_offset, core, i);
-
-                // Add 1px separator after each bar (except the last one)
-                if i < cores.len() - 1 {
-                    let separator_x = x_offset + self.core_width;
-                    writeln!(
-                        svg,
-                        r#"  <rect class="separator" x="{}" y="{}" width="1" height="{}"/>"#,
-                        separator_x, self.padding, self.core_height
-                    )
-                    .unwrap();
-                }
-            }
-        }
-
-        writeln!(svg, "</g></svg>").unwrap();
-        svg
-    }
-
-    fn generate_core_bar(
-        &self,
-        svg: &mut String,
-        x_offset: u16,
-        core: &CpuLoad,
-        _core_index: usize,
-    ) {
-        let available_height = self.core_height as f64;
-
-        // Calculate heights (clamp to 0-100%)
-        let user_percent = core.user_pct.clamp(0.0, 100.0);
-        let system_percent = core.system_pct.clamp(0.0, 100.0);
-        let total_percent = (user_percent + system_percent).min(100.0);
-
-        let user_height = (available_height * user_percent / 100.0) as u16;
-        let system_height = (available_height * system_percent / 100.0) as u16;
-
-        // Calculate positions (bars grow upward from bottom)
-        let user_y = self.padding + self.core_height - user_height;
-        let system_y = if total_percent <= 100.0 {
-            user_y.saturating_sub(system_height)
-        } else {
-            // If total > 100%, prioritize system time visibility
-            self.padding
-        };
-
-        // Generate user load bar (bottom)
-        if user_height > 0 {
-            writeln!(
-                svg,
-                r#"  <rect class="user-load" x="{}" y="{}" width="{}" height="{}"/>"#,
-                x_offset, user_y, self.core_width, user_height
-            )
-            .unwrap();
-        }
-
-        // Generate system load bar (top)
-        if system_height > 0 {
-            writeln!(
-                svg,
-                r#"  <rect class="system-load" x="{}" y="{}" width="{}" height="{}"/>"#,
-                x_offset, system_y, self.core_width, system_height
-            )
-            .unwrap();
-        }
-    }
-}
-
-impl StackedBarSvg {
-    // Calculate the total width needed for a given number of cores
-    fn width(&self, core_count: usize) -> u16 {
-        if core_count == 0 {
-            (self.padding * 2) + self.core_width // Minimum width
-        } else {
-            (core_count as u16 * self.core_width)
-                + ((core_count.saturating_sub(1)) as u16 * self.spacing)
-                + (self.padding * 2)
-        }
-    }
-
-    fn height(&self) -> u16 {
-        self.core_height + (self.padding * 2)
-    }
-
-    pub fn aspect_ratio(&self, core_count: usize) -> f64 {
-        self.width(core_count) as f64 / self.height() as f64
-    }
-}

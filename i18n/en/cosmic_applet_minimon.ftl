@@ -47,6 +47,7 @@ graph-disks-read = Read.
 graph-disks-back = Background.
 graph-disks-frame = Frame.
 graph-bar-width = Width of bars
+graph-bar-spacing = No space between bars
 settings-subpage-back = Back
 settings-subpage-general = General settings
 enable-net-combined = Combine download and upload

@@ -31,6 +31,7 @@ use zvariant::OwnedObjectPath;
 
 use log::{error, info};
 
+use crate::barchart::StackedBarSvg;
 use crate::colorpicker::ColorPicker;
 use crate::config::{
     ColorVariant, ContentType, DeviceKind, DisksVariant, GpuConfig, GraphColors, GraphKind,
@@ -227,6 +228,7 @@ pub enum Message {
     ToggleCpuTempLabel(bool),
     ToggleCpuNoDecimals(bool),
     CpuBarSizeChanged(u16),
+    CpuNarrowBarSpacing(bool),
     ToggleMemoryChart(bool),
     ToggleMemoryLabel(bool),
     ToggleMemoryPercentage(bool),
@@ -956,6 +958,15 @@ impl cosmic::Application for Minimon {
                 self.save_config();
             }
 
+            Message::CpuNarrowBarSpacing(enable) => {
+                if enable {
+                    self.config.cpu.bar_spacing = 0;
+                } else {
+                    self.config.cpu.bar_spacing = 1;
+                }
+                self.save_config();
+            }
+
             Message::ToggleMemoryChart(toggled) => {
                 info!("Message::ToggleMemoryChart({toggled:?})");
                 self.config.memory.chart = toggled;
@@ -1469,8 +1480,8 @@ impl Minimon {
         // Add the CPU chart if needed
         if self.config.cpu.chart {
             let width = if self.config.cpu.kind == GraphKind::StackedBars {
-                (size.0 as f64
-                    * crate::sensors::cpu::StackedBarSvg::new(self.config.cpu.bar_width, 24)
+                ((size.0) as f64
+                    * StackedBarSvg::new(self.config.cpu.bar_width, 24, self.config.cpu.bar_spacing)
                         .aspect_ratio(self.cpu.core_count()))
                 .round() as u16
             } else {
