@@ -5,7 +5,7 @@ use crate::{
     fl,
     svg_graph::SvgColors,
 };
-use cosmic::{Element, Renderer, Theme, iced_widget::Column, widget::Container};
+use cosmic::{iced::Alignment::Center, iced_widget::Column, widget::Container, Element, Renderer, Theme};
 use std::{any::Any, sync::LazyLock};
 
 use cosmic::widget;
@@ -359,14 +359,14 @@ impl Sensor for Cpu {
             );
         }
         cpu_column.push(
-            row!(
+            row!(widget::text::body(fl!("chart-type")),
                 widget::dropdown(&self.graph_options, selected, move |m| {
                     let mut choice: GraphKind = m.into();
                     if choice != GraphKind::Ring && choice != GraphKind::Line {
                         choice = GraphKind::StackedBars
                     };
                     Message::SelectGraphType(DeviceKind::Cpu, choice)
-                },)
+                })
                 .width(70),
                 widget::horizontal_space(),
                 widget::button::standard(fl!("change-colors")).on_press(Message::ColorPickerOpen(
@@ -374,7 +374,7 @@ impl Sensor for Cpu {
                     cpu_kind,
                     None
                 )),
-            )
+            ).align_y(Center)
             .into(),
         );
 

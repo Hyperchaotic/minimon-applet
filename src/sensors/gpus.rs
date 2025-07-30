@@ -1,3 +1,4 @@
+use cosmic::iced::Alignment::Center;
 use cosmic::{Element, Renderer, Theme};
 use log::info;
 use std::{collections::VecDeque, fmt::Write};
@@ -865,7 +866,7 @@ impl Gpu {
                         Message::GpuToggleLabel(self.id(), DeviceKind::Gpu, value)
                     }),
                 ),
-                row!(
+                row!(widget::text::body(fl!("chart-type")),
                     widget::dropdown(&self.gpu.graph_options, selected, move |m| {
                         Message::GpuSelectGraphType(id.clone(), DeviceKind::Gpu, m.into())
                     },)
@@ -874,7 +875,7 @@ impl Gpu {
                     widget::button::standard(fl!("change-colors")).on_press(
                         Message::ColorPickerOpen(DeviceKind::Gpu, gpu_kind, Some(self.id())),
                     )
-                ),
+                ).align_y(Center),
             )
             .spacing(cosmic.space_xs()),
         ));
@@ -929,7 +930,7 @@ impl Gpu {
                         Message::GpuToggleLabel(self.id(), DeviceKind::Vram, value)
                     }),
                 ),
-                row!(
+                row!(widget::text::body(fl!("chart-type")),
                     widget::dropdown(&self.vram.graph_options, selected, move |m| {
                         Message::GpuSelectGraphType(id.clone(), DeviceKind::Vram, m.into())
                     },)
@@ -938,7 +939,7 @@ impl Gpu {
                     widget::button::standard(fl!("change-colors")).on_press(
                         Message::ColorPickerOpen(DeviceKind::Vram, mem_kind, Some(self.id())),
                     )
-                ),
+                ).align_y(Center),
             )
             .spacing(cosmic.space_xs()),
         ));
@@ -1001,7 +1002,7 @@ impl Gpu {
                         Message::SelectGpuTempUnit(id1.clone(), m.into())
                     },)
                 ),
-                row!(
+                row!(widget::text::body(fl!("chart-type")),
                     widget::dropdown(&self.temp.graph_options, selected, move |m| {
                         Message::GpuSelectGraphType(id2.clone(), DeviceKind::GpuTemp, m.into())
                     },)
@@ -1010,7 +1011,7 @@ impl Gpu {
                     widget::button::standard(fl!("change-colors")).on_press(
                         Message::ColorPickerOpen(DeviceKind::GpuTemp, temp_kind, Some(self.id())),
                     )
-                ),
+                ).align_y(Center),
             )
             .spacing(cosmic.space_xs()),
         ));

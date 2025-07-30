@@ -1,4 +1,4 @@
-use cosmic::{Element, widget::Container};
+use cosmic::{iced::Alignment::Center, widget::Container, Element};
 use sysinfo::{MemoryRefreshKind, System};
 
 use crate::{
@@ -241,7 +241,7 @@ impl Sensor for Memory {
                     fl!("memory-as-percentage"),
                     toggler(config.percentage).on_toggle(Message::ToggleMemoryPercentage),
                 ),
-                row!(
+                row!(widget::text::body(fl!("chart-type")),
                     widget::dropdown(&self.graph_options, selected, move |m| {
                         Message::SelectGraphType(DeviceKind::Memory, m.into())
                     },)
@@ -249,7 +249,7 @@ impl Sensor for Memory {
                     widget::horizontal_space(),
                     widget::button::standard(fl!("change-colors"))
                         .on_press(Message::ColorPickerOpen(DeviceKind::Memory, mem_kind, None)),
-                )
+                ).align_y(Center)
             )
             .spacing(cosmic.space_xs()),
         ));

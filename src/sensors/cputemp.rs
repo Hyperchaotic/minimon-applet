@@ -5,8 +5,7 @@ use crate::{
     svg_graph::SvgColors,
 };
 use cosmic::{
-    Element,
-    widget::Container,
+    iced::Alignment::Center, widget::Container, Element
 };
 
 use cosmic::widget;
@@ -346,7 +345,7 @@ impl Sensor for CpuTemp {
                         Message::SelectCpuTempUnit(m.into())
                     },)
                 ),
-                row!(
+                row!(widget::text::body(fl!("chart-type")),
                     widget::dropdown(&self.graph_options, selected_graph, |m| {
                         Message::SelectGraphType(DeviceKind::CpuTemp, m.into())
                     },)
@@ -355,7 +354,7 @@ impl Sensor for CpuTemp {
                     widget::button::standard(fl!("change-colors")).on_press(
                         Message::ColorPickerOpen(DeviceKind::CpuTemp, temp_kind, None)
                     ),
-                )
+                ).align_y(Center)
             )
             .spacing(cosmic.space_xs()),
         ));

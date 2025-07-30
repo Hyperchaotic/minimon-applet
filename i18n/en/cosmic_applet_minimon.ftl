@@ -84,3 +84,4 @@ minutes-left = min left
 settings-small = Small
 settings-large = Large
 content-order = Content order
+chart-type = Chart type
