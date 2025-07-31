@@ -29,10 +29,6 @@ use super::gpu::amd::AmdGpu;
 use super::gpu::intel::IntelGpu;
 use super::gpu::{GpuIf, nvidia::NvidiaGpu};
 
-const GRAPH_OPTIONS: [&str; 2] = ["Ring", "Line"];
-const TEMP_GRAPH_OPTIONS: [&str; 3] = ["Ring", "Line", "Heat"];
-const UNIT_OPTIONS: [&str; 4] = ["Celcius", "Farenheit", "Kelvin", "Rankine"];
-
 const MAX_SAMPLES: usize = 21;
 
 #[cfg(feature = "lyon_charts")]
@@ -65,7 +61,7 @@ impl GpuGraph {
         GpuGraph {
             id: id.to_owned(),
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
-            graph_options: GRAPH_OPTIONS.to_vec(),
+            graph_options: super::GRAPH_OPTIONS_RING_LINE.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
@@ -278,7 +274,7 @@ impl VramGraph {
         VramGraph {
             id: id.to_owned(),
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
-            graph_options: GRAPH_OPTIONS.to_vec(),
+            graph_options: super::GRAPH_OPTIONS_RING_LINE.to_vec(),
             total,
             svg_colors: SvgColors::new(&GraphColors::default()),
             disabled: false,
@@ -459,8 +455,8 @@ impl TempGraph {
         TempGraph {
             id: id.to_owned(),
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
-            unit_options: UNIT_OPTIONS.to_vec(),
-            graph_options: TEMP_GRAPH_OPTIONS.to_vec(),
+            unit_options: super::UNIT_OPTIONS.to_vec(),
+            graph_options: super::GRAPH_OPTIONS_RING_LINE_HEAT.to_vec(),
             max_temp: 100.0,
             svg_colors: SvgColors::new(&GraphColors::default()),
             disabled: false,

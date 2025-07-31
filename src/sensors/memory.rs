@@ -26,8 +26,6 @@ use std::{collections::VecDeque, fmt::Write};
 
 use super::Sensor;
 
-const GRAPH_OPTIONS: [&str; 2] = ["Ring", "Line"];
-
 const MAX_SAMPLES: usize = 21;
 
 #[derive(Debug)]
@@ -165,7 +163,7 @@ impl Sensor for Memory {
 
     #[cfg(not(feature = "lyon_charts"))]
     fn chart(
-        &self,
+        &self, _height_hint: u16, _width_hint: u16
     ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         let svg = if self.config.kind == GraphKind::Ring {
             let mut latest = self.latest_sample();
@@ -213,7 +211,7 @@ impl Sensor for Memory {
         let mem = self.to_string(false);
         mem_elements.push(Element::from(
             column!(
-                Container::new(self.chart().width(60).height(60))
+                Container::new(self.chart(60, 60).width(60).height(60))
                     .width(90)
                     .align_x(Alignment::Center),
                 cosmic::widget::text::body(mem.to_string())
@@ -285,7 +283,7 @@ impl Default for Memory {
             max_val,
             system,
             config: MemoryConfig::default(),
-            graph_options: GRAPH_OPTIONS.to_vec(),
+            graph_options: super::GRAPH_OPTIONS_RING_LINE.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
         };
         memory.set_colors(GraphColors::default());

@@ -4,9 +4,7 @@ use crate::{
     fl,
     svg_graph::SvgColors,
 };
-use cosmic::{
-    iced::Alignment::Center, widget::Container, Element
-};
+use cosmic::{Element, iced::Alignment::Center, widget::Container};
 
 use cosmic::widget;
 use cosmic::widget::{settings, toggler};
@@ -36,9 +34,6 @@ use std::io;
 use super::{CpuVariant, Sensor, TempUnit};
 
 const MAX_SAMPLES: usize = 21;
-
-const GRAPH_OPTIONS: [&str; 3] = ["Ring", "Line", "Heat"];
-const UNIT_OPTIONS: [&str; 4] = ["Celcius", "Farenheit", "Kelvin", "Rankine"];
 
 #[derive(Debug)]
 pub struct HwmonTemp {
@@ -270,6 +265,8 @@ impl Sensor for CpuTemp {
     #[cfg(not(feature = "lyon_charts"))]
     fn chart(
         &self,
+        _height_hint: u16,
+        _width_hint: u16,
     ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         let mut max: f64 = 100.0;
         if let Some(hwmon) = &self.hwmon_temp {
@@ -313,13 +310,13 @@ impl Sensor for CpuTemp {
 
         temp_elements.push(Element::from(
             column!(
-                 Container::new(self.chart().width(60).height(60))
+                Container::new(self.chart(60, 60).width(60).height(60))
                     .width(90)
                     .align_x(Alignment::Center),
                 cosmic::widget::text::body(temp.to_string())
                     .width(90)
                     .align_x(Alignment::Center)
-           )
+            )
             .padding(5)
             .align_x(Alignment::Center),
         ));
@@ -345,7 +342,8 @@ impl Sensor for CpuTemp {
                         Message::SelectCpuTempUnit(m.into())
                     },)
                 ),
-                row!(widget::text::body(fl!("chart-type")),
+                row!(
+                    widget::text::body(fl!("chart-type")),
                     widget::dropdown(&self.graph_options, selected_graph, |m| {
                         Message::SelectGraphType(DeviceKind::CpuTemp, m.into())
                     },)
@@ -354,7 +352,8 @@ impl Sensor for CpuTemp {
                     widget::button::standard(fl!("change-colors")).on_press(
                         Message::ColorPickerOpen(DeviceKind::CpuTemp, temp_kind, None)
                     ),
-                ).align_y(Center)
+                )
+                .align_y(Center)
             )
             .spacing(cosmic.space_xs()),
         ));
@@ -398,9 +397,9 @@ impl Default for CpuTemp {
         let mut cpu = CpuTemp {
             hwmon_temp: hwmon,
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
-            graph_options: GRAPH_OPTIONS.to_vec(),
+            graph_options: super::GRAPH_OPTIONS_RING_LINE_HEAT.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
-            unit_options: UNIT_OPTIONS.to_vec(),
+            unit_options: super::UNIT_OPTIONS.to_vec(),
             config: CpuTempConfig::default(),
         };
         cpu.set_colors(GraphColors::default());

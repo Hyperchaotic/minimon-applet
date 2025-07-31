@@ -42,7 +42,7 @@ impl StackedBarSvg {
         let mut svg = String::new();
 
         // SVG header with COSMIC-friendly dark theme - width adapts to core count
-        writeln!(svg, r#"<svg width="{}" height="{}" viewBox="-1 -1 {} {}" xmlns="http://www.w3.org/2000/svg">"#, total_width, total_height, total_width+2, total_height+2).unwrap();
+        writeln!(svg, r#"<svg width="{total_width}" height="{total_height}" viewBox="0 0 {total_width} {total_height}" xmlns="http://www.w3.org/2000/svg">"#).unwrap();
 
         // CSS styles with configurable colors
         writeln!(
@@ -88,7 +88,6 @@ impl StackedBarSvg {
         }
 
         writeln!(svg, "</g></svg>").unwrap();
-        //println!("SVG: \n{}", svg);
         svg
     }
 
@@ -154,9 +153,5 @@ impl StackedBarSvg {
 
     pub fn height(&self) -> u16 {
         self.core_height + (self.padding * 2)
-    }
-
-    pub fn aspect_ratio(&self, core_count: usize) -> f64 {
-        self.width(core_count) as f64 / self.height() as f64
     }
 }

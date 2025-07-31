@@ -91,7 +91,7 @@ pub static SETTINGS_GPU_HEADING: LazyLock<&'static str> = LazyLock::new(|| fl!("
 
 // The UI requires static lifetime of dropdown items
 pub static SYSMON_LIST: LazyLock<BTreeMap<String, system_monitors::DesktopApp>> =
-    LazyLock::new(|| system_monitors::get_desktop_applications());
+    LazyLock::new(system_monitors::get_desktop_applications);
 
 pub static SYSMON_NAMES: LazyLock<Vec<&'static str>> =
     LazyLock::new(|| SYSMON_LIST.values().map(|app| app.name.as_str()).collect());
@@ -1284,11 +1284,12 @@ impl Minimon {
     fn general_settings_ui(&self) -> Element<crate::app::Message> {
         let refresh_rate = f64::from(self.config.refresh_rate) / 1000.0;
 
-        let heart = button::custom(
+        let heart = widget::button::custom(Element::from(row!(
+            widget::text(fl!("tip")),
             widget::svg(widget::svg::Handle::from_memory(HEART.as_bytes()))
                 .width(15)
-                .height(15),
-        );
+                .height(15)
+        )));
         let version_row = row!(
             text::heading(format!(
                 "Minimon version {} for COSMIC.",
@@ -1477,23 +1478,25 @@ impl Minimon {
             elements.push_back(self.figure_label(formatted_cpu).into());
         }
 
-        // Add the CPU chart if needed
-        if self.config.cpu.chart {
-            let width = if self.config.cpu.kind == GraphKind::StackedBars {
-                ((size.0) as f64
-                    * self.cpu.barchart
-                        .aspect_ratio(self.cpu.core_count()))
-                .round() as u16
-            } else {
-                size.1
-            };
+        let width: u16 = if self.config.cpu.kind == GraphKind::StackedBars {
+            StackedBarSvg::new(
+                self.config.cpu.bar_width,
+                size.0,
+                self.config.cpu.bar_spacing,
+            )
+            .width(self.cpu.core_count())
+        } else {
+            size.1
+        };
 
-            //println!("CPU UI: width: {}, height: {}, aspect ratio: {}, elem width: {}, ele height: {}",
+        elements.push_back(
+            self.cpu
+                .chart(size.0, width)
+                .height(size.0)
+                .width(width)
+                .into(),
+        );
 
-            //        );
-
-            elements.push_back(self.cpu.chart().height(size.0).width(width).into());
-        }
         elements
     }
 
@@ -1515,7 +1518,13 @@ impl Minimon {
 
             // Add the CPU chart if needed
             if self.config.cputemp.chart {
-                elements.push_back(self.cputemp.chart().height(size.0).width(size.1).into());
+                elements.push_back(
+                    self.cputemp
+                        .chart(size.0, size.1)
+                        .height(size.0)
+                        .width(size.1)
+                        .into(),
+                );
             }
         }
 
@@ -1540,7 +1549,13 @@ impl Minimon {
 
         // Chart section
         if self.config.memory.chart {
-            elements.push_back(self.memory.chart().height(size.0).width(size.1).into());
+            elements.push_back(
+                self.memory
+                    .chart(size.0, size.1)
+                    .height(size.0)
+                    .width(size.1)
+                    .into(),
+            );
         }
 
         elements
@@ -1594,7 +1609,13 @@ impl Minimon {
         }
 
         if self.config.network1.chart {
-            elements.push_back(self.network1.chart().height(size.0).width(size.1).into());
+            elements.push_back(
+                self.network1
+                    .chart(size.0, size.1)
+                    .height(size.0)
+                    .width(size.1)
+                    .into(),
+            );
         }
 
         if self.config.network2.label && !nw_combined {
@@ -1616,7 +1637,13 @@ impl Minimon {
         }
 
         if self.config.network2.chart && !nw_combined {
-            elements.push_back(self.network2.chart().height(size.0).width(size.1).into());
+            elements.push_back(
+                self.network2
+                    .chart(size.0, size.1)
+                    .height(size.0)
+                    .width(size.1)
+                    .into(),
+            );
         }
 
         if self.config.symbols && !elements.is_empty() {
@@ -1674,7 +1701,13 @@ impl Minimon {
         }
 
         if self.config.disks1.chart {
-            elements.push_back(self.disks1.chart().height(size.0).width(size.1).into());
+            elements.push_back(
+                self.disks1
+                    .chart(size.0, size.1)
+                    .height(size.0)
+                    .width(size.1)
+                    .into(),
+            );
         }
 
         if self.config.disks2.label && !disks_combined {
@@ -1696,7 +1729,13 @@ impl Minimon {
         }
 
         if self.config.disks2.chart && !disks_combined {
-            elements.push_back(self.disks2.chart().height(size.0).width(size.1).into());
+            elements.push_back(
+                self.disks2
+                    .chart(size.0, size.1)
+                    .height(size.0)
+                    .width(size.1)
+                    .into(),
+            );
         }
 
         if self.config.symbols && !elements.is_empty() {

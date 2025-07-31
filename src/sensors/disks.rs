@@ -215,7 +215,7 @@ impl Sensor for Disks {
 
     #[cfg(not(feature = "lyon_charts"))]
     fn chart(
-        &self,
+        &self, _height_hint: u16, _width_hint: u16
     ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         let svg = match self.config.variant {
             DisksVariant::Combined => crate::svg_graph::double_line(
@@ -260,7 +260,7 @@ impl Sensor for Disks {
         let k = self.config.variant;
 
         let mut rate = column!(
-            Container::new(self.chart().width(60).height(60))
+            Container::new(self.chart(60, 60).width(60).height(60))
                 .width(90)
                 .align_x(Alignment::Center)
         );

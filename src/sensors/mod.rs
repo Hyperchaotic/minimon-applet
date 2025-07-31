@@ -38,6 +38,30 @@ pub static COLOR_CHOICES_HEAT: LazyLock<[(&'static str, ColorVariant); 2]> = Laz
     ]
 });
 
+pub static UNIT_OPTIONS: LazyLock<[&'static str; 4]> = LazyLock::new(|| {
+    [
+        fl!("temperature-unit-celsius").leak(),
+        fl!("temperature-unit-fahrenheit").leak(),
+        fl!("temperature-unit-kelvin").leak(),
+        fl!("temperature-unit-rankine").leak(),
+    ]
+});
+
+static GRAPH_OPTIONS_RING_LINE: LazyLock<[&'static str; 2]> = LazyLock::new(|| {
+    [
+        fl!("graph-type-ring").leak(),
+        fl!("graph-type-line").leak(),
+    ]
+});
+
+static GRAPH_OPTIONS_RING_LINE_HEAT: LazyLock<[&'static str; 3]> = LazyLock::new(|| {
+    [
+        fl!("graph-type-ring").leak(),
+        fl!("graph-type-line").leak(),
+        fl!("graph-type-heat").leak(),
+    ]
+});
+
 use crate::{colorpicker::DemoGraph, config::GraphKind};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -61,7 +85,7 @@ pub trait Sensor {
     fn set_graph_kind(&mut self, kind: GraphKind);
     fn update(&mut self);
     fn demo_graph(&self) -> Box<dyn DemoGraph>;
-    fn chart(&self) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer>;
+    fn chart(&self, height_hint: u16, width_hint: u16) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer>;
     fn settings_ui(&self) -> Element<crate::app::Message>;
 }
 

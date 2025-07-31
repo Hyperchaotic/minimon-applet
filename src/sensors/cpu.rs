@@ -35,6 +35,14 @@ use super::Sensor;
 
 const MAX_SAMPLES: usize = 21;
 
+static GRAPH_OPTIONS_RING_LINE_BARS: LazyLock<[&'static str; 3]> = LazyLock::new(|| {
+    [
+        fl!("graph-type-ring").leak(),
+        fl!("graph-type-line").leak(),
+        fl!("graph-type-bars").leak(),
+    ]
+});
+
 pub static COLOR_CHOICES_BARS: LazyLock<[(&'static str, ColorVariant); 4]> = LazyLock::new(|| {
     [
         (fl!("graph-bars-system").leak(), ColorVariant::Color4),
@@ -78,7 +86,6 @@ pub struct Cpu {
     /// colors cached so we don't need to convert to string every time
     svg_colors: SvgColors,
     config: CpuConfig,
-    pub barchart: StackedBarSvg,
 }
 
 impl DemoGraph for Cpu {
@@ -161,7 +168,6 @@ impl Sensor for Cpu {
         if let Some(cfg) = config.downcast_ref::<CpuConfig>() {
             self.config = cfg.clone();
             self.svg_colors.set_colors(&cfg.colors);
-            self.barchart = StackedBarSvg::new(self.config.bar_width, 24, self.config.bar_spacing);
         }
     }
 
@@ -229,7 +235,11 @@ impl Sensor for Cpu {
     }
 
     #[cfg(not(feature = "lyon_charts"))]
-    fn chart(&self) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
+    fn chart(
+        &self,
+        height_hint: u16,
+        _width_hint: u16,
+    ) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
         let svg = match self.config.kind {
             GraphKind::Ring => {
                 let latest = self.latest_sample();
@@ -251,7 +261,10 @@ impl Sensor for Cpu {
                 crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
             }
             GraphKind::Line => crate::svg_graph::line(&self.samples_sum, 100.0, &self.svg_colors),
-            GraphKind::StackedBars => self.barchart.svg(&self.core_loads, &self.svg_colors),
+            GraphKind::StackedBars => {
+                StackedBarSvg::new(self.config.bar_width, height_hint, self.config.bar_spacing)
+                    .svg(&self.core_loads, &self.svg_colors)
+            }
             GraphKind::Heat => panic!("Heat not supported!"),
         };
 
@@ -274,7 +287,7 @@ impl Sensor for Cpu {
             let cpu = self.to_string();
             cpu_elements.push(Element::from(
                 column!(
-                    Container::new(self.chart().width(60).height(60))
+                    Container::new(self.chart(60, 60).width(60).height(60))
                         .width(90)
                         .align_x(Alignment::Center),
                     cosmic::widget::text::body(cpu.to_string())
@@ -285,14 +298,11 @@ impl Sensor for Cpu {
                 .align_x(Alignment::Center),
             ));
         } else {
-            let factor = 60_f64 / 24.0;
-            let width = (StackedBarSvg::new(self.config.bar_width, 60, self.config.bar_spacing)
-                .width(self.core_count()) as f64
-                * factor)
-                .round() as u16;
+            let width = StackedBarSvg::new(self.config.bar_width, 60, self.config.bar_spacing)
+                .width(self.core_count());
             cpu_column.push(Element::from(row!(
                 widget::horizontal_space(),
-                self.chart().height(60).width(width),
+                self.chart(60, width).height(60).width(width),
                 widget::horizontal_space()
             )));
         };
@@ -332,7 +342,7 @@ impl Sensor for Cpu {
                 .into(),
             );
 
-            let narrow = if config.bar_spacing == 0 { true } else { false };
+            let narrow = config.bar_spacing == 0;
             cpu_column.push(
                 settings::item(
                     fl!("graph-bar-spacing"),
@@ -404,9 +414,9 @@ impl Cpu {
         write!(value, "0").unwrap();
 
         let graph_opts: Vec<&'static str> = if is_horizontal {
-            ["Ring", "Line", "Bars"].into()
+            (*GRAPH_OPTIONS_RING_LINE_BARS).into()
         } else {
-            ["Ring", "Line"].into()
+            (*super::GRAPH_OPTIONS_RING_LINE).into()
         };
 
         let mut cpu = Cpu {
@@ -427,7 +437,6 @@ impl Cpu {
             graph_options: graph_opts.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
             config: CpuConfig::default(),
-            barchart: StackedBarSvg::default(),
         };
         cpu.set_colors(GraphColors::default());
         cpu
@@ -457,9 +466,8 @@ impl Cpu {
 
         combined_stats
     }
-        // Read CPU statistics from /proc/stat
-        fn read_cpu_stats2() -> HashMap<usize, CpuTimes> {
-    */
+    // Read CPU statistics from /proc/stat
+    fn read_cpu_stats2() -> HashMap<usize, CpuTimes> {*/
     fn read_cpu_stats() -> HashMap<usize, CpuTimes> {
         let mut cpu_stats = HashMap::new();
 
