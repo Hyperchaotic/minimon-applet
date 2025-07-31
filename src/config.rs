@@ -158,6 +158,7 @@ pub struct CpuConfig {
     pub label: bool,
     pub kind: GraphKind,
     pub colors: GraphColors,
+    pub bar_colors: GraphColors,
     pub no_decimals: bool,
     pub bar_width: u16, 
     pub bar_spacing: u16,
@@ -170,6 +171,10 @@ impl Default for CpuConfig {
             label: false,
             kind: GraphKind::Ring,
             colors: GraphColors::new(DeviceKind::Cpu),
+            bar_colors: GraphColors {
+                color3: Srgba::from_components((80, 80, 255, 255)),
+                ..Default::default()
+            },
             no_decimals: false,
             bar_width: 4,
             bar_spacing: 1,

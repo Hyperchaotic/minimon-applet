@@ -1826,7 +1826,11 @@ impl Minimon {
     fn save_colors(&mut self, colors: GraphColors, kind: DeviceKind, id: Option<String>) {
         match kind {
             DeviceKind::Cpu => {
-                self.config.cpu.colors = colors;
+                if self.config.cpu.kind == GraphKind::StackedBars {
+                    self.config.cpu.bar_colors = colors;
+                } else {
+                    self.config.cpu.colors = colors;
+                }
             }
             DeviceKind::CpuTemp => {
                 self.config.cputemp.colors = colors;

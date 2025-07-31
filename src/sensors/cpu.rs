@@ -85,6 +85,7 @@ pub struct Cpu {
     graph_options: Vec<&'static str>,
     /// colors cached so we don't need to convert to string every time
     svg_colors: SvgColors,
+    bar_svg_colors: SvgColors,
     config: CpuConfig,
 }
 
@@ -135,18 +136,27 @@ impl DemoGraph for Cpu {
                         system_pct: 5.4,
                     },
                 );
-                StackedBarSvg::default().svg(&map, &self.svg_colors)
+                StackedBarSvg::default().svg(&map, &self.bar_svg_colors)
             }
         }
     }
 
     fn colors(&self) -> GraphColors {
-        self.config.colors
+        if self.config.kind == GraphKind::StackedBars {
+            self.config.bar_colors
+        } else {
+            self.config.colors
+        }
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.config.colors = colors;
-        self.svg_colors.set_colors(&colors);
+        if self.config.kind == GraphKind::StackedBars {
+            self.config.bar_colors = colors;
+            self.bar_svg_colors.set_colors(&colors);
+        } else {
+            self.config.colors = colors;
+            self.svg_colors.set_colors(&colors);
+        }
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
@@ -168,6 +178,7 @@ impl Sensor for Cpu {
         if let Some(cfg) = config.downcast_ref::<CpuConfig>() {
             self.config = cfg.clone();
             self.svg_colors.set_colors(&cfg.colors);
+            self.bar_svg_colors.set_colors(&cfg.bar_colors);
         }
     }
 
@@ -263,7 +274,7 @@ impl Sensor for Cpu {
             GraphKind::Line => crate::svg_graph::line(&self.samples_sum, 100.0, &self.svg_colors),
             GraphKind::StackedBars => {
                 StackedBarSvg::new(self.config.bar_width, height_hint, self.config.bar_spacing)
-                    .svg(&self.core_loads, &self.svg_colors)
+                    .svg(&self.core_loads, &self.bar_svg_colors)
             }
             GraphKind::Heat => panic!("Heat not supported!"),
         };
@@ -436,6 +447,7 @@ impl Cpu {
             ]),
             graph_options: graph_opts.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
+            bar_svg_colors: SvgColors::new(&GraphColors::default()),
             config: CpuConfig::default(),
         };
         cpu.set_colors(GraphColors::default());
