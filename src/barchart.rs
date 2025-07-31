@@ -3,6 +3,7 @@ use std::fmt::Write;
 
 use crate::{sensors::cpu::CpuLoad, svg_graph::SvgColors};
 
+#[derive(Debug, Clone, Copy)]
 pub struct StackedBarSvg {
     core_width: u16,
     core_height: u16,

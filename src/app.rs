@@ -1481,7 +1481,7 @@ impl Minimon {
         if self.config.cpu.chart {
             let width = if self.config.cpu.kind == GraphKind::StackedBars {
                 ((size.0) as f64
-                    * StackedBarSvg::new(self.config.cpu.bar_width, 24, self.config.cpu.bar_spacing)
+                    * self.cpu.barchart
                         .aspect_ratio(self.cpu.core_count()))
                 .round() as u16
             } else {

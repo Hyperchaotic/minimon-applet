@@ -5,7 +5,9 @@ use crate::{
     fl,
     svg_graph::SvgColors,
 };
-use cosmic::{iced::Alignment::Center, iced_widget::Column, widget::Container, Element, Renderer, Theme};
+use cosmic::{
+    Element, Renderer, Theme, iced::Alignment::Center, iced_widget::Column, widget::Container,
+};
 use std::{any::Any, sync::LazyLock};
 
 use cosmic::widget;
@@ -76,6 +78,7 @@ pub struct Cpu {
     /// colors cached so we don't need to convert to string every time
     svg_colors: SvgColors,
     config: CpuConfig,
+    pub barchart: StackedBarSvg,
 }
 
 impl DemoGraph for Cpu {
@@ -158,6 +161,7 @@ impl Sensor for Cpu {
         if let Some(cfg) = config.downcast_ref::<CpuConfig>() {
             self.config = cfg.clone();
             self.svg_colors.set_colors(&cfg.colors);
+            self.barchart = StackedBarSvg::new(self.config.bar_width, 24, self.config.bar_spacing);
         }
     }
 
@@ -247,8 +251,7 @@ impl Sensor for Cpu {
                 crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
             }
             GraphKind::Line => crate::svg_graph::line(&self.samples_sum, 100.0, &self.svg_colors),
-            GraphKind::StackedBars => StackedBarSvg::new(self.config.bar_width, 24, self.config.bar_spacing)
-                .svg(&self.core_loads, &self.svg_colors),
+            GraphKind::StackedBars => self.barchart.svg(&self.core_loads, &self.svg_colors),
             GraphKind::Heat => panic!("Heat not supported!"),
         };
 
@@ -283,8 +286,8 @@ impl Sensor for Cpu {
             ));
         } else {
             let factor = 60_f64 / 24.0;
-            let width = (StackedBarSvg::new(self.config.bar_width, 60, self.config.bar_spacing).width(self.core_count())
-                as f64
+            let width = (StackedBarSvg::new(self.config.bar_width, 60, self.config.bar_spacing)
+                .width(self.core_count()) as f64
                 * factor)
                 .round() as u16;
             cpu_column.push(Element::from(row!(
@@ -359,7 +362,8 @@ impl Sensor for Cpu {
             );
         }
         cpu_column.push(
-            row!(widget::text::body(fl!("chart-type")),
+            row!(
+                widget::text::body(fl!("chart-type")),
                 widget::dropdown(&self.graph_options, selected, move |m| {
                     let mut choice: GraphKind = m.into();
                     if choice != GraphKind::Ring && choice != GraphKind::Line {
@@ -374,7 +378,8 @@ impl Sensor for Cpu {
                     cpu_kind,
                     None
                 )),
-            ).align_y(Center)
+            )
+            .align_y(Center)
             .into(),
         );
 
@@ -422,6 +427,7 @@ impl Cpu {
             graph_options: graph_opts.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
             config: CpuConfig::default(),
+            barchart: StackedBarSvg::default(),
         };
         cpu.set_colors(GraphColors::default());
         cpu
