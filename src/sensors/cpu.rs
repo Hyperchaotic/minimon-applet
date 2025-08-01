@@ -370,7 +370,7 @@ impl Sensor for Cpu {
             )
             .into(),
         );
-        if self.graph_kind() != GraphKind::StackedBars {
+        if self.config.label {
             cpu_column.push(
                 settings::item(
                     fl!("cpu-no-decimals"),
