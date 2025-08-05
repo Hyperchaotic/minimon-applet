@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use cosmic::{Element, iced_widget::Column, widget::Container};
+use log::info;
 use sysinfo::Networks;
 
 use crate::{
@@ -419,6 +420,7 @@ impl Default for Network {
 }
 
 impl Network {
+
     fn makestr(val: u64, format: UnitVariant, show_bytes: bool) -> String {
         let mut value = val as f64;
 
@@ -441,27 +443,23 @@ impl Network {
             unit_index += 1;
         }
 
-        // Format the number with varying precision
-        let value_str = if value < 10.0 {
-            format!("{value:.2}")
-        } else if value < 99.0 {
-            format!("{value:.1}")
+        // Format the number with varying precision, prevent the formatter from rounding up
+        let mut value_str = if value < 10.0 {
+            format!("{:.2}", (value * 100.0).trunc() / 100.0)
+        } else if value < 100.0 {
+            format!("{:.1}", (value * 10.0).trunc() / 10.0)
         } else {
-            format!("{value:.0}")
+            format!("{:.0}", value.trunc())
         };
+
+        // This happens when value is something like 9.9543456789908765453456 and it's rounded up to 10.
+        if value_str.len()==5 {
+            info!("Value: {value}. formatted: {value:.2}. string: {value_str}");
+            value_str.pop();
+        }
 
         let unit_str = units[unit_index];
         let mut result = String::with_capacity(20);
-
-        if format == UnitVariant::Long {
-            if value_str.len() == 3 {
-                result.push(' ');
-            }
-            if unit_index == 0 {
-                result.push(' ');
-            }
-        }
-
         result.push_str(&value_str);
 
         if format == UnitVariant::Long {
@@ -469,13 +467,6 @@ impl Network {
         }
 
         result.push_str(unit_str);
-
-        if format == UnitVariant::Long {
-            let padding = 9usize.saturating_sub(result.len());
-            if padding > 0 {
-                result = " ".repeat(padding) + &result;
-            }
-        }
 
         result
     }

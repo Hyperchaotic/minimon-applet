@@ -3,6 +3,9 @@ use cosmic::applet::{PanelType, Size};
 use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::cosmic_theme::palette::bool_mask::BoolMask;
 use cosmic::cosmic_theme::palette::{FromColor, WithAlpha};
+use cosmic::iced::advanced::graphics::text::cosmic_text::{Buffer, FontSystem, Metrics, Shaping};
+use cosmic::iced::alignment::Horizontal::{self};
+use cosmic::iced_winit::graphics::text::cosmic_text::Attrs;
 
 use std::collections::{BTreeMap, VecDeque};
 use std::{fs, time};
@@ -13,7 +16,7 @@ use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_p
 use cosmic::iced::window::Id;
 use cosmic::iced::{self, Subscription};
 use cosmic::widget::{button, container, horizontal_space, list, settings, spin_button, text};
-use cosmic::{Apply, Element};
+use cosmic::{Apply, Element, font};
 use cosmic::{widget, widget::autosize};
 
 use std::sync::Arc;
@@ -177,6 +180,16 @@ pub struct Minimon {
 
     // Tracks whether any chart or label is showing on the panel
     data_is_visible: bool,
+
+    // Used to measure label width, have to be cached because slow to load
+    font_system: FontSystem,
+
+    // Pre-calc the max width of labels to avoid panel wobble
+    label_cpu_width: Option<f32>,
+    label_gpu_width: Option<f32>,
+    label_network_width: Option<f32>,
+    label_disks_width: Option<f32>,
+    label_w_width: Option<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -219,7 +232,7 @@ pub enum Message {
 
     SelectGraphType(DeviceKind, GraphKind),
     Tick,
-    ACCheck,
+    SlowTimer,
     PopupClosed(Id),
 
     ToggleCpuChart(bool),
@@ -307,6 +320,12 @@ impl cosmic::Application for Minimon {
             is_laptop,
             on_ac: true,
             data_is_visible: false,
+            font_system: FontSystem::new(),
+            label_cpu_width: None,
+            label_gpu_width: None,
+            label_network_width: None,
+            label_disks_width: None,
+            label_w_width: None,
         };
 
         (app, Task::none())
@@ -331,8 +350,8 @@ impl cosmic::Application for Minimon {
             iced::time::every(time::Duration::from_millis(u64::from(val)))
         }
 
-        fn ac_time_subscription() -> Subscription<time::Instant> {
-            iced::time::every(time::Duration::from_millis(4000))
+        fn slow_time_subscription() -> Subscription<time::Instant> {
+            iced::time::every(time::Duration::from_millis(3000))
         }
 
         let mut subs: Vec<Subscription<Message>> = vec![
@@ -346,9 +365,7 @@ impl cosmic::Application for Minimon {
                 .map(|u| Message::ConfigChanged(Box::new(u.config))),
         ];
 
-        if self.is_laptop {
-            subs.push(ac_time_subscription().map(|_| Message::ACCheck));
-        }
+        subs.push(slow_time_subscription().map(|_| Message::SlowTimer));
 
         Subscription::batch(subs)
     }
@@ -602,7 +619,7 @@ impl cosmic::Application for Minimon {
                 ));
 
                 let disks = widget::text::body(format!(
-                    "W {} R {}",
+                    "w {} r {}",
                     &self
                         .disks1
                         .write_label(sample_rate_ms, disks::UnitVariant::Long),
@@ -695,11 +712,11 @@ impl cosmic::Application for Minimon {
             Message::TogglePopup => {
                 return if let Some(p) = self.popup.take() {
                     self.colorpicker.deactivate();
-                    // GPUs that sleep on battery wil be active while settings are up
                     // but have to go back to sleep if settings closed
                     self.maybe_stop_gpus();
                     destroy_popup(p)
                 } else {
+                    self.calculate_max_label_widths();
                     let new_id = Id::unique();
                     self.popup.replace(new_id);
                     let mut popup_settings = self.core.applet.get_popup_settings(
@@ -907,25 +924,28 @@ impl cosmic::Application for Minimon {
                 self.refresh_stats();
             }
 
-            Message::ACCheck => {
-                let current_on_ac = self.is_on_ac().unwrap_or(true);
-                if self.on_ac != current_on_ac {
-                    self.on_ac = current_on_ac;
+            Message::SlowTimer => {
+                if self.is_laptop {
+                    let current_on_ac = self.is_on_ac().unwrap_or(true);
+                    if self.on_ac != current_on_ac {
+                        self.on_ac = current_on_ac;
 
-                    for (id, gpu) in &mut self.gpus {
-                        if let Some(c) = self.config.gpus.get(id) {
-                            if c.pause_on_battery {
-                                if current_on_ac {
-                                    info!("Changed to AC, restart polling");
-                                    gpu.restart(); // on AC, start polling
-                                } else {
-                                    info!("Changed to DC, stop polling");
-                                    gpu.stop(); // on battery, stop polling
+                        for (id, gpu) in &mut self.gpus {
+                            if let Some(c) = self.config.gpus.get(id) {
+                                if c.pause_on_battery {
+                                    if current_on_ac {
+                                        info!("Changed to AC, restart polling");
+                                        gpu.restart(); // on AC, start polling
+                                    } else {
+                                        info!("Changed to DC, stop polling");
+                                        gpu.stop(); // on battery, stop polling
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                self.calculate_max_label_widths();
             }
 
             Message::ToggleCpuChart(toggled) => {
@@ -1222,6 +1242,7 @@ impl Minimon {
                 self.data_is_visible = true;
             }
         }
+        self.calculate_max_label_widths();
     }
 
     pub fn sub_page_header<'a, Message: 'static + Clone>(
@@ -1462,20 +1483,19 @@ impl Minimon {
         let cpu_usage = self.cpu.latest_sample();
         // Format CPU usage based on horizontal layout and sample value
         let formatted_cpu = if self.config.cpu.no_decimals {
-            if cpu_usage.round() < 10.0 {
-                format!(" {}%", cpu_usage.round())
-            } else {
-                format!("{}%", cpu_usage.round())
-            }
+            format!("{}%", cpu_usage.round())
         } else if cpu_usage < 10.0 && horizontal {
-            format!("{cpu_usage:.2}%")
+            format!("{:.2}%", (cpu_usage * 100.0).trunc() / 100.0)
         } else {
-            format!("{cpu_usage:.1}%")
+            format!("{:.1}%", (cpu_usage * 10.0).trunc() / 10.0)
         };
 
         // Add the CPU label if needed
         if self.config.cpu.label {
-            elements.push_back(self.figure_label(formatted_cpu).into());
+            elements.push_back(
+                self.figure_label(formatted_cpu, self.label_cpu_width)
+                    .into(),
+            );
         }
 
         let width: u16 = if self.config.cpu.kind == GraphKind::StackedBars {
@@ -1513,7 +1533,7 @@ impl Minimon {
 
             // Add the CPU label if needed
             if self.config.cputemp.label {
-                elements.push_back(self.figure_label(self.cputemp.to_string()).into());
+                elements.push_back(self.figure_label(self.cputemp.to_string(), None).into());
             }
 
             // Add the CPU chart if needed
@@ -1544,7 +1564,7 @@ impl Minimon {
         // Label section
         if self.config.memory.label {
             let formatted_mem = self.memory.to_string(!horizontal);
-            elements.push_back(self.figure_label(formatted_mem).into());
+            elements.push_back(self.figure_label(formatted_mem, None).into());
         }
 
         // Chart section
@@ -1568,40 +1588,41 @@ impl Minimon {
         let sample_rate_ms = self.config.refresh_rate;
         let mut elements: VecDeque<Element<Message>> = VecDeque::new();
 
-        let format_label = |text: String| self.figure_label(text);
+        let format_label = |text: String| self.figure_label(text, self.label_network_width);
+
+        let unit_len = if horizontal {
+            network::UnitVariant::Long
+        } else {
+            network::UnitVariant::Short
+        };
 
         if self.config.network1.label {
             let mut network_labels = Vec::new();
+            let mut dl_row = Vec::new();
 
-            // Download label
-            let dl_text = if horizontal {
-                format!(
-                    "↓ {}",
-                    self.network1
-                        .download_label(sample_rate_ms, network::UnitVariant::Long)
-                )
-            } else {
-                self.network1
-                    .download_label(sample_rate_ms, network::UnitVariant::Short)
-            };
+            if horizontal {
+                dl_row.push(self.figure_label("↓".to_owned(), None).into());
+            }
+            dl_row
+                .push(format_label(self.network1.download_label(sample_rate_ms, unit_len)).into());
+
             if nw_combined {
                 network_labels.push(widget::vertical_space().into());
             }
-            network_labels.push(format_label(dl_text).into());
+
+            network_labels.push(Row::from_vec(dl_row).spacing(0).padding(0).into());
 
             if nw_combined {
-                // Upload label
-                let ul_text = if horizontal {
-                    format!(
-                        "↑ {}",
-                        self.network1
-                            .upload_label(sample_rate_ms, network::UnitVariant::Long)
-                    )
-                } else {
-                    self.network1
-                        .upload_label(sample_rate_ms, network::UnitVariant::Short)
-                };
-                network_labels.push(format_label(ul_text).into());
+                let mut ul_row = Vec::new();
+
+                if horizontal {
+                    ul_row.push(self.figure_label("↑".to_owned(), None).into());
+                }
+                ul_row.push(
+                    format_label(self.network1.upload_label(sample_rate_ms, unit_len)).into(),
+                );
+
+                network_labels.push(Row::from_vec(ul_row).spacing(0).padding(0).into());
                 network_labels.push(widget::vertical_space().into());
             }
 
@@ -1621,17 +1642,14 @@ impl Minimon {
         if self.config.network2.label && !nw_combined {
             let mut network_labels = Vec::new();
 
-            let ul_text = if horizontal {
-                format!(
-                    "↑ {}",
-                    self.network2
-                        .upload_label(sample_rate_ms, network::UnitVariant::Long)
-                )
-            } else {
-                self.network2
-                    .upload_label(sample_rate_ms, network::UnitVariant::Short)
-            };
-            network_labels.push(format_label(ul_text).into());
+            let mut ul_row = Vec::new();
+
+            if horizontal {
+                ul_row.push(self.figure_label("↑".to_owned(), None).into());
+            }
+            ul_row.push(format_label(self.network2.upload_label(sample_rate_ms, unit_len)).into());
+
+            network_labels.push(Row::from_vec(ul_row).spacing(0).padding(0).into());
 
             elements.push_back(Column::from_vec(network_labels).into());
         }
@@ -1660,40 +1678,37 @@ impl Minimon {
         let sample_rate_ms = self.config.refresh_rate;
         let mut elements: VecDeque<Element<Message>> = VecDeque::new();
 
-        let format_label = |text: String| self.figure_label(text);
+        let format_label = |text: String| self.figure_label(text, self.label_disks_width);
+
+        let unit_len = if horizontal {
+            disks::UnitVariant::Long
+        } else {
+            disks::UnitVariant::Short
+        };
 
         if self.config.disks1.label {
             let mut disks_labels = Vec::new();
 
-            // Write label
-            let write_text = if horizontal {
-                format!(
-                    "W {}",
-                    self.disks1
-                        .write_label(sample_rate_ms, disks::UnitVariant::Long)
-                )
-            } else {
-                self.disks1
-                    .write_label(sample_rate_ms, disks::UnitVariant::Short)
-            };
+            let mut wr_row = Vec::new();
+            if horizontal {
+                wr_row.push(self.figure_label("w".to_owned(), self.label_w_width).into());
+            }
+            wr_row.push(format_label(self.disks1.write_label(sample_rate_ms, unit_len)).into());
+
             if disks_combined {
                 disks_labels.push(widget::vertical_space().into());
             }
-            disks_labels.push(format_label(write_text).into());
+
+            disks_labels.push(Row::from_vec(wr_row).spacing(0).padding(0).into());
 
             if disks_combined {
-                // Read label
-                let read_text = if horizontal {
-                    format!(
-                        "R {}",
-                        self.disks1
-                            .read_label(sample_rate_ms, disks::UnitVariant::Long)
-                    )
-                } else {
-                    self.disks1
-                        .read_label(sample_rate_ms, disks::UnitVariant::Short)
-                };
-                disks_labels.push(format_label(read_text).into());
+                let mut rd_row = Vec::new();
+                if horizontal {
+                    rd_row.push(self.figure_label("r".to_owned(), self.label_w_width).into());
+                }
+                rd_row.push(format_label(self.disks1.read_label(sample_rate_ms, unit_len)).into());
+
+                disks_labels.push(Row::from_vec(rd_row).spacing(0).padding(0).into());
                 disks_labels.push(widget::vertical_space().into());
             }
 
@@ -1713,17 +1728,12 @@ impl Minimon {
         if self.config.disks2.label && !disks_combined {
             let mut disks_labels = Vec::new();
 
-            let read_text = if horizontal {
-                format!(
-                    "R {}",
-                    self.disks2
-                        .read_label(sample_rate_ms, disks::UnitVariant::Long)
-                )
-            } else {
-                self.disks2
-                    .read_label(sample_rate_ms, disks::UnitVariant::Short)
-            };
-            disks_labels.push(format_label(read_text).into());
+            let mut rd_row = Vec::new();
+            if horizontal {
+                rd_row.push(self.figure_label("r".to_owned(), self.label_w_width).into());
+            }
+            rd_row.push(format_label(self.disks2.read_label(sample_rate_ms, unit_len)).into());
+            disks_labels.push(Row::from_vec(rd_row).spacing(0).padding(0).into());
 
             elements.push_back(Column::from_vec(disks_labels).into());
         }
@@ -1762,20 +1772,24 @@ impl Minimon {
             if stacked_labels {
                 let gpu_labels = vec![
                     widget::vertical_space().into(),
-                    self.figure_label(formatted_gpu).into(),
-                    self.figure_label(formatted_vram.clone()).into(),
+                    self.figure_label(formatted_gpu, self.label_gpu_width)
+                        .into(),
+                    self.figure_label(formatted_vram.clone(), None).into(),
                     widget::vertical_space().into(),
                 ];
                 elements.push_back(Column::from_vec(gpu_labels).into());
             } else if config.usage.label {
-                elements.push_back(self.figure_label(formatted_gpu).into());
+                elements.push_back(
+                    self.figure_label(formatted_gpu, self.label_gpu_width)
+                        .into(),
+                );
             }
 
             if config.usage.chart {
                 elements.push_back(gpu.gpu.chart().height(size.0).width(size.1).into());
             }
             if config.temp.label {
-                elements.push_back(self.figure_label(gpu.temp.to_string()).into());
+                elements.push_back(self.figure_label(gpu.temp.to_string(), None).into());
             }
 
             if config.temp.chart {
@@ -1783,7 +1797,7 @@ impl Minimon {
             }
 
             if config.vram.label && !stacked_labels {
-                elements.push_back(self.figure_label(formatted_vram).into());
+                elements.push_back(self.figure_label(formatted_vram, None).into());
             }
 
             if config.vram.chart {
@@ -1938,18 +1952,31 @@ impl Minimon {
         }
     }
 
-    fn figure_label<'a>(&self, text: String) -> widget::Text<'a, cosmic::Theme> {
-        let size = match self.core.applet.size {
+    fn label_font_size(&self) -> u16 {
+        match self.core.applet.size {
             Size::PanelSize(PanelSize::XL) => self.config.label_size_default + 5,
             Size::PanelSize(PanelSize::L) => self.config.label_size_default + 3,
             Size::PanelSize(PanelSize::M) => self.config.label_size_default + 2,
             Size::PanelSize(PanelSize::S) => self.config.label_size_default + 1,
             Size::PanelSize(PanelSize::XS) => self.config.label_size_default,
             _ => self.config.label_size_default,
-        };
+        }
+    }
+
+    fn figure_label<'a>(
+        &self,
+        text: String,
+        width: Option<f32>,
+    ) -> widget::Text<'a, cosmic::Theme> {
+        let size = self.label_font_size();
 
         if self.config.monospace_labels {
-            widget::text(text).size(size).font(cosmic::font::mono())
+            widget::text(text).size(size).font(cosmic::font::mono()) // .font(cosmic::font::Font::with_name("Noto Mono"))
+        } else if let Some(w) = width {
+            widget::text(text)
+                .size(size)
+                .width(w)
+                .align_x(Horizontal::Center)
         } else {
             widget::text(text).size(size)
         }
@@ -2039,6 +2066,82 @@ impl Minimon {
                 false
             }
         }
+    }
+
+    fn measure_text_width(&mut self, text: &str, attrs: &Attrs) -> Option<f32> {
+        let font_size = self.label_font_size();
+
+        let metrics = Metrics::new(font_size.into(), font_size.into());
+        // Create a buffer to shape the text
+        let mut buffer = Buffer::new(&mut self.font_system, metrics);
+        buffer.set_text(&mut self.font_system, text, attrs, Shaping::Advanced);
+
+        // Get the width of the first layout line
+        buffer
+            .lines
+            .first()
+            .and_then(|line| line.layout_opt())
+            .and_then(|layouts| layouts.first().map(|layout| layout.w.ceil()))
+    }
+
+    fn calculate_max_label_widths(&mut self) {
+        // Yes there are two different Family types
+        // font::default() returns one and Attrs takes another
+        use cosmic::iced::font::{Family as IcedFamily, Style as IcedStyle, Weight as IcedWeight};
+        use iced::advanced::graphics::text::cosmic_text::{
+            Family as CosmicTextFamily, Style as TextStyle, Weight as TextWeight,
+        };
+
+        let font = font::default();
+
+        let family = match font.family {
+            IcedFamily::Monospace => CosmicTextFamily::Monospace,
+            IcedFamily::Serif => CosmicTextFamily::Serif,
+            IcedFamily::SansSerif => CosmicTextFamily::SansSerif,
+            IcedFamily::Name(name) => CosmicTextFamily::Name(name),
+            IcedFamily::Cursive => CosmicTextFamily::Cursive,
+            IcedFamily::Fantasy => CosmicTextFamily::Fantasy,
+        };
+
+        let weight = match font.weight {
+            IcedWeight::Thin => TextWeight::THIN,
+            IcedWeight::ExtraLight => TextWeight::EXTRA_LIGHT,
+            IcedWeight::Light => TextWeight::LIGHT,
+            IcedWeight::Normal => TextWeight::NORMAL,
+            IcedWeight::Medium => TextWeight::MEDIUM,
+            IcedWeight::Bold => TextWeight::BOLD,
+            IcedWeight::ExtraBold => TextWeight::EXTRA_BOLD,
+            IcedWeight::Black => TextWeight::BLACK,
+            IcedWeight::Semibold => TextWeight::SEMIBOLD,
+        };
+
+        let style = match font.style {
+            IcedStyle::Normal => TextStyle::Normal,
+            IcedStyle::Italic => TextStyle::Italic,
+            IcedStyle::Oblique => TextStyle::Oblique,
+        };
+
+        let attrs = Attrs::new().family(family).weight(weight).style(style);
+
+        let is_horizontal = self.core.applet.is_horizontal();
+
+        self.label_cpu_width = self.measure_text_width("8.88%", &attrs);
+        self.label_gpu_width = self.label_cpu_width;
+
+        self.label_network_width = match (self.config.network1.show_bytes, is_horizontal) {
+            (false, false) => self.measure_text_width("8.88M", &attrs),
+            (false, true) => self.measure_text_width("8.88 Mbps", &attrs),
+            (true, false) => self.measure_text_width("8.88M", &attrs),
+            (true, true) => self.measure_text_width("8.88 MB/s", &attrs),
+        };
+
+        self.label_disks_width = if is_horizontal {
+            self.measure_text_width("8.88 MB/s", &attrs)
+        } else {
+            self.measure_text_width("8.88M", &attrs)
+        };
+
+        self.label_w_width = self.measure_text_width("W ", &attrs);
     }
 
     fn open_tipping_page_in_browser() {

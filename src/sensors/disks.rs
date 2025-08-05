@@ -63,7 +63,7 @@ pub static COLOR_CHOICES_READ: LazyLock<[(&'static str, ColorVariant); 3]> = Laz
     ]
 });
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum UnitVariant {
     Short,
     Long,
@@ -376,40 +376,32 @@ impl Disks {
 
         // Find the appropriate unit
         while value >= 999.0 && unit_index < units.len() - 1 {
-            value /= 1024.0;
+            value /= 1000.0;
             unit_index += 1;
         }
 
-        let s = if value < 10.0 {
-            &format!("{value:.2}")
-        } else if value < 99.0 {
-            &format!("{value:.1}")
+        // Format the number with varying precision, prevent the formatter from rounding up
+        let mut value_str = if value < 10.0 {
+            format!("{:.2}", (value * 100.0).trunc() / 100.0)
+        } else if value < 100.0 {
+            format!("{:.1}", (value * 10.0).trunc() / 10.0)
         } else {
-            &format!("{value:.0}")
+            format!("{:.0}", value.trunc())
         };
 
-        if format == UnitVariant::Long {
-            if s.len() == 3 {
-                formatted.push(' ');
-            }
-            if unit_index == 0 {
-                formatted.push(' ');
-            }
+        // This happens when value is something like 9.9543456789908765453456 and it's rounded up to 10.
+        if value_str.len()==5 {
+            log::info!("Value: {value}. formatted: {value:.2}. string: {value_str}");
+            value_str.pop();
         }
-        formatted.push_str(s);
+
+        formatted.push_str(&value_str);
 
         if format == UnitVariant::Long {
             formatted.push(' ');
         }
 
         formatted.push_str(units[unit_index]);
-
-        if format == UnitVariant::Long {
-            let padding = 9usize.saturating_sub(formatted.len());
-            if padding > 0 {
-                formatted = " ".repeat(padding) + &formatted;
-            }
-        }
 
         formatted
     }

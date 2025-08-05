@@ -47,12 +47,8 @@ pub static UNIT_OPTIONS: LazyLock<[&'static str; 4]> = LazyLock::new(|| {
     ]
 });
 
-static GRAPH_OPTIONS_RING_LINE: LazyLock<[&'static str; 2]> = LazyLock::new(|| {
-    [
-        fl!("graph-type-ring").leak(),
-        fl!("graph-type-line").leak(),
-    ]
-});
+static GRAPH_OPTIONS_RING_LINE: LazyLock<[&'static str; 2]> =
+    LazyLock::new(|| [fl!("graph-type-ring").leak(), fl!("graph-type-line").leak()]);
 
 static GRAPH_OPTIONS_RING_LINE_HEAT: LazyLock<[&'static str; 3]> = LazyLock::new(|| {
     [
@@ -85,7 +81,11 @@ pub trait Sensor {
     fn set_graph_kind(&mut self, kind: GraphKind);
     fn update(&mut self);
     fn demo_graph(&self) -> Box<dyn DemoGraph>;
-    fn chart(&self, height_hint: u16, width_hint: u16) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer>;
+    fn chart(
+        &self,
+        height_hint: u16,
+        width_hint: u16,
+    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer>;
     fn settings_ui(&self) -> Element<crate::app::Message>;
 }
 

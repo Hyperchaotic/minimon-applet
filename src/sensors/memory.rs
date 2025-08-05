@@ -318,11 +318,11 @@ impl Memory {
         }
 
         if current_val < 10.0 {
-            format!("{current_val:.2}{unit}")
+            format!("{:.2}{unit}", (current_val * 100.0).trunc() / 100.0)
         } else if current_val < 100.0 {
-            format!("{current_val:.1}{unit}")
+            format!("{:.1}{unit}", (current_val * 10.0).trunc() / 10.0)
         } else {
-            format!("{current_val}{unit}")
+            format!("{}{unit}", current_val.round())
         }
     }
 }

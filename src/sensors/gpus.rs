@@ -200,13 +200,13 @@ impl GpuGraph {
 impl fmt::Display for GpuGraph {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.disabled {
-            write!(f, "----%")
+            write!(f, "---%")
         } else {
             let current_val = self.latest_sample();
             if current_val < 10.0 {
-                write!(f, "{current_val:.2}%")
+                write!(f, "{:.2}%", (current_val * 100.0).trunc() / 100.0)
             } else if current_val < 100.0 {
-                write!(f, "{current_val:.1}%")
+                write!(f, "{:.1}%", (current_val * 10.0).trunc() / 10.0)
             } else {
                 write!(f, "{current_val}%")
             }
@@ -361,11 +361,11 @@ impl VramGraph {
                 write!(percentage, "{pct}").unwrap();
 
                 if latest < 10.0 {
-                    write!(value, "{latest:.2}").unwrap();
+                    write!(value, "{:.2}", (latest * 100.0).trunc() / 100.0).unwrap();
                 } else if latest < 100.0 {
-                    write!(value, "{latest:.1}").unwrap();
+                    write!(value, "{:.1}", (latest * 10.0).trunc() / 10.0).unwrap();
                 } else {
-                    write!(value, "{latest}").unwrap();
+                    write!(value, "{}", latest.round()).unwrap();
                 }
             }
             crate::svg_graph::ring(
@@ -413,13 +413,13 @@ impl VramGraph {
         let unit: &str = if vertical_panel { "GB" } else { " GB" };
 
         if self.disabled {
-            format!("----{unit}")
+            format!("---{unit}")
         } else if current_val < 10.0 {
-            format!("{current_val:.2}{unit}")
+            format!("{:.2}{unit}", (current_val * 100.0).trunc() / 100.0)
         } else if current_val < 100.0 {
-            format!("{current_val:.1}{unit}")
+            format!("{:.1}{unit}", (current_val * 10.0).trunc() / 10.0)
         } else {
-            format!("{current_val}{unit}")
+            format!("{}{unit}", current_val.round())
         }
     }
 
