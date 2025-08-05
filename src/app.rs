@@ -1509,13 +1509,15 @@ impl Minimon {
             size.1
         };
 
-        elements.push_back(
-            self.cpu
-                .chart(size.0, width)
-                .height(size.0)
-                .width(width)
-                .into(),
-        );
+        if self.config.cpu.chart {
+            elements.push_back(
+                self.cpu
+                    .chart(size.0, width)
+                    .height(size.0)
+                    .width(width)
+                    .into(),
+            );
+        }
 
         elements
     }
