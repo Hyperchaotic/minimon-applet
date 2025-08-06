@@ -58,9 +58,10 @@ impl HwmonTemp {
             let name = name.trim().to_lowercase();
             info!("  path: {name_path:?}. name: {name}");
 
-            if name.contains("coretemp") || name.contains("k10temp") || name.contains("cpu") {
+            if name.contains("coretemp") || name.contains("k10temp") || name.contains("cpu") || name.contains("zenpower") {
                 let mut tdie: Option<(PathBuf, String)> = None;
                 let mut tctl: Option<(PathBuf, String)> = None;
+                let mut ccd: Option<(PathBuf, String)> = None;
                 let mut core_fallbacks = vec![];
 
                 for i in 0..100 {
@@ -79,6 +80,9 @@ impl HwmonTemp {
                         } else if label.eq_ignore_ascii_case("Tctl") {
                             info!("  found sensor {label_path:?} {label}");
                             tctl = Some((input_path.clone(), label.to_string()));
+                        } else if label.eq_ignore_ascii_case("ccd") {
+                            info!("  found sensor {label_path:?} {label}");
+                            ccd = Some((input_path.clone(), label.to_string()));
                         } else if label.starts_with("Core") || label.contains("Package") {
                             info!("  found sensor {label_path:?} {label}");
                             core_fallbacks.push((input_path.clone(), label.to_string()));
@@ -87,7 +91,7 @@ impl HwmonTemp {
                 }
 
                 // Prioritize Tdie > Tctl
-                if let Some((path, _label)) = tdie.or(tctl) {
+                if let Some((path, _label)) = tdie.or(ccd).or(tctl) {
                     let crit_path = hwmon.join("temp1_crit");
                     let crit_temp = fs::read_to_string(&crit_path)
                         .ok()
