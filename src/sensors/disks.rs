@@ -403,6 +403,13 @@ impl Disks {
 
         formatted.push_str(units[unit_index]);
 
+        if format == UnitVariant::Long {
+            let padding = 9usize.saturating_sub(formatted.len());
+            if padding > 0 {
+                formatted = " ".repeat(padding) + &formatted;
+            }
+        }
+        
         formatted
     }
 

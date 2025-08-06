@@ -1612,7 +1612,7 @@ impl Minimon {
                 network_labels.push(widget::vertical_space().into());
             }
 
-            network_labels.push(Row::from_vec(dl_row).spacing(0).padding(0).into());
+            network_labels.push(Row::from_vec(dl_row).into());
 
             if nw_combined {
                 let mut ul_row = Vec::new();
@@ -1624,7 +1624,7 @@ impl Minimon {
                     format_label(self.network1.upload_label(sample_rate_ms, unit_len)).into(),
                 );
 
-                network_labels.push(Row::from_vec(ul_row).spacing(0).padding(0).into());
+                network_labels.push(Row::from_vec(ul_row).into());
                 network_labels.push(widget::vertical_space().into());
             }
 
@@ -1651,7 +1651,7 @@ impl Minimon {
             }
             ul_row.push(format_label(self.network2.upload_label(sample_rate_ms, unit_len)).into());
 
-            network_labels.push(Row::from_vec(ul_row).spacing(0).padding(0).into());
+            network_labels.push(Row::from_vec(ul_row).into());
 
             elements.push_back(Column::from_vec(network_labels).into());
         }
@@ -1977,10 +1977,10 @@ impl Minimon {
         } else if let Some(w) = width {
             widget::text(text)
                 .size(size)
-                .width(w)
+                .width(w).wrapping(iced::core::text::Wrapping::None)
                 .align_x(Horizontal::Center)
         } else {
-            widget::text(text).size(size)
+            widget::text(text).size(size).wrapping(iced::core::text::Wrapping::None)
         }
     }
 
@@ -2083,7 +2083,7 @@ impl Minimon {
             .lines
             .first()
             .and_then(|line| line.layout_opt())
-            .and_then(|layouts| layouts.first().map(|layout| layout.w.ceil()))
+            .and_then(|layouts| layouts.first().map(|layout| layout.w.ceil()+2.0))
     }
 
     fn calculate_max_label_widths(&mut self) {

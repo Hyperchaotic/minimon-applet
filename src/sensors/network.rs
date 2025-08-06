@@ -468,6 +468,13 @@ impl Network {
 
         result.push_str(unit_str);
 
+        if format == UnitVariant::Long {
+            let padding = 9usize.saturating_sub(result.len());
+            if padding > 0 {
+                result = " ".repeat(padding) + &result;
+            }
+        }
+        
         result
     }
 
