@@ -1,5 +1,6 @@
 use cosmic::applet::cosmic_panel_config::PanelSize;
 use cosmic::applet::{PanelType, Size};
+use cosmic::config::FontConfig;
 use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic::cosmic_theme::palette::bool_mask::BoolMask;
 use cosmic::cosmic_theme::palette::{FromColor, WithAlpha};
@@ -184,6 +185,8 @@ pub struct Minimon {
     // Used to measure label width, have to be cached because slow to load
     font_system: FontSystem,
 
+    interface_font: Option<FontConfig>,
+
     // Pre-calc the max width of labels to avoid panel wobble
     label_cpu_width: Option<f32>,
     label_gpu_width: Option<f32>,
@@ -246,6 +249,7 @@ pub enum Message {
     ToggleMemoryLabel(bool),
     ToggleMemoryPercentage(bool),
     ConfigChanged(Box<MinimonConfig>),
+    ThemeChanged(Box<cosmic::config::CosmicTk>),
     LaunchSystemMonitor(&'static system_monitors::DesktopApp),
     RefreshRateChanged(f64),
     LabelSizeChanged(u16),
@@ -321,6 +325,7 @@ impl cosmic::Application for Minimon {
             on_ac: true,
             data_is_visible: false,
             font_system: FontSystem::new(),
+            interface_font: None,
             label_cpu_width: None,
             label_gpu_width: None,
             label_network_width: None,
@@ -354,7 +359,7 @@ impl cosmic::Application for Minimon {
             iced::time::every(time::Duration::from_millis(3000))
         }
 
-        let mut subs: Vec<Subscription<Message>> = vec![
+        let mut subscriptions: Vec<Subscription<Message>> = vec![
             time_subscription(&self.refresh_rate).map(|_| Message::Tick),
             self.core
                 .watch_config(match self.core.applet.panel_type {
@@ -365,9 +370,15 @@ impl cosmic::Application for Minimon {
                 .map(|u| Message::ConfigChanged(Box::new(u.config))),
         ];
 
-        subs.push(slow_time_subscription().map(|_| Message::SlowTimer));
+        subscriptions.push(slow_time_subscription().map(|_| Message::SlowTimer));
 
-        Subscription::batch(subs)
+        subscriptions.push(
+            self.core
+                .watch_config("com.system76.CosmicTk")
+                .map(|u| Message::ThemeChanged(Box::new(u.config))),
+        );
+
+        Subscription::batch(subscriptions)
     }
 
     fn on_close_requested(&self, id: Id) -> Option<Message> {
@@ -709,7 +720,18 @@ impl cosmic::Application for Minimon {
     /// background thread managed by the application's executor.
     fn update(&mut self, message: Self::Message) -> Task<Self::Message> {
         match message {
+            Message::ThemeChanged(cosmictk) => {
+                let new_font = cosmictk.interface_font;
+
+                if self.interface_font.as_ref() != Some(&new_font) {
+                    info!("Message::ThemeChanged. Font is now: {:?}", new_font);
+                    self.interface_font = Some(new_font);
+                    self.calculate_max_label_widths();
+                }
+            }
+
             Message::TogglePopup => {
+                info!("Message::TogglePopup");
                 return if let Some(p) = self.popup.take() {
                     self.colorpicker.deactivate();
                     // but have to go back to sleep if settings closed
@@ -945,7 +967,6 @@ impl cosmic::Application for Minimon {
                         }
                     }
                 }
-                self.calculate_max_label_widths();
             }
 
             Message::ToggleCpuChart(toggled) => {
@@ -1977,10 +1998,13 @@ impl Minimon {
         } else if let Some(w) = width {
             widget::text(text)
                 .size(size)
-                .width(w).wrapping(iced::core::text::Wrapping::None)
+                .width(w)
+                .wrapping(iced::core::text::Wrapping::None)
                 .align_x(Horizontal::Center)
         } else {
-            widget::text(text).size(size).wrapping(iced::core::text::Wrapping::None)
+            widget::text(text)
+                .size(size)
+                .wrapping(iced::core::text::Wrapping::None)
         }
     }
 
@@ -2083,7 +2107,7 @@ impl Minimon {
             .lines
             .first()
             .and_then(|line| line.layout_opt())
-            .and_then(|layouts| layouts.first().map(|layout| layout.w.ceil()+2.0))
+            .and_then(|layouts| layouts.first().map(|layout| layout.w.ceil() + 2.0))
     }
 
     fn calculate_max_label_widths(&mut self) {
@@ -2094,56 +2118,56 @@ impl Minimon {
             Family as CosmicTextFamily, Style as TextStyle, Weight as TextWeight,
         };
 
-        let font = font::default();
+        if let Some(font) = self.interface_font.clone().map(Into::<iced::Font>::into) {
+            let family = match font.family {
+                IcedFamily::Monospace => CosmicTextFamily::Monospace,
+                IcedFamily::Serif => CosmicTextFamily::Serif,
+                IcedFamily::SansSerif => CosmicTextFamily::SansSerif,
+                IcedFamily::Name(name) => CosmicTextFamily::Name(name),
+                IcedFamily::Cursive => CosmicTextFamily::Cursive,
+                IcedFamily::Fantasy => CosmicTextFamily::Fantasy,
+            };
 
-        let family = match font.family {
-            IcedFamily::Monospace => CosmicTextFamily::Monospace,
-            IcedFamily::Serif => CosmicTextFamily::Serif,
-            IcedFamily::SansSerif => CosmicTextFamily::SansSerif,
-            IcedFamily::Name(name) => CosmicTextFamily::Name(name),
-            IcedFamily::Cursive => CosmicTextFamily::Cursive,
-            IcedFamily::Fantasy => CosmicTextFamily::Fantasy,
-        };
+            let weight = match font.weight {
+                IcedWeight::Thin => TextWeight::THIN,
+                IcedWeight::ExtraLight => TextWeight::EXTRA_LIGHT,
+                IcedWeight::Light => TextWeight::LIGHT,
+                IcedWeight::Normal => TextWeight::NORMAL,
+                IcedWeight::Medium => TextWeight::MEDIUM,
+                IcedWeight::Bold => TextWeight::BOLD,
+                IcedWeight::ExtraBold => TextWeight::EXTRA_BOLD,
+                IcedWeight::Black => TextWeight::BLACK,
+                IcedWeight::Semibold => TextWeight::SEMIBOLD,
+            };
 
-        let weight = match font.weight {
-            IcedWeight::Thin => TextWeight::THIN,
-            IcedWeight::ExtraLight => TextWeight::EXTRA_LIGHT,
-            IcedWeight::Light => TextWeight::LIGHT,
-            IcedWeight::Normal => TextWeight::NORMAL,
-            IcedWeight::Medium => TextWeight::MEDIUM,
-            IcedWeight::Bold => TextWeight::BOLD,
-            IcedWeight::ExtraBold => TextWeight::EXTRA_BOLD,
-            IcedWeight::Black => TextWeight::BLACK,
-            IcedWeight::Semibold => TextWeight::SEMIBOLD,
-        };
+            let style = match font.style {
+                IcedStyle::Normal => TextStyle::Normal,
+                IcedStyle::Italic => TextStyle::Italic,
+                IcedStyle::Oblique => TextStyle::Oblique,
+            };
 
-        let style = match font.style {
-            IcedStyle::Normal => TextStyle::Normal,
-            IcedStyle::Italic => TextStyle::Italic,
-            IcedStyle::Oblique => TextStyle::Oblique,
-        };
+            let attrs = Attrs::new().family(family).weight(weight).style(style);
 
-        let attrs = Attrs::new().family(family).weight(weight).style(style);
+            let is_horizontal = self.core.applet.is_horizontal();
 
-        let is_horizontal = self.core.applet.is_horizontal();
+            self.label_cpu_width = self.measure_text_width("8.88%", &attrs);
+            self.label_gpu_width = self.label_cpu_width;
 
-        self.label_cpu_width = self.measure_text_width("8.88%", &attrs);
-        self.label_gpu_width = self.label_cpu_width;
+            self.label_network_width = match (self.config.network1.show_bytes, is_horizontal) {
+                (false, false) => self.measure_text_width("8.88M", &attrs),
+                (false, true) => self.measure_text_width("8.88 Mbps", &attrs),
+                (true, false) => self.measure_text_width("8.88M", &attrs),
+                (true, true) => self.measure_text_width("8.88 MB/s", &attrs),
+            };
 
-        self.label_network_width = match (self.config.network1.show_bytes, is_horizontal) {
-            (false, false) => self.measure_text_width("8.88M", &attrs),
-            (false, true) => self.measure_text_width("8.88 Mbps", &attrs),
-            (true, false) => self.measure_text_width("8.88M", &attrs),
-            (true, true) => self.measure_text_width("8.88 MB/s", &attrs),
-        };
+            self.label_disks_width = if is_horizontal {
+                self.measure_text_width("8.88 MB/s", &attrs)
+            } else {
+                self.measure_text_width("8.88M", &attrs)
+            };
 
-        self.label_disks_width = if is_horizontal {
-            self.measure_text_width("8.88 MB/s", &attrs)
-        } else {
-            self.measure_text_width("8.88M", &attrs)
-        };
-
-        self.label_w_width = self.measure_text_width("W ", &attrs);
+            self.label_w_width = self.measure_text_width("W ", &attrs);
+        }
     }
 
     fn open_tipping_page_in_browser() {
