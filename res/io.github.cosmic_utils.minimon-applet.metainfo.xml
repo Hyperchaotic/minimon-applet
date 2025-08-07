@@ -43,6 +43,18 @@
     <internet>always</internet>
   </recommends>
   <releases>
+    <release version="0.8.0" date="2025-08-07">
+      <url type="details">https://github.com/cosmic-utils/minimon-applet/releases/tag/v0.8.0</url>
+      <description>
+        <p>What's new:</p>
+        <ul>
+          <li>Updated Polish translation.</li>
+          <li>Labels on the panel should not wobble/cause movement anymore.</li>
+          <li>Experimental support for the Zenpower module for AMD Ryzen.</li>
+          <li>A bar chart showing CPU core utilizaion, stacked into user+system for each core.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.7.0" date="2025-07-25">
       <url type="details">https://github.com/cosmic-utils/minimon-applet/releases/tag/v0.7.0</url>
       <description>

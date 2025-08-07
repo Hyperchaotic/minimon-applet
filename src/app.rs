@@ -17,7 +17,7 @@ use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_p
 use cosmic::iced::window::Id;
 use cosmic::iced::{self, Subscription};
 use cosmic::widget::{button, container, horizontal_space, list, settings, spin_button, text};
-use cosmic::{Apply, Element, font};
+use cosmic::{Apply, Element};
 use cosmic::{widget, widget::autosize};
 
 use std::sync::Arc;
@@ -724,7 +724,7 @@ impl cosmic::Application for Minimon {
                 let new_font = cosmictk.interface_font;
 
                 if self.interface_font.as_ref() != Some(&new_font) {
-                    info!("Message::ThemeChanged. Font is now: {:?}", new_font);
+                    info!("Message::ThemeChanged. Font is now: {new_font:?}");
                     self.interface_font = Some(new_font);
                     self.calculate_max_label_widths();
                 }
