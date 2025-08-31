@@ -17,9 +17,12 @@
     <color type="primary" scheme_preference="dark">#2b2b2b</color>
   </branding>
   <summary>A Customizable System Monitor applet for COSMIC</summary>
+  <summary xml:lang="hu">Egy testreszabható rendszerfigyelő kisalkalmazás a COSMIC-hoz</summary>
   <description>
     <p>A lightweight hardware monitoring applet for the COSMIC desktop environment with UI for
       customization. Shows information on CPU, GPU, network, memory, and disk usage.</p>
+    <p xml:lang="hu">Egy könnyűsúlyú hardverfigyelő kisalkalmazás a COSMIC asztali környezethez, testreszabható felülettel. 
+     Megjeleníti a CPU, GPU, hálózat, memória és lemez használatot.</p>
   </description>
   <icon type="stock">io.github.cosmic_utils.minimon-applet.svg</icon>
   <launchable type="desktop-id">io.github.cosmic_utils.minimon-applet.desktop</launchable>
@@ -28,6 +31,7 @@
       <image>
         https://raw.githubusercontent.com/cosmic-utils/minimon-applet/main/res/screenshots/main_expanded_styled.png</image>
       <caption>A styled instance of the applet with with the window view open.</caption>
+      <caption xml:lang="hu">A kisalkalmazás egy formázott példánya megnyitott ablaknézettel.</caption>
     </screenshot>
   </screenshots>
   <provides>

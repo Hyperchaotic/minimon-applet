@@ -8,5 +8,6 @@ NotShowIn=COSMIC
 Icon=io.github.cosmic_utils.minimon-applet
 Categories=COSMIC
 Keywords=Monitor;System;CPU;GPU;Memory;Network;Disk;
+Keywords[hu]=Rendszer;CPU;GPU;Memória;Hálózat;Lemez;
 X-CosmicApplet=true
 X-CosmicHoverPopup=Auto
