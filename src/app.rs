@@ -2100,7 +2100,7 @@ impl Minimon {
         let metrics = Metrics::new(font_size.into(), font_size.into());
         // Create a buffer to shape the text
         let mut buffer = Buffer::new(&mut self.font_system, metrics);
-        buffer.set_text(&mut self.font_system, text, attrs, Shaping::Advanced);
+        buffer.set_text(&mut self.font_system, text, attrs, Shaping::Advanced, None);
 
         // Get the width of the first layout line
         buffer
