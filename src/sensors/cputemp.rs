@@ -1,8 +1,5 @@
 use crate::{
-    colorpicker::DemoGraph,
-    config::{ColorVariant, CpuTempConfig, DeviceKind, GraphColors, GraphKind},
-    fl,
-    svg_graph::SvgColors,
+    colorpicker::DemoGraph, config::{ColorVariant, CpuTempConfig, DeviceKind, GraphColors, GraphKind}, fl, sensors::INVALID_IMG, svg_graph::SvgColors
 };
 use cosmic::{Element, iced::Alignment::Center, widget::Container};
 
@@ -163,7 +160,7 @@ impl DemoGraph for CpuTemp {
             GraphKind::Heat => {
                 crate::svg_graph::heat(&VecDeque::from(DEMO_SAMPLES), 100, &self.svg_colors)
             }
-            GraphKind::StackedBars => panic!("StackedBars not supported for CpuTemp"),
+            GraphKind::StackedBars => { log::error!("StackedBars not supported for CpuTemp"); INVALID_IMG.to_string() },
         }
     }
 
@@ -286,14 +283,13 @@ impl Sensor for CpuTemp {
                     let _ = value.pop();
                 }
                 let mut percentage = String::with_capacity(10);
-
-                write!(percentage, "{latest}").unwrap();
+                percentage.push_str(&latest.to_string());
 
                 crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
             }
             GraphKind::Line => crate::svg_graph::line(&self.samples, max, &self.svg_colors),
             GraphKind::Heat => crate::svg_graph::heat(&self.samples, max as u64, &self.svg_colors),
-            GraphKind::StackedBars => panic!("StackedBars not supported for CpuTemp"),
+            GraphKind::StackedBars => { log::error!("StackedBars not supported for CpuTemp"); INVALID_IMG.to_string() },
         };
 
         let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
@@ -365,9 +361,9 @@ impl Sensor for CpuTemp {
         let mut expl = String::with_capacity(128);
         if let Some(hw) = &self.hwmon_temp {
             if hw.cpu == super::CpuVariant::Amd {
-                _ = write!(expl, "{}", fl!("cpu-temp-amd"));
+                expl.push_str(&fl!("cpu-temp-amd"));
             } else {
-                _ = write!(expl, "{}", fl!("cpu-temp-intel"));
+                expl.push_str(&fl!("cpu-temp-intel"));
             }
         }
 

@@ -74,7 +74,7 @@ pub fn line(samples: &VecDeque<f64>, max_y: f64, colors: &SvgColors) -> String {
             if index > 0 {
                 acc.push(' ');
             }
-            write!(&mut acc, "{x},{y}").unwrap();
+            let _ = write!(&mut acc, "{x},{y}");
             acc
         },
     );
@@ -139,8 +139,8 @@ pub fn double_line(
                 let x = ((index * 2) + 1) as u32;
                 let y1 = (41.0 - (scaling * value1 as f64)).round() as u32;
                 let y2 = (41.0 - (scaling * value2 as f64)).round() as u32;
-                write!(&mut acc1, "{x},{y1} ").unwrap();
-                write!(&mut acc2, "{x},{y2} ").unwrap();
+                let _ = write!(&mut acc1, "{x},{y1} ");
+                let _ = write!(&mut acc2, "{x},{y2} ");
                 (acc1, acc2)
             },
         );
@@ -201,7 +201,7 @@ pub fn line_adaptive(
         |mut acc, (index, &value)| {
             let x = ((index * 2) + 1) as u32;
             let y = (41.0 - (scaling * value as f64)).round() as u32;
-            write!(&mut acc, "{x},{y} ").unwrap();
+            let _ = write!(&mut acc, "{x},{y} ");
             acc
         },
     );
@@ -243,7 +243,7 @@ pub fn heat(samples: &VecDeque<f64>, max_y: u64, colors: &SvgColors) -> String {
             if index > 0 {
                 acc.push(' ');
             }
-            write!(&mut acc, "{x},{y}").unwrap();
+            let _ = write!(&mut acc, "{x},{y}");
             acc
         },
     );

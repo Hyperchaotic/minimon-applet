@@ -42,10 +42,10 @@ impl StackedBarSvg {
         let mut svg = String::new();
 
         // SVG header with COSMIC-friendly dark theme - width adapts to core count
-        writeln!(svg, r#"<svg width="{total_width}" height="{total_height}" viewBox="0 0 {total_width} {total_height}" xmlns="http://www.w3.org/2000/svg">"#).unwrap();
+        let _ = writeln!(svg, r#"<svg width="{total_width}" height="{total_height}" viewBox="0 0 {total_width} {total_height}" xmlns="http://www.w3.org/2000/svg">"#);
 
         // CSS styles with configurable colors
-        writeln!(
+        let _ = writeln!(
             svg,
             r#"  <defs>
     <style>
@@ -59,14 +59,12 @@ impl StackedBarSvg {
   </clipPath>
   </defs>"#,
             colors.color1, colors.color2, colors.color3, colors.color4, colors.color1,
-        )
-        .unwrap();
+        );
 
         // Background with adaptive width
-        writeln!(
+        let _ = writeln!(
             svg,
-            r#"  <g clip-path="url(#rounded-clip)"><rect class="background" width="{total_width}" height="{total_height}" rx="4.5" ry="4.5"/>"#)
-        .unwrap();
+            r#"  <g clip-path="url(#rounded-clip)"><rect class="background" width="{total_width}" height="{total_height}" rx="4.5" ry="4.5"/>"#);
 
         for i in 0..cores.len() {
             if let Some(core) = cores.get(&i) {
@@ -87,7 +85,7 @@ impl StackedBarSvg {
             }
         }
 
-        writeln!(svg, "</g></svg>").unwrap();
+        let _ = writeln!(svg, "</g></svg>");
         svg
     }
 
@@ -119,22 +117,20 @@ impl StackedBarSvg {
 
         // Generate user load bar (bottom)
         if user_height > 0 {
-            writeln!(
+            let _ = writeln!(
                 svg,
                 r#"  <rect class="user-load" x="{}" y="{}" width="{}" height="{}"/>"#,
                 x_offset, user_y, self.core_width, user_height
-            )
-            .unwrap();
+            );
         }
 
         // Generate system load bar (top)
         if system_height > 0 {
-            writeln!(
+            let _ = writeln!(
                 svg,
                 r#"  <rect class="system-load" x="{}" y="{}" width="{}" height="{}"/>"#,
                 x_offset, system_y, self.core_width, system_height
-            )
-            .unwrap();
+            );
         }
     }
 }

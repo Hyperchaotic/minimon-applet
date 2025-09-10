@@ -732,25 +732,24 @@ impl cosmic::Application for Minimon {
 
             Message::TogglePopup => {
                 info!("Message::TogglePopup");
-                return if let Some(p) = self.popup.take() {
+                if let Some(p) = self.popup.take() {
                     self.colorpicker.deactivate();
                     // but have to go back to sleep if settings closed
                     self.maybe_stop_gpus();
-                    destroy_popup(p)
+                    return destroy_popup(p);
                 } else {
                     self.calculate_max_label_widths();
                     let new_id = Id::unique();
                     self.popup.replace(new_id);
-                    let mut popup_settings = self.core.applet.get_popup_settings(
-                        self.core.main_window_id().unwrap(),
-                        new_id,
-                        None,
-                        None,
-                        None,
-                    );
-                    popup_settings.positioner.size_limits = Limits::NONE;
 
-                    get_popup(popup_settings)
+                    if let Some(main_id) = self.core.main_window_id() {
+                        let mut popup_settings = self
+                            .core
+                            .applet
+                            .get_popup_settings(main_id, new_id, None, None, None);
+                        popup_settings.positioner.size_limits = Limits::NONE;
+                        return get_popup(popup_settings)
+                    }
                 };
             }
             Message::PopupClosed(id) => {

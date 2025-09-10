@@ -30,7 +30,8 @@ impl From<usize> for GraphKind {
             0 => GraphKind::Ring,
             1 => GraphKind::Line,
             2 => GraphKind::Heat,
-            _ => panic!("Invalid index for SvgKind"),
+            3 => GraphKind::StackedBars,
+            _ => { log::error!("GrapKind::From({}) Invalid index for GraphKind", index); GraphKind::Line },
         }
     }
 }

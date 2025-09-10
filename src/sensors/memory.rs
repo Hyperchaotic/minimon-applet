@@ -1,10 +1,11 @@
-use cosmic::{iced::Alignment::Center, widget::Container, Element};
+use cosmic::{Element, iced::Alignment::Center, widget::Container};
 use sysinfo::{MemoryRefreshKind, System};
 
 use crate::{
     colorpicker::DemoGraph,
     config::{ColorVariant, DeviceKind, GraphColors, GraphKind, MemoryConfig},
     fl,
+    sensors::INVALID_IMG,
     svg_graph::SvgColors,
 };
 
@@ -57,8 +58,10 @@ impl DemoGraph for Memory {
                 self.max_val,
                 &self.svg_colors,
             ),
-            GraphKind::Heat => panic!("heat not supported for Memory!"),
-            GraphKind::StackedBars => panic!("StackedBars not supported for Memory"),
+            _ => {
+                log::error!("Graph type {:?} not supported for memory", self.config.kind);
+                INVALID_IMG.to_string()
+            }
         }
     }
 
@@ -163,7 +166,9 @@ impl Sensor for Memory {
 
     #[cfg(not(feature = "lyon_charts"))]
     fn chart(
-        &self, _height_hint: u16, _width_hint: u16
+        &self,
+        _height_hint: u16,
+        _width_hint: u16,
     ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         let svg = if self.config.kind == GraphKind::Ring {
             let mut latest = self.latest_sample();
@@ -175,7 +180,7 @@ impl Sensor for Memory {
                 pct = 100;
             }
 
-            write!(percentage, "{pct}").unwrap();
+            percentage.push_str(&pct.to_string());
 
             // If set, convert to percentage
             if self.config.percentage {
@@ -183,11 +188,11 @@ impl Sensor for Memory {
             }
 
             if latest < 10.0 {
-                write!(value, "{latest:.2}").unwrap();
+                let _ = write!(value, "{latest:.2}");
             } else if latest <= 99.9 {
-                write!(value, "{latest:.1}").unwrap();
+                let _ = write!(value, "{latest:.1}");
             } else {
-                write!(value, "100").unwrap();
+                let _ = write!(value, "100");
             }
 
             crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
@@ -239,7 +244,8 @@ impl Sensor for Memory {
                     fl!("memory-as-percentage"),
                     toggler(config.percentage).on_toggle(Message::ToggleMemoryPercentage),
                 ),
-                row!(widget::text::body(fl!("chart-type")),
+                row!(
+                    widget::text::body(fl!("chart-type")),
                     widget::dropdown(&self.graph_options, selected, move |m| {
                         Message::SelectGraphType(DeviceKind::Memory, m.into())
                     },)
@@ -247,7 +253,8 @@ impl Sensor for Memory {
                     widget::horizontal_space(),
                     widget::button::standard(fl!("change-colors"))
                         .on_press(Message::ColorPickerOpen(DeviceKind::Memory, mem_kind, None)),
-                ).align_y(Center)
+                )
+                .align_y(Center)
             )
             .spacing(cosmic.space_xs()),
         ));
@@ -273,10 +280,10 @@ impl Default for Memory {
 
         // value and percentage are pre-allocated and reused as they're changed often.
         let mut percentage = String::with_capacity(6);
-        write!(percentage, "0").unwrap();
+        percentage.push('0');
 
         let mut value = String::with_capacity(6);
-        write!(value, "0").unwrap();
+        value.push('0');
 
         let mut memory = Memory {
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),

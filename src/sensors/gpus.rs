@@ -3,7 +3,7 @@ use cosmic::{Element, Renderer, Theme};
 use log::info;
 use std::{collections::VecDeque, fmt::Write};
 
-use crate::sensors::GpuConfig;
+use crate::sensors::{GpuConfig, INVALID_IMG};
 use cosmic::widget::{self, Column, Container};
 use cosmic::widget::{settings, toggler};
 use cosmic::{
@@ -54,10 +54,11 @@ pub struct GpuGraph {
 impl GpuGraph {
     fn new(id: &str) -> Self {
         let mut percentage = String::with_capacity(6);
-        write!(percentage, "0").unwrap();
+        percentage.push('0');
 
         let mut value = String::with_capacity(6);
-        write!(value, "0").unwrap();
+        value.push('0');
+
         GpuGraph {
             id: id.to_owned(),
             samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
@@ -135,17 +136,17 @@ impl GpuGraph {
             let mut percentage = String::with_capacity(10);
 
             if self.disabled {
-                _ = write!(percentage, "0");
-                _ = write!(value, "-");
+                percentage.push('0');
+                value.push('-');
             } else {
                 if latest < 10.0 {
-                    write!(value, "{latest:.2}").unwrap();
+                    let _ = write!(value, "{latest:.2}");
                 } else if latest < 100.0 {
-                    write!(value, "{latest:.1}").unwrap();
+                    let _ = write!(value, "{latest:.1}");
                 } else {
-                    write!(value, "{latest}").unwrap();
+                    let _ = write!(value, "{latest}");
                 }
-                write!(percentage, "{latest}").unwrap();
+                percentage.push_str(&latest.to_string());
             }
 
             crate::svg_graph::ring(
@@ -230,8 +231,10 @@ impl DemoGraph for GpuGraph {
             GraphKind::Line => {
                 crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100.0, &self.svg_colors)
             }
-            GraphKind::Heat => panic!("Heat not supported for GpuGraph!"),
-            GraphKind::StackedBars => panic!("StackedBars not supported for GpuGraph!"),
+            _ => {
+                log::error!("GPUGraph type not supported {:?}", self.config.kind);
+                INVALID_IMG.to_string()
+            }
         }
     }
 
@@ -353,19 +356,19 @@ impl VramGraph {
             let mut percentage = String::with_capacity(10);
 
             if self.disabled {
-                _ = write!(percentage, "0");
-                _ = write!(value, "-");
+                percentage.push('0');
+                value.push('-');
             } else {
                 let pct: u64 = ((latest / self.total) * 100.0) as u64;
 
-                write!(percentage, "{pct}").unwrap();
+                percentage.push_str(&pct.to_string());
 
                 if latest < 10.0 {
-                    write!(value, "{:.2}", (latest * 100.0).trunc() / 100.0).unwrap();
+                    let _ = write!(value, "{:.2}", (latest * 100.0).trunc() / 100.0);
                 } else if latest < 100.0 {
-                    write!(value, "{:.1}", (latest * 10.0).trunc() / 10.0).unwrap();
+                    let _ = write!(value, "{:.1}", (latest * 10.0).trunc() / 10.0);
                 } else {
-                    write!(value, "{}", latest.round()).unwrap();
+                    let _ = write!(value, "{}", latest.round());
                 }
             }
             crate::svg_graph::ring(
@@ -551,7 +554,7 @@ impl TempGraph {
                 }
                 let mut percentage = String::with_capacity(10);
 
-                write!(percentage, "{latest}").unwrap();
+                percentage.push_str(&latest.to_string());
 
                 crate::svg_graph::ring(
                     &value,
@@ -575,7 +578,10 @@ impl TempGraph {
             GraphKind::Heat => {
                 crate::svg_graph::heat(&self.samples, self.max_temp as u64, &self.svg_colors)
             }
-            GraphKind::StackedBars => panic!("StackedBars not supported for GpuTemp"),
+            GraphKind::StackedBars => {
+                log::error!("StackedBars not supported for GpuTemp");
+                INVALID_IMG.to_string()
+            }
         };
         let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
 
@@ -626,7 +632,10 @@ impl DemoGraph for TempGraph {
             GraphKind::Heat => {
                 crate::svg_graph::heat(&VecDeque::from(HEAT_DEMO_SAMPLES), 100, &self.svg_colors)
             }
-            GraphKind::StackedBars => panic!("StackedBars not supported for GpuTemp"),
+            GraphKind::StackedBars => {
+                log::error!("StackedBars not supported for GpuTemp");
+                INVALID_IMG.to_string()
+            }
         }
     }
 
@@ -692,8 +701,10 @@ impl DemoGraph for VramGraph {
             GraphKind::Line => {
                 crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 32.0, &self.svg_colors)
             }
-            GraphKind::Heat => panic!("Heat not supported for GpuTemp!"),
-            GraphKind::StackedBars => panic!("StackedBars not supported for GpuTemp"),
+            _ => {
+                log::error!("VRAM Graph type not supported {:?}", self.config.kind);
+                INVALID_IMG.to_string()
+            }
         }
     }
 
@@ -781,7 +792,10 @@ impl Gpu {
                 dmo.update_config(&self.temp.config, 0);
                 Box::new(dmo)
             }
-            _ => panic!("Gpu::demo_graph({device:?}) Wrong device kind"),
+            _ => {
+                log::error!("Gpu::demo_graph({device:?}) Wrong device kind");
+                panic!("Gpu::demo_graph({device:?}) Wrong device kind")
+            }
         }
     }
 
@@ -862,7 +876,8 @@ impl Gpu {
                         Message::GpuToggleLabel(self.id(), DeviceKind::Gpu, value)
                     }),
                 ),
-                row!(widget::text::body(fl!("chart-type")),
+                row!(
+                    widget::text::body(fl!("chart-type")),
                     widget::dropdown(&self.gpu.graph_options, selected, move |m| {
                         Message::GpuSelectGraphType(id.clone(), DeviceKind::Gpu, m.into())
                     },)
@@ -871,7 +886,8 @@ impl Gpu {
                     widget::button::standard(fl!("change-colors")).on_press(
                         Message::ColorPickerOpen(DeviceKind::Gpu, gpu_kind, Some(self.id())),
                     )
-                ).align_y(Center),
+                )
+                .align_y(Center),
             )
             .spacing(cosmic.space_xs()),
         ));
@@ -926,7 +942,8 @@ impl Gpu {
                         Message::GpuToggleLabel(self.id(), DeviceKind::Vram, value)
                     }),
                 ),
-                row!(widget::text::body(fl!("chart-type")),
+                row!(
+                    widget::text::body(fl!("chart-type")),
                     widget::dropdown(&self.vram.graph_options, selected, move |m| {
                         Message::GpuSelectGraphType(id.clone(), DeviceKind::Vram, m.into())
                     },)
@@ -935,7 +952,8 @@ impl Gpu {
                     widget::button::standard(fl!("change-colors")).on_press(
                         Message::ColorPickerOpen(DeviceKind::Vram, mem_kind, Some(self.id())),
                     )
-                ).align_y(Center),
+                )
+                .align_y(Center),
             )
             .spacing(cosmic.space_xs()),
         ));
@@ -998,7 +1016,8 @@ impl Gpu {
                         Message::SelectGpuTempUnit(id1.clone(), m.into())
                     },)
                 ),
-                row!(widget::text::body(fl!("chart-type")),
+                row!(
+                    widget::text::body(fl!("chart-type")),
                     widget::dropdown(&self.temp.graph_options, selected, move |m| {
                         Message::GpuSelectGraphType(id2.clone(), DeviceKind::GpuTemp, m.into())
                     },)
@@ -1007,7 +1026,8 @@ impl Gpu {
                     widget::button::standard(fl!("change-colors")).on_press(
                         Message::ColorPickerOpen(DeviceKind::GpuTemp, temp_kind, Some(self.id())),
                     )
-                ).align_y(Center),
+                )
+                .align_y(Center),
             )
             .spacing(cosmic.space_xs()),
         ));
