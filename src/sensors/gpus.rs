@@ -128,8 +128,8 @@ impl GpuGraph {
 
     #[cfg(not(feature = "lyon_charts"))]
     pub fn chart(
-        &self,
-    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
+        &'_ self,
+    ) -> cosmic::widget::Container<'_, crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         let svg = if self.config.kind == GraphKind::Ring {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
@@ -349,7 +349,7 @@ impl VramGraph {
     }
 
     #[cfg(not(feature = "lyon_charts"))]
-    pub fn chart(&self) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
+    pub fn chart(&'_ self) -> cosmic::widget::Container<'_, crate::app::Message, Theme, Renderer> {
         let svg = if self.config.kind == GraphKind::Ring {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
@@ -542,7 +542,7 @@ impl TempGraph {
     }
 
     #[cfg(not(feature = "lyon_charts"))]
-    pub fn chart(&self) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
+    pub fn chart(&'_ self) -> cosmic::widget::Container<'_, crate::app::Message, Theme, Renderer> {
         let svg = match self.config.kind {
             GraphKind::Ring => {
                 let latest = self.latest_sample();
@@ -837,9 +837,9 @@ impl Gpu {
     }
 
     fn settings_usage_ui(
-        &self,
+        &'_ self,
         config: &crate::config::GpuUsageConfig,
-    ) -> Element<crate::app::Message> {
+    ) -> Element<'_, crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 
@@ -903,9 +903,9 @@ impl Gpu {
     }
 
     fn settings_vram_ui(
-        &self,
+        &'_ self,
         config: &crate::config::GpuVramConfig,
-    ) -> Element<crate::app::Message> {
+    ) -> Element<'_, crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 
@@ -969,9 +969,9 @@ impl Gpu {
     }
 
     fn settings_temp_ui(
-        &self,
+        &'_ self,
         config: &crate::config::GpuTempConfig,
-    ) -> Element<crate::app::Message> {
+    ) -> Element<'_, crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 
@@ -1043,9 +1043,9 @@ impl Gpu {
     }
 
     pub fn settings_ui(
-        &self,
+        &'_ self,
         config: &crate::config::GpuConfig,
-    ) -> cosmic::Element<crate::app::Message> {
+    ) -> cosmic::Element<'_, crate::app::Message> {
         let battery_disable = if self.is_laptop {
             Some(
                 settings::item(

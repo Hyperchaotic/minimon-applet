@@ -20,7 +20,6 @@ use std::any::Any;
 
 use std::{
     collections::VecDeque,
-    fmt::Write,
     fs,
     path::{Path, PathBuf},
 };
@@ -265,10 +264,10 @@ impl Sensor for CpuTemp {
 
     #[cfg(not(feature = "lyon_charts"))]
     fn chart(
-        &self,
+        &'_ self,
         _height_hint: u16,
         _width_hint: u16,
-    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
+    ) -> cosmic::widget::Container<'_, crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         let mut max: f64 = 100.0;
         if let Some(hwmon) = &self.hwmon_temp {
             max = hwmon.crit_temp;
@@ -300,7 +299,7 @@ impl Sensor for CpuTemp {
         )
     }
 
-    fn settings_ui(&self) -> Element<crate::app::Message> {
+    fn settings_ui(&'_ self) -> Element<'_, crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 

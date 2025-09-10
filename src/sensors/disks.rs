@@ -215,8 +215,8 @@ impl Sensor for Disks {
 
     #[cfg(not(feature = "lyon_charts"))]
     fn chart(
-        &self, _height_hint: u16, _width_hint: u16
-    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
+        &'_ self, _height_hint: u16, _width_hint: u16
+    ) -> cosmic::widget::Container<'_, crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         let svg = match self.config.variant {
             DisksVariant::Combined => crate::svg_graph::double_line(
                 &self.write,
@@ -245,7 +245,7 @@ impl Sensor for Disks {
         )
     }
 
-    fn settings_ui(&self) -> Element<crate::app::Message> {
+    fn settings_ui(&'_ self) -> Element<'_, crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
         let mut disk_elements = Vec::new();

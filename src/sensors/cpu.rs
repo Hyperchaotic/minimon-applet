@@ -243,10 +243,10 @@ impl Sensor for Cpu {
 
     #[cfg(not(feature = "lyon_charts"))]
     fn chart(
-        &self,
+        &'_ self,
         height_hint: u16,
         _width_hint: u16,
-    ) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
+    ) -> cosmic::widget::Container<'_, crate::app::Message, Theme, Renderer> {
         let svg = match self.config.kind {
             GraphKind::Ring => {
                 let latest = self.latest_sample();
@@ -283,7 +283,7 @@ impl Sensor for Cpu {
         )
     }
 
-    fn settings_ui(&self) -> Element<crate::app::Message> {
+    fn settings_ui(&'_ self) -> Element<'_, crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 

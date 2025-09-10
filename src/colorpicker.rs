@@ -339,7 +339,7 @@ impl ColorPicker {
         }
     }
 
-    pub fn view_colorpicker(&self) -> Element<crate::app::Message> {
+    pub fn view_colorpicker(&'_ self) -> Element<'_, crate::app::Message> {
         let color = self.sliders();
         let title = format!("{} {}", self.device, fl!("colorpicker-colors"));
 

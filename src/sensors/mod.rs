@@ -93,11 +93,11 @@ pub trait Sensor {
     fn update(&mut self);
     fn demo_graph(&self) -> Box<dyn DemoGraph>;
     fn chart(
-        &self,
+        &'_ self,
         height_hint: u16,
         width_hint: u16,
-    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer>;
-    fn settings_ui(&self) -> Element<crate::app::Message>;
+    ) -> cosmic::widget::Container<'_, crate::app::Message, cosmic::Theme, cosmic::Renderer>;
+    fn settings_ui(&'_ self) -> Element<'_, crate::app::Message>;
 }
 
 pub mod cpu;

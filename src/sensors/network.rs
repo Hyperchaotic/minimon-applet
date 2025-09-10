@@ -233,8 +233,8 @@ impl Sensor for Network {
 
     #[cfg(not(feature = "lyon_charts"))]
     fn chart(
-        &self, _height_hint: u16, _width_hint: u16
-    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
+        &'_ self, _height_hint: u16, _width_hint: u16
+    ) -> cosmic::widget::Container<'_, crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         let svg = match self.config.variant {
             NetworkVariant::Combined => crate::svg_graph::double_line(
                 &self.download,
@@ -263,7 +263,7 @@ impl Sensor for Network {
         )
     }
 
-    fn settings_ui(&self) -> Element<crate::app::Message> {
+    fn settings_ui(&'_ self) -> Element<'_, crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
         let mut net_elements = Vec::new();

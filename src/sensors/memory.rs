@@ -166,10 +166,10 @@ impl Sensor for Memory {
 
     #[cfg(not(feature = "lyon_charts"))]
     fn chart(
-        &self,
+        &'_ self,
         _height_hint: u16,
         _width_hint: u16,
-    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
+    ) -> cosmic::widget::Container<'_, crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         let svg = if self.config.kind == GraphKind::Ring {
             let mut latest = self.latest_sample();
             let mut value = String::with_capacity(10);
@@ -208,7 +208,7 @@ impl Sensor for Memory {
         )
     }
 
-    fn settings_ui(&self) -> Element<crate::app::Message> {
+    fn settings_ui(&'_ self) -> Element<'_, crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 
