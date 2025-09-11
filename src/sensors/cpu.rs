@@ -1,9 +1,5 @@
 use crate::{
-    barchart::StackedBarSvg,
-    colorpicker::DemoGraph,
-    config::{ColorVariant, CpuConfig, DeviceKind, GraphColors, GraphKind},
-    fl,
-    svg_graph::SvgColors,
+    barchart::StackedBarSvg, colorpicker::DemoGraph, config::{ColorVariant, CpuConfig, DeviceKind, GraphColors, GraphKind}, fl, sensors::INVALID_IMG, svg_graph::SvgColors
 };
 use cosmic::{
     Element, Renderer, Theme, iced::Alignment::Center, iced_widget::Column, widget::Container,
@@ -105,7 +101,7 @@ impl DemoGraph for Cpu {
             GraphKind::Line => {
                 crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100.0, &self.svg_colors)
             }
-            GraphKind::Heat => panic!("Wrong graph choice!"),
+            GraphKind::Heat => { log::error!("Wrong graph choice!"); INVALID_IMG.to_string() },
             GraphKind::StackedBars => {
                 let mut map = HashMap::new();
                 map.insert(
@@ -247,10 +243,10 @@ impl Sensor for Cpu {
 
     #[cfg(not(feature = "lyon_charts"))]
     fn chart(
-        &self,
+        &'_ self,
         height_hint: u16,
         _width_hint: u16,
-    ) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
+    ) -> cosmic::widget::Container<'_, crate::app::Message, Theme, Renderer> {
         let svg = match self.config.kind {
             GraphKind::Ring => {
                 let latest = self.latest_sample();
@@ -258,16 +254,16 @@ impl Sensor for Cpu {
                 let mut percentage = String::with_capacity(10);
 
                 if self.config.no_decimals {
-                    write!(value, "{}%", latest.round()).unwrap();
+                    let _ = write!(value, "{}%", latest.round());
                 } else if latest < 10.0 {
-                    write!(value, "{latest:.2}").unwrap()
+                    let _ = write!(value, "{latest:.2}");
                 } else if latest <= 99.9 {
-                    write!(value, "{latest:.1}").unwrap();
+                    let _ = write!(value, "{latest:.1}");
                 } else {
-                    write!(value, "100").unwrap();
+                    let _ = write!(value, "100");
                 }
 
-                write!(percentage, "{latest}").unwrap();
+                percentage.push_str(&latest.to_string());
 
                 crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
             }
@@ -276,7 +272,7 @@ impl Sensor for Cpu {
                 StackedBarSvg::new(self.config.bar_width, height_hint, self.config.bar_spacing)
                     .svg(&self.core_loads, &self.bar_svg_colors)
             }
-            GraphKind::Heat => panic!("Heat not supported!"),
+            GraphKind::Heat => { log::error!("Heat not supported!"); INVALID_IMG.to_string() },
         };
 
         let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
@@ -287,7 +283,7 @@ impl Sensor for Cpu {
         )
     }
 
-    fn settings_ui(&self) -> Element<crate::app::Message> {
+    fn settings_ui(&'_ self) -> Element<'_, crate::app::Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 
@@ -419,10 +415,10 @@ impl Cpu {
     pub fn new(is_horizontal: bool) -> Self {
         // value and percentage are pre-allocated and reused as they're changed often.
         let mut percentage = String::with_capacity(6);
-        write!(percentage, "0").unwrap();
+        percentage.push('0');
 
         let mut value = String::with_capacity(6);
-        write!(value, "0").unwrap();
+        value.push('0');
 
         let graph_opts: Vec<&'static str> = if is_horizontal {
             (*GRAPH_OPTIONS_RING_LINE_BARS).into()

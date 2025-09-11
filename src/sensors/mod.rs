@@ -7,6 +7,17 @@ use crate::{
     fl,
 };
 
+const INVALID_IMG: &str = r#"
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 24 24" width="24" height="24"
+     role="img" aria-label="Invalid image"
+     fill="none" stroke="currentColor" stroke-width="2"
+     style="color:#e53935">
+  <title>Invalid image</title>
+  <line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round"/>
+  <line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round"/>
+</svg>"#;
+
 #[cfg(feature = "lyon_charts")]
 macro_rules! chart_container {
     ($chart:expr) => {
@@ -82,11 +93,11 @@ pub trait Sensor {
     fn update(&mut self);
     fn demo_graph(&self) -> Box<dyn DemoGraph>;
     fn chart(
-        &self,
+        &'_ self,
         height_hint: u16,
         width_hint: u16,
-    ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer>;
-    fn settings_ui(&self) -> Element<crate::app::Message>;
+    ) -> cosmic::widget::Container<'_, crate::app::Message, cosmic::Theme, cosmic::Renderer>;
+    fn settings_ui(&'_ self) -> Element<'_, crate::app::Message>;
 }
 
 pub mod cpu;
@@ -104,7 +115,7 @@ impl From<usize> for TempUnit {
             1 => TempUnit::Farenheit,
             2 => TempUnit::Kelvin,
             3 => TempUnit::Rankine,
-            _ => panic!("Invalid index for TempUnit"),
+            _ => { log::error!("Invalid index for TempUnit"); TempUnit::Celcius},
         }
     }
 }

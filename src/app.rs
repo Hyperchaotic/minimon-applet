@@ -385,7 +385,7 @@ impl cosmic::Application for Minimon {
         Some(Message::PopupClosed(id))
     }
 
-    fn view(&self) -> Element<Message> {
+    fn view(&'_ self) -> Element<'_, Message> {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
         let horizontal = matches!(
@@ -482,7 +482,7 @@ impl cosmic::Application for Minimon {
     }
 
     // Settings popup, can be list overview, individual page or colorpicker
-    fn view_window(&self, _id: Id) -> Element<Self::Message> {
+    fn view_window(&'_ self, _id: Id) -> Element<'_, Self::Message> {
         // Get configured system monitor, else the DEFAULT one, else first one in the map, else None.
         fn get_sysmon(name: &Option<String>) -> Option<&'static system_monitors::DesktopApp> {
             match &name {
@@ -732,25 +732,24 @@ impl cosmic::Application for Minimon {
 
             Message::TogglePopup => {
                 info!("Message::TogglePopup");
-                return if let Some(p) = self.popup.take() {
+                if let Some(p) = self.popup.take() {
                     self.colorpicker.deactivate();
                     // but have to go back to sleep if settings closed
                     self.maybe_stop_gpus();
-                    destroy_popup(p)
+                    return destroy_popup(p);
                 } else {
                     self.calculate_max_label_widths();
                     let new_id = Id::unique();
                     self.popup.replace(new_id);
-                    let mut popup_settings = self.core.applet.get_popup_settings(
-                        self.core.main_window_id().unwrap(),
-                        new_id,
-                        None,
-                        None,
-                        None,
-                    );
-                    popup_settings.positioner.size_limits = Limits::NONE;
 
-                    get_popup(popup_settings)
+                    if let Some(main_id) = self.core.main_window_id() {
+                        let mut popup_settings = self
+                            .core
+                            .applet
+                            .get_popup_settings(main_id, new_id, None, None, None);
+                        popup_settings.positioner.size_limits = Limits::NONE;
+                        return get_popup(popup_settings)
+                    }
                 };
             }
             Message::PopupClosed(id) => {
@@ -1323,7 +1322,7 @@ impl Minimon {
         .into()
     }
 
-    fn general_settings_ui(&self) -> Element<crate::app::Message> {
+    fn general_settings_ui(&'_ self) -> Element<'_, crate::app::Message> {
         let refresh_rate = f64::from(self.config.refresh_rate) / 1000.0;
 
         let heart = widget::button::custom(Element::from(row!(
@@ -1491,7 +1490,7 @@ impl Minimon {
         }
     }
 
-    fn cpu_panel_ui(&self, horizontal: bool) -> VecDeque<Element<crate::app::Message>> {
+    fn cpu_panel_ui(&'_ self, horizontal: bool) -> VecDeque<Element<'_, crate::app::Message>> {
         let size = self.core.applet.suggested_size(false);
 
         let mut elements: VecDeque<Element<Message>> = VecDeque::new();
@@ -1543,7 +1542,7 @@ impl Minimon {
         elements
     }
 
-    fn cpu_temp_panel_ui(&self, _horizontal: bool) -> VecDeque<Element<crate::app::Message>> {
+    fn cpu_temp_panel_ui(&'_ self, _horizontal: bool) -> VecDeque<Element<'_, crate::app::Message>> {
         let size = self.core.applet.suggested_size(false);
 
         let mut elements: VecDeque<Element<Message>> = VecDeque::new();
@@ -1574,7 +1573,7 @@ impl Minimon {
         elements
     }
 
-    fn memory_panel_ui(&self, horizontal: bool) -> VecDeque<Element<crate::app::Message>> {
+    fn memory_panel_ui(&'_ self, horizontal: bool) -> VecDeque<Element<'_, crate::app::Message>> {
         let size = self.core.applet.suggested_size(false);
 
         let mut elements: VecDeque<Element<Message>> = VecDeque::new();
@@ -1604,7 +1603,7 @@ impl Minimon {
         elements
     }
 
-    fn network_panel_ui(&self, horizontal: bool) -> VecDeque<Element<crate::app::Message>> {
+    fn network_panel_ui(&'_ self, horizontal: bool) -> VecDeque<Element<'_, crate::app::Message>> {
         let size = self.core.applet.suggested_size(false);
 
         let nw_combined = self.config.network1.variant == NetworkVariant::Combined;
@@ -1694,7 +1693,7 @@ impl Minimon {
         elements
     }
 
-    fn disks_panel_ui(&self, horizontal: bool) -> VecDeque<Element<crate::app::Message>> {
+    fn disks_panel_ui(&'_ self, horizontal: bool) -> VecDeque<Element<'_, crate::app::Message>> {
         let size = self.core.applet.suggested_size(false);
 
         let disks_combined = self.config.disks1.variant == DisksVariant::Combined;

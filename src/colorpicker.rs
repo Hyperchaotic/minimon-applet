@@ -281,33 +281,39 @@ impl ColorPicker {
         self.slider_blue_val = color.blue;
         self.slider_alpha_val = color.alpha;
 
-        let dmo = self.demo_chart.as_mut().expect("ERROR: No demo svg!");
-        let mut col = dmo.colors();
-        col.set_color(color, self.color_variant);
-        dmo.set_colors(col);
+        if let Some(dmo) = self.demo_chart.as_mut() {
+            let mut col = dmo.colors();
+            col.set_color(color, self.color_variant);
+            dmo.set_colors(col);
 
-        // Set the shading for sliders, this is required to be static lifetime
-        COLOR_STOPS_RED_LOW.lock().unwrap()[1].color =
-            Color::from_rgb(f32::from(color.red) / f32::from(u8::MAX), 0.0, 0.0);
-        COLOR_STOPS_RED_HIGH.lock().unwrap()[0].color =
-            Color::from_rgb(f32::from(color.red) / f32::from(u8::MAX), 0.0, 0.0);
+            // Set the shading for sliders, this is required to be static lifetime
+            COLOR_STOPS_RED_LOW.lock().unwrap()[1].color =
+                Color::from_rgb(f32::from(color.red) / f32::from(u8::MAX), 0.0, 0.0);
+            COLOR_STOPS_RED_HIGH.lock().unwrap()[0].color =
+                Color::from_rgb(f32::from(color.red) / f32::from(u8::MAX), 0.0, 0.0);
 
-        COLOR_STOPS_GREEN_LOW.lock().unwrap()[1].color =
-            Color::from_rgb(0.0, f32::from(color.green) / f32::from(u8::MAX), 0.0);
-        COLOR_STOPS_GREEN_HIGH.lock().unwrap()[0].color =
-            Color::from_rgb(0.0, f32::from(color.green) / f32::from(u8::MAX), 0.0);
+            COLOR_STOPS_GREEN_LOW.lock().unwrap()[1].color =
+                Color::from_rgb(0.0, f32::from(color.green) / f32::from(u8::MAX), 0.0);
+            COLOR_STOPS_GREEN_HIGH.lock().unwrap()[0].color =
+                Color::from_rgb(0.0, f32::from(color.green) / f32::from(u8::MAX), 0.0);
 
-        COLOR_STOPS_BLUE_LOW.lock().unwrap()[1].color =
-            Color::from_rgb(0.0, 0.0, f32::from(color.blue) / f32::from(u8::MAX));
-        COLOR_STOPS_BLUE_HIGH.lock().unwrap()[0].color =
-            Color::from_rgb(0.0, 0.0, f32::from(color.blue) / f32::from(u8::MAX));
+            COLOR_STOPS_BLUE_LOW.lock().unwrap()[1].color =
+                Color::from_rgb(0.0, 0.0, f32::from(color.blue) / f32::from(u8::MAX));
+            COLOR_STOPS_BLUE_HIGH.lock().unwrap()[0].color =
+                Color::from_rgb(0.0, 0.0, f32::from(color.blue) / f32::from(u8::MAX));
+        } else {
+            log::error!("Colorpicker::update_color() No demo graph object!");
+        }
     }
 
     pub fn default_colors(&mut self) {
         let colors = GraphColors::new(self.device);
-        let dmo = self.demo_chart.as_mut().expect("ERROR: No demo svg!");
-        dmo.set_colors(colors);
-        self.update_color(colors.get_color(self.color_variant));
+        if let Some(dmo) = self.demo_chart.as_mut() {
+            dmo.set_colors(colors);
+            self.update_color(colors.get_color(self.color_variant));
+        } else {
+            log::error!("Colorpicker::default_colors() No demo graph object!");
+        }
     }
 
     pub fn color_variant(&self) -> ColorVariant {
@@ -315,161 +321,172 @@ impl ColorPicker {
     }
 
     pub fn set_color_variant(&mut self, variant: ColorVariant) {
-        let dmo = self.demo_chart.as_mut().expect("ERROR: No demo svg!");
-        self.color_variant = variant;
-        let color = dmo.colors().get_color(variant);
-        self.update_color(color);
+        if let Some(dmo) = self.demo_chart.as_mut() {
+            self.color_variant = variant;
+            let color = dmo.colors().get_color(variant);
+            self.update_color(color);
+        } else {
+            log::error!("Colorpicker::set_color_variant() No demo graph object!");
+        }
     }
 
     pub fn colors(&self) -> GraphColors {
-        let dmo = self.demo_chart.as_ref().expect("ERROR: No demo svg!");
-        dmo.colors()
+        if let Some(dmo) = self.demo_chart.as_ref() {
+            dmo.colors()
+        } else {
+            log::error!("Colorpicker::set_color_variant() No demo graph object!");
+            GraphColors::default()
+        }
     }
 
-    pub fn view_colorpicker(&self) -> Element<crate::app::Message> {
+    pub fn view_colorpicker(&'_ self) -> Element<'_, crate::app::Message> {
         let color = self.sliders();
         let title = format!("{} {}", self.device, fl!("colorpicker-colors"));
 
-        let mut children = Vec::new();
-
-        let dmo = self.demo_chart.as_ref().expect("ERROR: No demo svg!");
-        children.push(widget::horizontal_space().into());
-        for (s, c) in dmo.color_choices() {
-            children.push(Element::from(widget::radio(
-                s,
-                c,
-                if self.color_variant() == c {
-                    Some(c)
-                } else {
-                    None
-                },
-                Message::ColorPickerSelectVariant,
-            )));
+        if let Some(dmo) = self.demo_chart.as_ref() {
+            let mut children = Vec::new();
             children.push(widget::horizontal_space().into());
-        }
+            for (s, c) in dmo.color_choices() {
+                children.push(Element::from(widget::radio(
+                    s,
+                    c,
+                    if self.color_variant() == c {
+                        Some(c)
+                    } else {
+                        None
+                    },
+                    Message::ColorPickerSelectVariant,
+                )));
+                children.push(widget::horizontal_space().into());
+            }
 
-        let fields = cosmic::widget::row::with_children(children);
+            let fields = cosmic::widget::row::with_children(children);
 
-        let c = widget::list_column()
-            .padding(0)
-            .spacing(0)
-            .add(
-                widget::text::title2(title)
-                    .width(Length::Fill)
-                    .align_x(Horizontal::Center),
-            )
-            .add(
-                widget::svg(widget::svg::Handle::from_memory(self.demo().into_bytes()))
-                    .width(Length::Fill)
-                    .height(100),
-            )
-            .add(column!(
-                Element::from(
-                    row!(
-                        widget::horizontal_space(),
-                        widget::svg(widget::svg::Handle::from_memory(RED_RECT.as_bytes()))
-                            .height(20),
-                        widget::horizontal_space(),
-                        ColorPicker::color_slider(
-                            color.red,
-                            Message::ColorPickerSliderRedChanged,
-                            &COLOR_STOPS_RED_LOW,
-                            &COLOR_STOPS_RED_HIGH
-                        ),
-                        widget::horizontal_space(),
-                        widget::text_input("", color.red.to_string())
-                            .width(50)
-                            .on_input(Message::ColorTextInputRedChanged),
-                        widget::horizontal_space(),
-                    )
-                    .align_y(Alignment::Center)
-                ),
-                Element::from(
-                    row!(
-                        widget::horizontal_space(),
-                        widget::svg(widget::svg::Handle::from_memory(GREEN_RECT.as_bytes()))
-                            .height(20),
-                        widget::horizontal_space(),
-                        ColorPicker::color_slider(
-                            color.green,
-                            Message::ColorPickerSliderGreenChanged,
-                            &COLOR_STOPS_GREEN_LOW,
-                            &COLOR_STOPS_GREEN_HIGH
-                        ),
-                        widget::horizontal_space(),
-                        widget::text_input("", color.green.to_string())
-                            .width(50)
-                            .on_input(Message::ColorTextInputGreenChanged),
-                        widget::horizontal_space(),
-                    )
-                    .align_y(Alignment::Center)
-                ),
-                Element::from(
-                    row!(
-                        widget::horizontal_space(),
-                        widget::svg(widget::svg::Handle::from_memory(BLUE_RECT.as_bytes()))
-                            .height(20),
-                        widget::horizontal_space(),
-                        ColorPicker::color_slider(
-                            color.blue,
-                            Message::ColorPickerSliderBlueChanged,
-                            &COLOR_STOPS_BLUE_LOW,
-                            &COLOR_STOPS_BLUE_HIGH
-                        ),
-                        widget::horizontal_space(),
-                        widget::text_input("", color.blue.to_string())
-                            .width(50)
-                            .on_input(Message::ColorTextInputBlueChanged),
-                        widget::horizontal_space(),
-                    )
-                    .align_y(Alignment::Center)
-                ),
-                Element::from(
-                    row!(
-                        widget::horizontal_space(),
-                        widget::svg(widget::svg::Handle::from_memory(ALPHA_RECT.as_bytes()))
-                            .height(20),
-                        widget::horizontal_space(),
-                        widget::slider(
-                            0..=255,
-                            color.alpha,
-                            Message::ColorPickerSliderAlphaChanged
-                        )
-                        .width(Length::Fixed(220.0))
-                        .step(1),
-                        widget::horizontal_space(),
-                        widget::text_input("", color.alpha.to_string())
-                            .width(50)
-                            .on_input(Message::ColorTextInputAlphaChanged),
-                        widget::horizontal_space(),
-                    )
-                    .align_y(Alignment::Center)
-                ),
-            ))
-            .add(fields)
-            .spacing(10)
-            .add(
-                row!(
-                    widget::button::standard(fl!("colorpicker-defaults"))
-                        .on_press(Message::ColorPickerDefaults),
-                    widget::button::standard(fl!("colorpicker-accent"))
-                        .on_press(Message::ColorPickerAccent),
-                    row!(
-                        widget::horizontal_space(),
-                        widget::button::destructive(fl!("colorpicker-cancel"))
-                            .on_press(Message::ColorPickerClose(false, dmo.id())),
-                        widget::button::suggested(fl!("colorpicker-save"))
-                            .on_press(Message::ColorPickerClose(true, dmo.id()))
-                    )
-                    .width(Length::Fill)
-                    .spacing(5)
-                    .align_y(Alignment::End)
+            let c = widget::list_column()
+                .padding(0)
+                .spacing(0)
+                .add(
+                    widget::text::title2(title)
+                        .width(Length::Fill)
+                        .align_x(Horizontal::Center),
                 )
-                .padding(5)
-                .spacing(5)
-                .width(Length::Fill),
-            );
+                .add(
+                    widget::svg(widget::svg::Handle::from_memory(self.demo().into_bytes()))
+                        .width(Length::Fill)
+                        .height(100),
+                )
+                .add(column!(
+                    Element::from(
+                        row!(
+                            widget::horizontal_space(),
+                            widget::svg(widget::svg::Handle::from_memory(RED_RECT.as_bytes()))
+                                .height(20),
+                            widget::horizontal_space(),
+                            ColorPicker::color_slider(
+                                color.red,
+                                Message::ColorPickerSliderRedChanged,
+                                &COLOR_STOPS_RED_LOW,
+                                &COLOR_STOPS_RED_HIGH
+                            ),
+                            widget::horizontal_space(),
+                            widget::text_input("", color.red.to_string())
+                                .width(50)
+                                .on_input(Message::ColorTextInputRedChanged),
+                            widget::horizontal_space(),
+                        )
+                        .align_y(Alignment::Center)
+                    ),
+                    Element::from(
+                        row!(
+                            widget::horizontal_space(),
+                            widget::svg(widget::svg::Handle::from_memory(GREEN_RECT.as_bytes()))
+                                .height(20),
+                            widget::horizontal_space(),
+                            ColorPicker::color_slider(
+                                color.green,
+                                Message::ColorPickerSliderGreenChanged,
+                                &COLOR_STOPS_GREEN_LOW,
+                                &COLOR_STOPS_GREEN_HIGH
+                            ),
+                            widget::horizontal_space(),
+                            widget::text_input("", color.green.to_string())
+                                .width(50)
+                                .on_input(Message::ColorTextInputGreenChanged),
+                            widget::horizontal_space(),
+                        )
+                        .align_y(Alignment::Center)
+                    ),
+                    Element::from(
+                        row!(
+                            widget::horizontal_space(),
+                            widget::svg(widget::svg::Handle::from_memory(BLUE_RECT.as_bytes()))
+                                .height(20),
+                            widget::horizontal_space(),
+                            ColorPicker::color_slider(
+                                color.blue,
+                                Message::ColorPickerSliderBlueChanged,
+                                &COLOR_STOPS_BLUE_LOW,
+                                &COLOR_STOPS_BLUE_HIGH
+                            ),
+                            widget::horizontal_space(),
+                            widget::text_input("", color.blue.to_string())
+                                .width(50)
+                                .on_input(Message::ColorTextInputBlueChanged),
+                            widget::horizontal_space(),
+                        )
+                        .align_y(Alignment::Center)
+                    ),
+                    Element::from(
+                        row!(
+                            widget::horizontal_space(),
+                            widget::svg(widget::svg::Handle::from_memory(ALPHA_RECT.as_bytes()))
+                                .height(20),
+                            widget::horizontal_space(),
+                            widget::slider(
+                                0..=255,
+                                color.alpha,
+                                Message::ColorPickerSliderAlphaChanged
+                            )
+                            .width(Length::Fixed(220.0))
+                            .step(1),
+                            widget::horizontal_space(),
+                            widget::text_input("", color.alpha.to_string())
+                                .width(50)
+                                .on_input(Message::ColorTextInputAlphaChanged),
+                            widget::horizontal_space(),
+                        )
+                        .align_y(Alignment::Center)
+                    ),
+                ))
+                .add(fields)
+                .spacing(10)
+                .add(
+                    row!(
+                        widget::button::standard(fl!("colorpicker-defaults"))
+                            .on_press(Message::ColorPickerDefaults),
+                        widget::button::standard(fl!("colorpicker-accent"))
+                            .on_press(Message::ColorPickerAccent),
+                        row!(
+                            widget::horizontal_space(),
+                            widget::button::destructive(fl!("colorpicker-cancel"))
+                                .on_press(Message::ColorPickerClose(false, dmo.id())),
+                            widget::button::suggested(fl!("colorpicker-save"))
+                                .on_press(Message::ColorPickerClose(true, dmo.id()))
+                        )
+                        .width(Length::Fill)
+                        .spacing(5)
+                        .align_y(Alignment::End)
+                    )
+                    .padding(5)
+                    .spacing(5)
+                    .width(Length::Fill),
+                );
 
-        c.into()
+            return c.into();
+        } else {
+            return widget::button::destructive(fl!("colorpicker-cancel"))
+                .on_press(Message::ColorPickerClose(false, None))
+                .into();
+        }
     }
 }
