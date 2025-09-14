@@ -65,6 +65,17 @@
     <internet>always</internet>
   </recommends>
   <releases>
+    <release version="0.8.1" date="2025-09-14">
+      <url type="details">https://github.com/cosmic-utils/minimon-applet/releases/tag/v0.8.1</url>
+      <description>
+        <p>What's new:</p>
+        <ul>
+          <li>Arabic and Hungarian translations.</li>
+          <li>Added missing keys to existing translations, fix typos in English.</li>
+          <li>Fix layout problem with button to change colors.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.8.0" date="2025-08-07">
       <url type="details">https://github.com/cosmic-utils/minimon-applet/releases/tag/v0.8.0</url>
       <description>
