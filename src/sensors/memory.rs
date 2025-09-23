@@ -23,7 +23,8 @@ use cosmic::{
 
 use crate::app::Message;
 
-use std::{collections::VecDeque, fmt::Write};
+use bounded_vec_deque::BoundedVecDeque;
+use std::fmt::Write;
 
 use super::Sensor;
 
@@ -31,7 +32,7 @@ const MAX_SAMPLES: usize = 21;
 
 #[derive(Debug)]
 pub struct Memory {
-    samples: VecDeque<f64>,
+    samples: BoundedVecDeque<f64>,
     max_val: f64,
     system: System,
     graph_options: Vec<&'static str>,
@@ -54,7 +55,7 @@ impl DemoGraph for Memory {
                 )
             }
             GraphKind::Line => crate::svg_graph::line(
-                &VecDeque::from(DEMO_SAMPLES),
+                &std::collections::VecDeque::from(DEMO_SAMPLES),
                 self.max_val,
                 &self.svg_colors,
             ),
@@ -109,10 +110,6 @@ impl Sensor for Memory {
 
         self.system.refresh_memory_specifics(r);
         let new_val: f64 = self.system.used_memory() as f64 / 1_073_741_824.0;
-
-        if self.samples.len() >= MAX_SAMPLES {
-            self.samples.pop_front();
-        }
         self.samples.push_back(new_val);
     }
 
@@ -286,7 +283,10 @@ impl Default for Memory {
         value.push('0');
 
         let mut memory = Memory {
-            samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
+            samples: BoundedVecDeque::from_iter(
+                std::iter::repeat(0.0).take(MAX_SAMPLES),
+                MAX_SAMPLES,
+            ),
             max_val,
             system,
             config: MemoryConfig::default(),

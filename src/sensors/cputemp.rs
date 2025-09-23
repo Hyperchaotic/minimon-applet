@@ -1,5 +1,9 @@
 use crate::{
-    colorpicker::DemoGraph, config::{ColorVariant, CpuTempConfig, DeviceKind, GraphColors, GraphKind}, fl, sensors::INVALID_IMG, svg_graph::SvgColors
+    colorpicker::DemoGraph,
+    config::{ColorVariant, CpuTempConfig, DeviceKind, GraphColors, GraphKind},
+    fl,
+    sensors::INVALID_IMG,
+    svg_graph::SvgColors,
 };
 use cosmic::{Element, iced::Alignment::Center, widget::Container};
 
@@ -18,8 +22,8 @@ use log::info;
 use crate::app::Message;
 use std::any::Any;
 
+use bounded_vec_deque::BoundedVecDeque;
 use std::{
-    collections::VecDeque,
     fs,
     path::{Path, PathBuf},
 };
@@ -54,7 +58,11 @@ impl HwmonTemp {
             let name = name.trim().to_lowercase();
             info!("  path: {name_path:?}. name: {name}");
 
-            if name.contains("coretemp") || name.contains("k10temp") || name.contains("cpu") || name.contains("zenpower") {
+            if name.contains("coretemp")
+                || name.contains("k10temp")
+                || name.contains("cpu")
+                || name.contains("zenpower")
+            {
                 let mut tdie: Option<(PathBuf, String)> = None;
                 let mut tctl: Option<(PathBuf, String)> = None;
                 let mut ccd: Option<(PathBuf, String)> = None;
@@ -132,7 +140,7 @@ impl HwmonTemp {
 #[derive(Debug)]
 pub struct CpuTemp {
     hwmon_temp: Option<HwmonTemp>,
-    pub samples: VecDeque<f64>,
+    pub samples: BoundedVecDeque<f64>,
     graph_options: Vec<&'static str>,
     unit_options: Vec<&'static str>,
     /// colors cached so we don't need to convert to string every time
@@ -153,13 +161,20 @@ impl DemoGraph for CpuTemp {
                     &self.svg_colors,
                 )
             }
-            GraphKind::Line => {
-                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100.0, &self.svg_colors)
+            GraphKind::Line => crate::svg_graph::line(
+                &std::collections::VecDeque::from(DEMO_SAMPLES),
+                100.0,
+                &self.svg_colors,
+            ),
+            GraphKind::Heat => crate::svg_graph::heat(
+                &std::collections::VecDeque::from(DEMO_SAMPLES),
+                100,
+                &self.svg_colors,
+            ),
+            GraphKind::StackedBars => {
+                log::error!("StackedBars not supported for CpuTemp");
+                INVALID_IMG.to_string()
             }
-            GraphKind::Heat => {
-                crate::svg_graph::heat(&VecDeque::from(DEMO_SAMPLES), 100, &self.svg_colors)
-            }
-            GraphKind::StackedBars => { log::error!("StackedBars not supported for CpuTemp"); INVALID_IMG.to_string() },
         }
     }
 
@@ -207,9 +222,6 @@ impl Sensor for CpuTemp {
         if let Some(hw) = &self.hwmon_temp {
             match hw.read_temp() {
                 Ok(temp) => {
-                    if self.samples.len() >= MAX_SAMPLES {
-                        self.samples.pop_front();
-                    }
                     self.samples.push_back(f64::from(temp));
                 }
                 Err(e) => info!("Error reading temp data {e:?}"),
@@ -288,7 +300,10 @@ impl Sensor for CpuTemp {
             }
             GraphKind::Line => crate::svg_graph::line(&self.samples, max, &self.svg_colors),
             GraphKind::Heat => crate::svg_graph::heat(&self.samples, max as u64, &self.svg_colors),
-            GraphKind::StackedBars => { log::error!("StackedBars not supported for CpuTemp"); INVALID_IMG.to_string() },
+            GraphKind::StackedBars => {
+                log::error!("StackedBars not supported for CpuTemp");
+                INVALID_IMG.to_string()
+            }
         };
 
         let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
@@ -395,7 +410,10 @@ impl Default for CpuTemp {
 
         let mut cpu = CpuTemp {
             hwmon_temp: hwmon,
-            samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
+            samples: BoundedVecDeque::from_iter(
+                std::iter::repeat(0.0).take(MAX_SAMPLES),
+                MAX_SAMPLES,
+            ),
             graph_options: super::GRAPH_OPTIONS_RING_LINE_HEAT.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
             unit_options: super::UNIT_OPTIONS.to_vec(),

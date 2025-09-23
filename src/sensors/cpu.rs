@@ -1,6 +1,12 @@
 use crate::{
-    barchart::StackedBarSvg, colorpicker::DemoGraph, config::{ColorVariant, CpuConfig, DeviceKind, GraphColors, GraphKind}, fl, sensors::INVALID_IMG, svg_graph::SvgColors
+    barchart::StackedBarSvg,
+    colorpicker::DemoGraph,
+    config::{ColorVariant, CpuConfig, DeviceKind, GraphColors, GraphKind},
+    fl,
+    sensors::INVALID_IMG,
+    svg_graph::SvgColors,
 };
+use bounded_vec_deque::BoundedVecDeque;
 use cosmic::{
     Element, Renderer, Theme, iced::Alignment::Center, iced_widget::Column, widget::Container,
 };
@@ -20,7 +26,7 @@ use cosmic::{
 use crate::app::Message;
 
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::HashMap,
     fmt::Write,
     fs::File,
     io::{BufRead, BufReader},
@@ -48,8 +54,8 @@ pub static COLOR_CHOICES_BARS: LazyLock<[(&'static str, ColorVariant); 4]> = Laz
     ]
 });
 
-#[derive(Debug)]
-struct CpuTimes {
+#[derive(Debug, Clone, Copy, Default)]
+struct CpuStat {
     user: u64,
     nice: u64,
     system: u64,
@@ -60,7 +66,7 @@ struct CpuTimes {
     steal: u64,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct CpuLoad {
     pub user_pct: f64,
     pub system_pct: f64,
@@ -72,12 +78,14 @@ pub struct Cpu {
     total_cpu_load: CpuLoad,
     // Load per core since last update split into user and system
     core_loads: HashMap<usize, CpuLoad>,
-    // Load per core since last update split into values read from /proc
-    prev_core_times: HashMap<usize, CpuTimes>,
+    // Current Load per core since /proc
+    current_core_stats: HashMap<usize, CpuStat>,
+    // Load per core in last update
+    prev_core_stats: HashMap<usize, CpuStat>,
     // Total CPU load for the last MAX_SAMPLES updates
-    samples_sum: VecDeque<f64>,
+    samples_sum: BoundedVecDeque<f64>,
     // CPU load for the last MAX_SAMPLES updates, split into user and system
-    samples_split: VecDeque<CpuLoad>,
+    samples_split: BoundedVecDeque<CpuLoad>,
     graph_options: Vec<&'static str>,
     /// colors cached so we don't need to convert to string every time
     svg_colors: SvgColors,
@@ -98,10 +106,15 @@ impl DemoGraph for Cpu {
                     &self.svg_colors,
                 )
             }
-            GraphKind::Line => {
-                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100.0, &self.svg_colors)
+            GraphKind::Line => crate::svg_graph::line(
+                &std::collections::VecDeque::from(DEMO_SAMPLES),
+                100.0,
+                &self.svg_colors,
+            ),
+            GraphKind::Heat => {
+                log::error!("Wrong graph choice!");
+                INVALID_IMG.to_string()
             }
-            GraphKind::Heat => { log::error!("Wrong graph choice!"); INVALID_IMG.to_string() },
             GraphKind::StackedBars => {
                 let mut map = HashMap::new();
                 map.insert(
@@ -191,17 +204,9 @@ impl Sensor for Cpu {
 
     fn update(&mut self) {
         self.update_stats();
-
-        if self.samples_split.len() >= MAX_SAMPLES {
-            self.samples_split.pop_front();
-        }
         self.samples_split.push_back(self.total_cpu_load);
-
-        let new_sum = self.total_cpu_load.user_pct + self.total_cpu_load.system_pct;
-        if self.samples_sum.len() >= MAX_SAMPLES {
-            self.samples_sum.pop_front();
-        }
-        self.samples_sum.push_back(new_sum);
+        self.samples_sum
+            .push_back(self.total_cpu_load.user_pct + self.total_cpu_load.system_pct);
     }
 
     fn demo_graph(&self) -> Box<dyn DemoGraph> {
@@ -272,7 +277,10 @@ impl Sensor for Cpu {
                 StackedBarSvg::new(self.config.bar_width, height_hint, self.config.bar_spacing)
                     .svg(&self.core_loads, &self.bar_svg_colors)
             }
-            GraphKind::Heat => { log::error!("Heat not supported!"); INVALID_IMG.to_string() },
+            GraphKind::Heat => {
+                log::error!("Heat not supported!");
+                INVALID_IMG.to_string()
+            }
         };
 
         let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
@@ -426,21 +434,36 @@ impl Cpu {
             (*super::GRAPH_OPTIONS_RING_LINE).into()
         };
 
+        // Initialize CPU/Core structures
+        let mut core_stats: HashMap<usize, CpuStat> = HashMap::new();
+        Self::read_cpu_stats(&mut core_stats);
+        log::info!("Found CPU Cores: {}", core_stats.len());
+
+        let core_loads: HashMap<usize, CpuLoad> = core_stats
+            .keys()
+            .map(|&k| (k, CpuLoad::default()))
+            .collect();
+
         let mut cpu = Cpu {
             total_cpu_load: CpuLoad {
                 user_pct: 0.,
                 system_pct: 0.,
             },
-            core_loads: HashMap::new(),
-            prev_core_times: Cpu::read_cpu_stats(),
-            samples_sum: VecDeque::from(vec![0.0; MAX_SAMPLES]),
-            samples_split: VecDeque::from(vec![
-                CpuLoad {
+            core_loads,
+            current_core_stats: HashMap::from(core_stats.clone()),
+            prev_core_stats: core_stats,
+            samples_sum: BoundedVecDeque::from_iter(
+                std::iter::repeat(0.0).take(MAX_SAMPLES),
+                MAX_SAMPLES,
+            ),
+            samples_split: BoundedVecDeque::from_iter(
+                std::iter::repeat(CpuLoad {
                     user_pct: 0.,
-                    system_pct: 0.
-                };
-                MAX_SAMPLES
-            ]),
+                    system_pct: 0.,
+                })
+                .take(MAX_SAMPLES),
+                MAX_SAMPLES,
+            ),
             graph_options: graph_opts.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
             bar_svg_colors: SvgColors::new(&GraphColors::default()),
@@ -458,33 +481,14 @@ impl Cpu {
         self.core_loads.len()
     }
 
-    /* Simulated Threadripper
-    fn read_cpu_stats() -> HashMap<usize, CpuTimes> {
-        let mut combined_stats = HashMap::new();
-
-        for batch in 0..5 {
-            let batch_stats = Self::read_cpu_stats2();
-
-            // Offset the core IDs by batch * 20 to avoid conflicts
-            for (core_id, cpu_times) in batch_stats {
-                let new_core_id = core_id + (batch * 20);
-                combined_stats.insert(new_core_id, cpu_times);
-            }
-        }
-
-        combined_stats
-    }
-    // Read CPU statistics from /proc/stat
-    fn read_cpu_stats2() -> HashMap<usize, CpuTimes> {*/
-    fn read_cpu_stats() -> HashMap<usize, CpuTimes> {
-        let mut cpu_stats = HashMap::new();
-
+    fn read_cpu_stats(cpu_stats: &mut HashMap<usize, CpuStat>) {
         // Open /proc/stat file
         let Ok(file) = File::open(Path::new("/proc/stat")) else {
-            return cpu_stats;
+            return;
         };
 
         let reader = BufReader::new(file);
+        cpu_stats.clear();
 
         // Read each line from the file
         for line in reader.lines() {
@@ -498,7 +502,7 @@ impl Cpu {
             }
 
             // Extract CPU number
-            let Ok(cpu_num) = parts[0].trim_start_matches("cpu").parse::<usize>() else {
+            let Ok(core_num) = parts[0].trim_start_matches("cpu").parse::<usize>() else {
                 continue;
             };
 
@@ -517,8 +521,8 @@ impl Cpu {
             let softirq = parts[7].parse::<u64>().unwrap_or(0);
             let steal = parts[8].parse::<u64>().unwrap_or(0);
 
-            // Create CpuTimes struct and insert into HashMap
-            let cpu_times = CpuTimes {
+            // Create CpuStat struct and insert into HashMap
+            let core_stats = CpuStat {
                 user,
                 nice,
                 system,
@@ -529,27 +533,25 @@ impl Cpu {
                 steal,
             };
 
-            cpu_stats.insert(cpu_num, cpu_times);
+            cpu_stats.insert(core_num, core_stats);
         }
-
-        cpu_stats
     }
 
     // Update current CPU load by comparing to previous samples
     fn update_stats(&mut self) {
         // Read current CPU stats
-        let current_cpu_times = Cpu::read_cpu_stats();
-
-        // Temporary storage for new per-core loads
-        let mut new_cpu_loads = HashMap::with_capacity(current_cpu_times.len());
+        self.current_core_stats.clear();
+        Cpu::read_cpu_stats(&mut self.current_core_stats);
 
         // Running totals for average computation
         let mut total_user_pct = 0.0;
         let mut total_system_pct = 0.0;
         let mut counted_cores = 0;
 
-        for (&cpu_num, current) in &current_cpu_times {
-            if let Some(prev) = self.prev_core_times.get(&cpu_num) {
+        self.core_loads.clear();
+
+        for (&core_num, current) in &self.current_core_stats {
+            if let Some(prev) = self.prev_core_stats.get_mut(&core_num) {
                 // Compute time deltas
                 let user = current.user.saturating_sub(prev.user);
                 let nice = current.nice.saturating_sub(prev.nice);
@@ -569,8 +571,8 @@ impl Cpu {
                 let user_pct = (user + nice) as f64 / total_f64 * 100.0;
                 let system_pct = system as f64 / total_f64 * 100.0;
 
-                new_cpu_loads.insert(
-                    cpu_num,
+                self.core_loads.insert(
+                    core_num,
                     CpuLoad {
                         user_pct,
                         system_pct,
@@ -580,10 +582,10 @@ impl Cpu {
                 total_user_pct += user_pct;
                 total_system_pct += system_pct;
                 counted_cores += 1;
+
+                *prev = *current;
             }
         }
-
-        self.core_loads = new_cpu_loads;
 
         if counted_cores > 0 {
             let core_count_f64 = f64::from(counted_cores);
@@ -592,8 +594,6 @@ impl Cpu {
                 system_pct: total_system_pct / core_count_f64,
             };
         }
-
-        self.prev_core_times = current_cpu_times;
     }
 }
 

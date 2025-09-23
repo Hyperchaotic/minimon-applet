@@ -28,6 +28,7 @@ fern = "0.7"
 chrono = "0.4.40"
 sha2 = "0.10"
 hex = "0.4"
+bounded-vec-deque = "0.1"
 
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"

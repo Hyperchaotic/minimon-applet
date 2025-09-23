@@ -1,7 +1,8 @@
+use bounded_vec_deque::BoundedVecDeque;
 use cosmic::iced::Alignment::Center;
 use cosmic::{Element, Renderer, Theme};
 use log::info;
-use std::{collections::VecDeque, fmt::Write};
+use std::fmt::Write;
 
 use crate::sensors::{GpuConfig, INVALID_IMG};
 use cosmic::widget::{self, Column, Container};
@@ -43,7 +44,7 @@ static DISABLED_COLORS: LazyLock<GraphColors> = LazyLock::new(|| GraphColors {
 
 pub struct GpuGraph {
     id: String,
-    samples: VecDeque<f64>,
+    samples: BoundedVecDeque<f64>,
     graph_options: Vec<&'static str>,
     svg_colors: SvgColors,
     disabled: bool,
@@ -61,7 +62,10 @@ impl GpuGraph {
 
         GpuGraph {
             id: id.to_owned(),
-            samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
+            samples: BoundedVecDeque::from_iter(
+                std::iter::repeat(0.0).take(MAX_SAMPLES),
+                MAX_SAMPLES,
+            ),
             graph_options: super::GRAPH_OPTIONS_RING_LINE.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
             disabled: false,
@@ -191,9 +195,6 @@ impl GpuGraph {
     }
 
     pub fn update(&mut self, sample: u32) {
-        if self.samples.len() >= MAX_SAMPLES {
-            self.samples.pop_front();
-        }
         self.samples.push_back(f64::from(sample));
     }
 }
@@ -228,9 +229,11 @@ impl DemoGraph for GpuGraph {
                     &self.svg_colors,
                 )
             }
-            GraphKind::Line => {
-                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100.0, &self.svg_colors)
-            }
+            GraphKind::Line => crate::svg_graph::line(
+                &std::collections::VecDeque::from(DEMO_SAMPLES),
+                100.0,
+                &self.svg_colors,
+            ),
             _ => {
                 log::error!("GPUGraph type not supported {:?}", self.config.kind);
                 INVALID_IMG.to_string()
@@ -262,7 +265,7 @@ impl DemoGraph for GpuGraph {
 
 pub struct VramGraph {
     id: String,
-    samples: VecDeque<f64>,
+    samples: BoundedVecDeque<f64>,
     graph_options: Vec<&'static str>,
     total: f64,
     svg_colors: SvgColors,
@@ -276,7 +279,10 @@ impl VramGraph {
     fn new(id: &str, total: f64) -> Self {
         VramGraph {
             id: id.to_owned(),
-            samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
+            samples: BoundedVecDeque::from_iter(
+                std::iter::repeat(0.0).take(MAX_SAMPLES),
+                MAX_SAMPLES,
+            ),
             graph_options: super::GRAPH_OPTIONS_RING_LINE.to_vec(),
             total,
             svg_colors: SvgColors::new(&GraphColors::default()),
@@ -432,17 +438,13 @@ impl VramGraph {
 
     pub fn update(&mut self, sample: u64) {
         let new_val: f64 = sample as f64 / 1_073_741_824.0;
-
-        if self.samples.len() >= MAX_SAMPLES {
-            self.samples.pop_front();
-        }
         self.samples.push_back(new_val);
     }
 }
 
 pub struct TempGraph {
     id: String,
-    samples: VecDeque<f64>,
+    samples: BoundedVecDeque<f64>,
     unit_options: Vec<&'static str>,
     graph_options: Vec<&'static str>,
     max_temp: f64,
@@ -457,7 +459,10 @@ impl TempGraph {
     fn new(id: &str) -> Self {
         TempGraph {
             id: id.to_owned(),
-            samples: VecDeque::from(vec![0.0; MAX_SAMPLES]),
+            samples: BoundedVecDeque::from_iter(
+                std::iter::repeat(0.0).take(MAX_SAMPLES),
+                MAX_SAMPLES,
+            ),
             unit_options: super::UNIT_OPTIONS.to_vec(),
             graph_options: super::GRAPH_OPTIONS_RING_LINE_HEAT.to_vec(),
             max_temp: 100.0,
@@ -606,9 +611,6 @@ impl TempGraph {
 
     pub fn update(&mut self, sample: u32) {
         let new_val = f64::from(sample) / 1000.0;
-        if self.samples.len() >= MAX_SAMPLES {
-            self.samples.pop_front();
-        }
         self.samples.push_back(new_val);
     }
 }
@@ -626,12 +628,16 @@ impl DemoGraph for TempGraph {
                     &self.svg_colors,
                 )
             }
-            GraphKind::Line => {
-                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 100.0, &self.svg_colors)
-            }
-            GraphKind::Heat => {
-                crate::svg_graph::heat(&VecDeque::from(HEAT_DEMO_SAMPLES), 100, &self.svg_colors)
-            }
+            GraphKind::Line => crate::svg_graph::line(
+                &std::collections::VecDeque::from(DEMO_SAMPLES),
+                100.0,
+                &self.svg_colors,
+            ),
+            GraphKind::Heat => crate::svg_graph::heat(
+                &std::collections::VecDeque::from(HEAT_DEMO_SAMPLES),
+                100,
+                &self.svg_colors,
+            ),
             GraphKind::StackedBars => {
                 log::error!("StackedBars not supported for GpuTemp");
                 INVALID_IMG.to_string()
@@ -698,9 +704,11 @@ impl DemoGraph for VramGraph {
                     &self.svg_colors,
                 )
             }
-            GraphKind::Line => {
-                crate::svg_graph::line(&VecDeque::from(DEMO_SAMPLES), 32.0, &self.svg_colors)
-            }
+            GraphKind::Line => crate::svg_graph::line(
+                &std::collections::VecDeque::from(DEMO_SAMPLES),
+                32.0,
+                &self.svg_colors,
+            ),
             _ => {
                 log::error!("VRAM Graph type not supported {:?}", self.config.kind);
                 INVALID_IMG.to_string()

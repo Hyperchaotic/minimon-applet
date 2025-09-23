@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use bounded_vec_deque::BoundedVecDeque;
 
 use cosmic::{Element, iced_widget::Column, widget::Container};
 use log::info;
@@ -70,8 +70,8 @@ pub enum UnitVariant {
 #[derive(Debug)]
 pub struct Network {
     networks: Networks,
-    download: VecDeque<u64>,
-    upload: VecDeque<u64>,
+    download: BoundedVecDeque<u64>,
+    upload: BoundedVecDeque<u64>,
     max_y: Option<u64>,
     svg_colors: SvgColors,
     dropdown_options: Vec<&'static str>,
@@ -81,8 +81,8 @@ pub struct Network {
 
 impl DemoGraph for Network {
     fn demo(&self) -> String {
-        let download = VecDeque::from(DL_DEMO);
-        let upload = VecDeque::from(UL_DEMO);
+        let download = std::collections::VecDeque::from(DL_DEMO);
+        let upload = std::collections::VecDeque::from(UL_DEMO);
 
         match self.config.variant {
             NetworkVariant::Combined => crate::svg_graph::double_line(
@@ -168,15 +168,7 @@ impl Sensor for Network {
             dl += network.received() * 8;
             ul += network.transmitted() * 8;
         }
-
-        if self.download.len() >= MAX_SAMPLES {
-            self.download.pop_front();
-        }
         self.download.push_back(dl);
-
-        if self.upload.len() >= MAX_SAMPLES {
-            self.upload.pop_front();
-        }
         self.upload.push_back(ul);
     }
 
@@ -233,7 +225,9 @@ impl Sensor for Network {
 
     #[cfg(not(feature = "lyon_charts"))]
     fn chart(
-        &'_ self, _height_hint: u16, _width_hint: u16
+        &'_ self,
+        _height_hint: u16,
+        _width_hint: u16,
     ) -> cosmic::widget::Container<'_, crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         let svg = match self.config.variant {
             NetworkVariant::Combined => crate::svg_graph::double_line(
@@ -408,8 +402,11 @@ impl Default for Network {
         let networks = Networks::new_with_refreshed_list();
         Network {
             networks,
-            download: VecDeque::from(vec![0; MAX_SAMPLES]),
-            upload: VecDeque::from(vec![0; MAX_SAMPLES]),
+            download: BoundedVecDeque::from_iter(
+                std::iter::repeat(0).take(MAX_SAMPLES),
+                MAX_SAMPLES,
+            ),
+            upload: BoundedVecDeque::from_iter(std::iter::repeat(0).take(MAX_SAMPLES), MAX_SAMPLES),
             max_y: None,
             dropdown_options: ["b", "Kb", "Mb", "Gb", "Tb"].into(),
             svg_colors: SvgColors::new(&GraphColors::default()),
@@ -420,7 +417,6 @@ impl Default for Network {
 }
 
 impl Network {
-
     fn makestr(val: u64, format: UnitVariant, show_bytes: bool) -> String {
         let mut value = val as f64;
 
@@ -453,7 +449,7 @@ impl Network {
         };
 
         // This happens when value is something like 9.9543456789908765453456 and it's rounded up to 10.
-        if value_str.len()==5 {
+        if value_str.len() == 5 {
             info!("Value: {value}. formatted: {value:.2}. string: {value_str}");
             value_str.pop();
         }
@@ -474,13 +470,13 @@ impl Network {
                 result = " ".repeat(padding) + &result;
             }
         }
-        
+
         result
     }
 
     // If the sample rate doesn't match exactly one second (more or less),
     // we grab enough samples to cover it and average the value of samples cover a longer duration.
-    fn last_second_bitrate(samples: &VecDeque<u64>, sample_interval_ms: u32) -> u64 {
+    fn last_second_bitrate(samples: &BoundedVecDeque<u64>, sample_interval_ms: u32) -> u64 {
         let mut total_duration = 0u32;
         let mut total_bitrate = 0u64;
 

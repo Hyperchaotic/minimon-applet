@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use bounded_vec_deque::BoundedVecDeque;
 
 use sysinfo::{DiskRefreshKind, Disks as DisksInfo};
 
@@ -72,8 +72,8 @@ pub enum UnitVariant {
 #[derive(Debug)]
 pub struct Disks {
     disks: DisksInfo,
-    write: VecDeque<u64>,
-    read: VecDeque<u64>,
+    write: BoundedVecDeque<u64>,
+    read: BoundedVecDeque<u64>,
     max_y: Option<u64>,
     svg_colors: SvgColors,
     config: DisksConfig,
@@ -82,8 +82,8 @@ pub struct Disks {
 
 impl DemoGraph for Disks {
     fn demo(&self) -> String {
-        let write = VecDeque::from(DL_DEMO);
-        let read = VecDeque::from(UL_DEMO);
+        let write = std::collections::VecDeque::from(DL_DEMO);
+        let read = std::collections::VecDeque::from(UL_DEMO);
 
         match self.config.variant {
             DisksVariant::Combined => {
@@ -152,14 +152,7 @@ impl Sensor for Disks {
             rd += usage.read_bytes;
         }
 
-        if self.write.len() >= MAX_SAMPLES {
-            self.write.pop_front();
-        }
         self.write.push_back(wr);
-
-        if self.read.len() >= MAX_SAMPLES {
-            self.read.pop_front();
-        }
         self.read.push_back(rd);
     }
 
@@ -215,7 +208,9 @@ impl Sensor for Disks {
 
     #[cfg(not(feature = "lyon_charts"))]
     fn chart(
-        &'_ self, _height_hint: u16, _width_hint: u16
+        &'_ self,
+        _height_hint: u16,
+        _width_hint: u16,
     ) -> cosmic::widget::Container<'_, crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         let svg = match self.config.variant {
             DisksVariant::Combined => crate::svg_graph::double_line(
@@ -352,8 +347,8 @@ impl Default for Disks {
         let disks = DisksInfo::new_with_refreshed_list();
         Disks {
             disks,
-            write: VecDeque::from(vec![0; MAX_SAMPLES]),
-            read: VecDeque::from(vec![0; MAX_SAMPLES]),
+            write: BoundedVecDeque::from_iter(std::iter::repeat(0).take(MAX_SAMPLES), MAX_SAMPLES),
+            read: BoundedVecDeque::from_iter(std::iter::repeat(0).take(MAX_SAMPLES), MAX_SAMPLES),
             max_y: None,
             svg_colors: SvgColors::new(&GraphColors::default()),
             config: DisksConfig::default(),
@@ -390,7 +385,7 @@ impl Disks {
         };
 
         // This happens when value is something like 9.9543456789908765453456 and it's rounded up to 10.
-        if value_str.len()==5 {
+        if value_str.len() == 5 {
             log::info!("Value: {value}. formatted: {value:.2}. string: {value_str}");
             value_str.pop();
         }
@@ -409,13 +404,13 @@ impl Disks {
                 formatted = " ".repeat(padding) + &formatted;
             }
         }
-        
+
         formatted
     }
 
     // If the sample rate doesn't match exactly one second (more or less),
     // we grab enough samples to cover it and average the value of samples cover a longer duration.
-    fn last_second_rate(samples: &VecDeque<u64>, sample_interval_ms: u32) -> u64 {
+    fn last_second_rate(samples: &BoundedVecDeque<u64>, sample_interval_ms: u32) -> u64 {
         let mut total_duration = 0u32;
         let mut total_bitrate = 0u64;
 
