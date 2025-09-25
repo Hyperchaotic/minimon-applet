@@ -101,11 +101,11 @@ impl DemoGraph for Disks {
     }
 
     fn colors(&self) -> GraphColors {
-        self.config.colors
+        *self.config.colors()
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.config.colors = colors;
+        *self.config.colors_mut() = colors;
         self.svg_colors.set_colors(&colors);
     }
 
@@ -126,7 +126,7 @@ impl Sensor for Disks {
     fn update_config(&mut self, config: &dyn Any, refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<DisksConfig>() {
             self.config = cfg.clone();
-            self.svg_colors.set_colors(&cfg.colors);
+            self.svg_colors.set_colors(&cfg.colors());
             self.refresh_rate = refresh_rate;
         }
     }
@@ -297,14 +297,14 @@ impl Sensor for Disks {
         disk_bandwidth_items.push(
             settings::item(
                 fl!("enable-chart"),
-                widget::toggler(config.chart).on_toggle(move |t| Message::ToggleDisksChart(k, t)),
+                widget::toggler(config.chart_visible()).on_toggle(move |t| Message::ToggleDisksChart(k, t)),
             )
             .into(),
         );
         disk_bandwidth_items.push(
             settings::item(
                 fl!("enable-label"),
-                widget::toggler(config.label).on_toggle(move |t| Message::ToggleDisksLabel(k, t)),
+                widget::toggler(config.label_visible()).on_toggle(move |t| Message::ToggleDisksLabel(k, t)),
             )
             .into(),
         );

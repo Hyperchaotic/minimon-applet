@@ -179,11 +179,11 @@ impl DemoGraph for CpuTemp {
     }
 
     fn colors(&self) -> GraphColors {
-        self.config.colors
+        *self.config.colors()
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.config.colors = colors;
+        *self.config.colors_mut() = colors;
         self.svg_colors.set_colors(&colors);
     }
 
@@ -205,7 +205,7 @@ impl Sensor for CpuTemp {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<CpuTempConfig>() {
             self.config = cfg.clone();
-            self.svg_colors.set_colors(&cfg.colors);
+            self.svg_colors.set_colors(&cfg.colors());
         }
     }
 
@@ -344,11 +344,11 @@ impl Sensor for CpuTemp {
             column!(
                 settings::item(
                     fl!("enable-chart"),
-                    toggler(config.chart).on_toggle(|value| { Message::ToggleCpuTempChart(value) }),
+                    toggler(config.chart_visible()).on_toggle(|value| { Message::ToggleCpuTempChart(value) }),
                 ),
                 settings::item(
                     fl!("enable-label"),
-                    toggler(config.label).on_toggle(|value| { Message::ToggleCpuTempLabel(value) }),
+                    toggler(config.label_visible()).on_toggle(|value| { Message::ToggleCpuTempLabel(value) }),
                 ),
                 settings::item(
                     fl!("temperature-unit"),

@@ -82,7 +82,7 @@ impl GpuGraph {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<GpuUsageConfig>() {
             self.config = cfg.clone();
-            self.svg_colors = SvgColors::new(&cfg.colors);
+            self.svg_colors = SvgColors::new(&cfg.colors());
         }
     }
 
@@ -242,11 +242,11 @@ impl DemoGraph for GpuGraph {
     }
 
     fn colors(&self) -> GraphColors {
-        self.config.colors
+        *self.config.colors()
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.config.colors = colors;
+        *self.config.colors_mut() = colors;
         self.svg_colors.set_colors(&colors);
     }
 
@@ -300,7 +300,7 @@ impl VramGraph {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<GpuVramConfig>() {
             self.config = cfg.clone();
-            self.svg_colors = SvgColors::new(&cfg.colors);
+            self.svg_colors = SvgColors::new(&cfg.colors());
         }
     }
 
@@ -481,7 +481,7 @@ impl TempGraph {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<GpuTempConfig>() {
             self.config = cfg.clone();
-            self.svg_colors = SvgColors::new(&cfg.colors);
+            self.svg_colors = SvgColors::new(&cfg.colors());
         }
     }
 
@@ -646,11 +646,11 @@ impl DemoGraph for TempGraph {
     }
 
     fn colors(&self) -> GraphColors {
-        self.config.colors
+        *self.config.colors()
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.config.colors = colors;
+        *self.config.colors_mut() = colors;
         self.svg_colors.set_colors(&colors);
     }
 
@@ -717,11 +717,11 @@ impl DemoGraph for VramGraph {
     }
 
     fn colors(&self) -> GraphColors {
-        self.config.colors
+        *self.config.colors()
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.config.colors = colors;
+        *self.config.colors_mut() = colors;
         self.svg_colors.set_colors(&colors);
     }
 
@@ -874,13 +874,13 @@ impl Gpu {
             column!(
                 settings::item(
                     fl!("enable-chart"),
-                    toggler(config.chart).on_toggle(move |value| {
+                    toggler(config.chart_visible()).on_toggle(move |value| {
                         Message::GpuToggleChart(self.id(), DeviceKind::Gpu, value)
                     }),
                 ),
                 settings::item(
                     fl!("enable-label"),
-                    toggler(config.label).on_toggle(move |value| {
+                    toggler(config.label_visible()).on_toggle(move |value| {
                         Message::GpuToggleLabel(self.id(), DeviceKind::Gpu, value)
                     }),
                 ),
@@ -940,13 +940,13 @@ impl Gpu {
             column!(
                 settings::item(
                     fl!("enable-chart"),
-                    toggler(config.chart).on_toggle(|value| {
+                    toggler(config.chart_visible()).on_toggle(|value| {
                         Message::GpuToggleChart(self.id(), DeviceKind::Vram, value)
                     }),
                 ),
                 settings::item(
                     fl!("enable-label"),
-                    toggler(config.label).on_toggle(|value| {
+                    toggler(config.label_visible()).on_toggle(|value| {
                         Message::GpuToggleLabel(self.id(), DeviceKind::Vram, value)
                     }),
                 ),
@@ -1008,13 +1008,13 @@ impl Gpu {
             column!(
                 settings::item(
                     fl!("enable-chart"),
-                    toggler(config.chart).on_toggle(|value| {
+                    toggler(config.chart_visible()).on_toggle(|value| {
                         Message::GpuToggleChart(self.id(), DeviceKind::GpuTemp, value)
                     }),
                 ),
                 settings::item(
                     fl!("enable-label"),
-                    toggler(config.label).on_toggle(|value| {
+                    toggler(config.label_visible()).on_toggle(|value| {
                         Message::GpuToggleLabel(self.id(), DeviceKind::GpuTemp, value)
                     }),
                 ),
@@ -1074,7 +1074,7 @@ impl Gpu {
         let usage = self.settings_usage_ui(&config.usage);
         let vram = self.settings_vram_ui(&config.vram);
 
-        let stacked = if config.vram.label && config.usage.label {
+        let stacked = if config.vram.label_visible() && config.usage.label_visible() {
             Some(settings::item(
                 fl!("settings-gpu-stack-labels"),
                 row!(

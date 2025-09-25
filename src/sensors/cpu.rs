@@ -89,7 +89,6 @@ pub struct Cpu {
     graph_options: Vec<&'static str>,
     /// colors cached so we don't need to convert to string every time
     svg_colors: SvgColors,
-    bar_svg_colors: SvgColors,
     config: CpuConfig,
 }
 
@@ -145,27 +144,18 @@ impl DemoGraph for Cpu {
                         system_pct: 5.4,
                     },
                 );
-                StackedBarSvg::default().svg(&map, &self.bar_svg_colors)
+                StackedBarSvg::default().svg(&map, &self.svg_colors)
             }
         }
     }
 
     fn colors(&self) -> GraphColors {
-        if self.config.kind == GraphKind::StackedBars {
-            self.config.bar_colors
-        } else {
-            self.config.colors
-        }
+        *self.config.colors()
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        if self.config.kind == GraphKind::StackedBars {
-            self.config.bar_colors = colors;
-            self.bar_svg_colors.set_colors(&colors);
-        } else {
-            self.config.colors = colors;
-            self.svg_colors.set_colors(&colors);
-        }
+        *self.config.colors_mut() = colors;
+        self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
@@ -186,8 +176,7 @@ impl Sensor for Cpu {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<CpuConfig>() {
             self.config = cfg.clone();
-            self.svg_colors.set_colors(&cfg.colors);
-            self.bar_svg_colors.set_colors(&cfg.bar_colors);
+            self.svg_colors.set_colors(cfg.colors());
         }
     }
 
@@ -275,7 +264,7 @@ impl Sensor for Cpu {
             GraphKind::Line => crate::svg_graph::line(&self.samples_sum, 100.0, &self.svg_colors),
             GraphKind::StackedBars => {
                 StackedBarSvg::new(self.config.bar_width, height_hint, self.config.bar_spacing)
-                    .svg(&self.core_loads, &self.bar_svg_colors)
+                    .svg(&self.core_loads, &self.svg_colors)
             }
             GraphKind::Heat => {
                 log::error!("Heat not supported!");
@@ -336,7 +325,7 @@ impl Sensor for Cpu {
         cpu_column.push(
             settings::item(
                 fl!("enable-chart"),
-                toggler(config.chart).on_toggle(Message::ToggleCpuChart),
+                toggler(config.chart_visible()).on_toggle(Message::ToggleCpuChart),
             )
             .into(),
         );
@@ -370,11 +359,11 @@ impl Sensor for Cpu {
         cpu_column.push(
             settings::item(
                 fl!("enable-label"),
-                toggler(config.label).on_toggle(Message::ToggleCpuLabel),
+                toggler(config.label_visible()).on_toggle(Message::ToggleCpuLabel),
             )
             .into(),
         );
-        if self.config.label {
+        if self.config.label_visible() {
             cpu_column.push(
                 settings::item(
                     fl!("cpu-no-decimals"),
@@ -466,7 +455,6 @@ impl Cpu {
             ),
             graph_options: graph_opts.to_vec(),
             svg_colors: SvgColors::new(&GraphColors::default()),
-            bar_svg_colors: SvgColors::new(&GraphColors::default()),
             config: CpuConfig::default(),
         };
         cpu.set_colors(GraphColors::default());

@@ -67,11 +67,11 @@ impl DemoGraph for Memory {
     }
 
     fn colors(&self) -> GraphColors {
-        self.config.colors
+        *self.config.colors()
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.config.colors = colors;
+        *self.config.colors_mut() = colors;
         self.svg_colors.set_colors(&colors);
     }
 
@@ -92,7 +92,7 @@ impl Sensor for Memory {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<MemoryConfig>() {
             self.config = cfg.clone();
-            self.svg_colors.set_colors(&cfg.colors);
+            self.svg_colors.set_colors(&cfg.colors());
         }
     }
 
@@ -231,11 +231,11 @@ impl Sensor for Memory {
             column!(
                 settings::item(
                     fl!("enable-chart"),
-                    toggler(config.chart).on_toggle(|value| { Message::ToggleMemoryChart(value) }),
+                    toggler(config.chart_visible()).on_toggle(|value| { Message::ToggleMemoryChart(value) }),
                 ),
                 settings::item(
                     fl!("enable-label"),
-                    toggler(config.label).on_toggle(|value| { Message::ToggleMemoryLabel(value) }),
+                    toggler(config.label_visible()).on_toggle(|value| { Message::ToggleMemoryLabel(value) }),
                 ),
                 settings::item(
                     fl!("memory-as-percentage"),

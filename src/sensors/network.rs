@@ -104,11 +104,11 @@ impl DemoGraph for Network {
     }
 
     fn colors(&self) -> GraphColors {
-        self.config.colors
+        *self.config.colors()
     }
 
     fn set_colors(&mut self, colors: GraphColors) {
-        self.config.colors = colors;
+        *self.config.colors_mut() = colors;
         self.svg_colors.set_colors(&colors);
     }
 
@@ -129,7 +129,7 @@ impl Sensor for Network {
     fn update_config(&mut self, config: &dyn Any, refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<NetworkConfig>() {
             self.config = cfg.clone();
-            self.svg_colors.set_colors(&cfg.colors);
+            self.svg_colors.set_colors(&cfg.colors());
             self.refresh_rate = refresh_rate;
 
             if self.config.show_bytes {
@@ -320,14 +320,14 @@ impl Sensor for Network {
         net_bandwidth_items.push(
             settings::item(
                 fl!("enable-chart"),
-                widget::toggler(config.chart).on_toggle(move |t| Message::ToggleNetChart(k, t)),
+                widget::toggler(config.chart_visible()).on_toggle(move |t| Message::ToggleNetChart(k, t)),
             )
             .into(),
         );
         net_bandwidth_items.push(
             settings::item(
                 fl!("enable-label"),
-                widget::toggler(config.label).on_toggle(move |t| Message::ToggleNetLabel(k, t)),
+                widget::toggler(config.label_visible()).on_toggle(move |t| Message::ToggleNetLabel(k, t)),
             )
             .into(),
         );
