@@ -121,14 +121,14 @@ impl ChartColors {
                 color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
                 color2: Srgba::from_components((47, 141, 255, 255)),
                 color3: Srgba::from_components((0, 255, 0, 255)),
-                color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                color4: Srgba::from_components((255, 255, 255, 255)),
             },
 
             DeviceKind::Disks(_) => ChartColors {
                 color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
                 color2: Srgba::from_components((255, 102, 0, 255)),
                 color3: Srgba::from_components((255, 255, 0, 255)),
-                color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
+                color4: Srgba::from_components((255, 255, 255, 255)),
             },
             DeviceKind::Gpu => ChartColors {
                 color4: Srgba::from_components((0, 255, 0, 255)),
