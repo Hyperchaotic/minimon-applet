@@ -145,7 +145,7 @@ impl Default for ColorPicker {
         ColorPicker {
             demo_chart: None,
             device: DeviceKind::Cpu,
-            color_variant: ColorVariant::Color1,
+            color_variant: ColorVariant::Background,
             slider_red_val: 0,
             slider_green_val: 0,
             slider_blue_val: 0,
@@ -166,7 +166,7 @@ impl ColorPicker {
     pub fn activate(&mut self, device: DeviceKind, demo_chart: Box<dyn DemoGraph>) {
         info!("colorpicker::activate({device:?})");
         self.device = device;
-        self.color_variant = ColorVariant::Color1;
+        self.color_variant = ColorVariant::Background;
         self.demo_chart = Some(demo_chart);
     }
 

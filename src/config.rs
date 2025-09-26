@@ -10,10 +10,11 @@ use crate::{fl, sensors::TempUnit};
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq)]
 pub enum ColorVariant {
-    Color1,
-    Color2,
-    Color3,
-    Color4,
+    Background,
+    Frame,
+    Text,
+    Graph1,
+    Graph2,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,30 +81,33 @@ impl std::fmt::Display for DeviceKind {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
 #[version = 1]
 pub struct ChartColors {
-    pub color1: Srgba<u8>,
-    pub color2: Srgba<u8>,
-    pub color3: Srgba<u8>,
-    pub color4: Srgba<u8>,
+    pub background: Srgba<u8>,
+    pub frame: Srgba<u8>,
+    pub text: Srgba<u8>,
+    pub graph1: Srgba<u8>,
+    pub graph2: Srgba<u8>,
 }
 
 impl Default for ChartColors {
     fn default() -> Self {
         Self {
-            color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 0xff)),
-            color2: Srgba::from_components((255, 255, 255, 255)),
-            color3: Srgba::from_components((85, 85, 85, 255)),
-            color4: Srgba::from_components((255, 6, 0, 255)),
+            background: Srgba::from_components((0x2b, 0x2b, 0x2b, 0xff)),
+            frame: Srgba::from_components((255, 255, 255, 255)),
+            text: Srgba::from_components((255, 255, 255, 255)),
+            graph1: Srgba::from_components((255, 6, 0, 255)),
+            graph2: Srgba::from_components((85, 85, 85, 255)),
         }
     }
 }
 
 impl ChartColors {
     pub fn new(device: DeviceKind, chart: ChartKind) -> Self {
+        let default = ChartColors::default();
         match device {
             DeviceKind::Cpu => {
                 if chart == ChartKind::StackedBars {
                     ChartColors {
-                        color3: Srgba::from_components((80, 80, 255, 255)),
+                        graph1: Srgba::from_components((80, 80, 255, 255)),
                         ..Default::default()
                     }
                 } else {
@@ -113,33 +117,30 @@ impl ChartColors {
             DeviceKind::CpuTemp => ChartColors::default(),
 
             DeviceKind::Memory => ChartColors {
-                color4: Srgba::from_components((187, 41, 187, 255)),
+                graph1: Srgba::from_components((187, 41, 187, 255)),
                 ..Default::default()
             },
 
             DeviceKind::Network(_) => ChartColors {
-                color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                color2: Srgba::from_components((47, 141, 255, 255)),
-                color3: Srgba::from_components((0, 255, 0, 255)),
-                color4: Srgba::from_components((255, 255, 255, 255)),
+                graph1: Srgba::from_components((47, 141, 255, 255)),
+                graph2: Srgba::from_components((0, 255, 0, 255)),
+                ..Default::default()
             },
 
             DeviceKind::Disks(_) => ChartColors {
-                color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
-                color2: Srgba::from_components((255, 102, 0, 255)),
-                color3: Srgba::from_components((255, 255, 0, 255)),
-                color4: Srgba::from_components((255, 255, 255, 255)),
+                graph1: Srgba::from_components((255, 102, 0, 255)),
+                graph2: Srgba::from_components((255, 255, 0, 255)),
+                ..Default::default()
             },
             DeviceKind::Gpu => ChartColors {
-                color4: Srgba::from_components((0, 255, 0, 255)),
+                graph1: Srgba::from_components((0, 255, 0, 255)),
                 ..Default::default()
             },
             DeviceKind::Vram => ChartColors {
-                color4: Srgba::from_components((0, 255, 0, 255)),
+                graph1: Srgba::from_components((0, 255, 0, 255)),
                 ..Default::default()
             },
             DeviceKind::GpuTemp => ChartColors {
-                color4: Srgba::from_components((255, 95, 31, 255)),
                 ..Default::default()
             },
         }
@@ -147,19 +148,21 @@ impl ChartColors {
 
     pub fn set_color(&mut self, srgb: Srgba<u8>, variant: ColorVariant) {
         match variant {
-            ColorVariant::Color1 => self.color1 = srgb,
-            ColorVariant::Color2 => self.color2 = srgb,
-            ColorVariant::Color3 => self.color3 = srgb,
-            ColorVariant::Color4 => self.color4 = srgb,
+            ColorVariant::Background => self.background = srgb,
+            ColorVariant::Frame => self.frame = srgb,
+            ColorVariant::Text => self.text = srgb,
+            ColorVariant::Graph1 => self.graph1 = srgb,
+            ColorVariant::Graph2 => self.graph2 = srgb,
         }
     }
 
     pub fn get_color(self, variant: ColorVariant) -> Srgba<u8> {
         match variant {
-            ColorVariant::Color1 => self.color1,
-            ColorVariant::Color2 => self.color2,
-            ColorVariant::Color3 => self.color3,
-            ColorVariant::Color4 => self.color4,
+            ColorVariant::Background => self.background,
+            ColorVariant::Frame => self.frame,
+            ColorVariant::Text => self.text,
+            ColorVariant::Graph1 => self.graph1,
+            ColorVariant::Graph2 => self.graph2,
         }
     }
 }

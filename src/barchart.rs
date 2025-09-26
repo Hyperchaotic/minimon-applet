@@ -58,7 +58,7 @@ impl StackedBarSvg {
     <rect x="0" y="0" width="{total_width}" height="{total_height}" rx="4.5" ry="4.5"/>
   </clipPath>
   </defs>"#,
-            colors.color1, colors.color2, colors.color3, colors.color4, colors.color1,
+            colors.background, colors.frame, colors.graph1, colors.graph2, colors.background,
         );
 
         // Background with adaptive width
