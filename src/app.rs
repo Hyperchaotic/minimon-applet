@@ -38,7 +38,7 @@ use log::{error, info};
 use crate::barchart::StackedBarSvg;
 use crate::colorpicker::ColorPicker;
 use crate::config::{
-    ColorVariant, ContentType, DeviceKind, DisksVariant, GpuConfig, GraphColors, GraphKind,
+    ColorVariant, ContentType, DeviceKind, DisksVariant, GpuConfig, ChartColors, ChartKind,
     NetworkVariant,
 };
 use crate::sensors::cpu::Cpu;
@@ -205,7 +205,7 @@ pub struct ContentOrderChange {
 pub enum Message {
     TogglePopup,
 
-    ColorPickerOpen(DeviceKind, GraphKind, Option<String>),
+    ColorPickerOpen(DeviceKind, ChartKind, Option<String>),
     ColorPickerClose(bool, Option<String>),
     ColorPickerDefaults,
     ColorPickerAccent,
@@ -233,7 +233,7 @@ pub enum Message {
     ToggleDisksChart(DisksVariant, bool),
     ToggleDisksLabel(DisksVariant, bool),
 
-    SelectGraphType(DeviceKind, GraphKind),
+    SelectGraphType(DeviceKind, ChartKind),
     Tick,
     SlowTimer,
     PopupClosed(Id),
@@ -262,7 +262,7 @@ pub enum Message {
     GpuToggleChart(String, DeviceKind, bool),
     GpuToggleLabel(String, DeviceKind, bool),
     GpuToggleStackLabels(String, bool),
-    GpuSelectGraphType(String, DeviceKind, GraphKind),
+    GpuSelectGraphType(String, DeviceKind, ChartKind),
     SelectGpuTempUnit(String, TempUnit),
     ToggleDisableOnBattery(String, bool),
     ToggleSymbols(bool),
@@ -748,7 +748,7 @@ impl cosmic::Application for Minimon {
                             .applet
                             .get_popup_settings(main_id, new_id, None, None, None);
                         popup_settings.positioner.size_limits = Limits::NONE;
-                        return get_popup(popup_settings)
+                        return get_popup(popup_settings);
                     }
                 };
             }
@@ -798,8 +798,9 @@ impl cosmic::Application for Minimon {
             Message::ColorPickerClose(save, maybe_gpu_id) => {
                 info!("Message::ColorPickerClose({save},{maybe_gpu_id:?})");
                 if save {
+                    let cols = *self.colorpicker.colors();
                     self.save_colors(
-                        self.colorpicker.colors(),
+                        &cols,
                         self.colorpicker.device(),
                         maybe_gpu_id,
                     );
@@ -883,14 +884,14 @@ impl cosmic::Application for Minimon {
             Message::ToggleDisksChart(variant, toggled) => {
                 info!("Message::ToggleDiskChart({variant:?})");
                 let (_, config) = disks_select!(self, variant);
-                config.chart = toggled;
+                config.show_chart(toggled);
                 self.save_config();
             }
 
             Message::ToggleDisksLabel(variant, toggled) => {
                 info!("Message::ToggleDiskLabel({variant:?})");
                 let (_, config) = disks_select!(self, variant);
-                config.label = toggled;
+                config.show_label(toggled);
                 self.save_config();
             }
 
@@ -912,15 +913,15 @@ impl cosmic::Application for Minimon {
                 match dev {
                     DeviceKind::Cpu => {
                         self.cpu.set_graph_kind(kind);
-                        self.config.cpu.kind = kind;
+                        self.config.cpu.chart = kind;
                     }
                     DeviceKind::CpuTemp => {
                         self.cputemp.set_graph_kind(kind);
-                        self.config.cputemp.kind = kind;
+                        self.config.cputemp.chart = kind;
                     }
                     DeviceKind::Memory => {
                         self.memory.set_graph_kind(kind);
-                        self.config.memory.kind = kind;
+                        self.config.memory.chart = kind;
                     }
                     _ => error!("Message::SelectGraphType unsupported kind/device combination."), // Disks and Network don't have graph selection
                 }
@@ -970,13 +971,13 @@ impl cosmic::Application for Minimon {
 
             Message::ToggleCpuChart(toggled) => {
                 info!("Message::ToggleCpuChart({toggled:?})");
-                self.config.cpu.chart = toggled;
+                self.config.cpu.show_chart(toggled);
                 self.save_config();
             }
 
             Message::ToggleCpuTempChart(toggled) => {
                 info!("Message::ToggleCpuTempChart({toggled:?})");
-                self.config.cputemp.chart = toggled;
+                self.config.cputemp.show_chart(toggled);
                 self.save_config();
             }
 
@@ -1009,32 +1010,32 @@ impl cosmic::Application for Minimon {
 
             Message::ToggleMemoryChart(toggled) => {
                 info!("Message::ToggleMemoryChart({toggled:?})");
-                self.config.memory.chart = toggled;
+                self.config.memory.show_chart(toggled);
                 self.save_config();
             }
 
             Message::ToggleNetChart(variant, toggled) => {
                 info!("Message::ToggleNetChart({toggled:?})");
                 let (_, config) = network_select!(self, variant);
-                config.chart = toggled;
+                config.show_chart(toggled);
                 self.save_config();
             }
 
             Message::ToggleCpuLabel(toggled) => {
                 info!("Message::ToggleCpuLabel({toggled:?})");
-                self.config.cpu.label = toggled;
+                self.config.cpu.show_label(toggled);
                 self.save_config();
             }
 
             Message::ToggleCpuTempLabel(toggled) => {
                 info!("Message::ToggleCpuTempLabel({toggled:?})");
-                self.config.cputemp.label = toggled;
+                self.config.cputemp.show_label(toggled);
                 self.save_config();
             }
 
             Message::ToggleMemoryLabel(toggled) => {
                 info!("Message::ToggleMemoryLabel({toggled:?})");
-                self.config.memory.label = toggled;
+                self.config.memory.show_label(toggled);
                 self.save_config();
             }
 
@@ -1048,7 +1049,7 @@ impl cosmic::Application for Minimon {
             Message::ToggleNetLabel(variant, toggled) => {
                 info!("Message::ToggleNetLabel({toggled:?})");
                 let (_, config) = network_select!(self, variant);
-                config.label = toggled;
+                config.show_label(toggled);
                 self.save_config();
             }
 
@@ -1132,9 +1133,9 @@ impl cosmic::Application for Minimon {
                     "GpuToggleChart",
                     device,
                     |config, device| match device {
-                        DeviceKind::Gpu => config.usage.chart = toggled,
-                        DeviceKind::Vram => config.vram.chart = toggled,
-                        DeviceKind::GpuTemp => config.temp.chart = toggled,
+                        DeviceKind::Gpu => config.usage.show_chart(toggled),
+                        DeviceKind::Vram => config.vram.show_chart(toggled),
+                        DeviceKind::GpuTemp => config.temp.show_chart(toggled),
                         _ => error!("GpuToggleChart: wrong kind {device:?}"),
                     },
                 );
@@ -1146,9 +1147,9 @@ impl cosmic::Application for Minimon {
                     "GpuToggleLabel",
                     device,
                     |config, device| match device {
-                        DeviceKind::Gpu => config.usage.label = toggled,
-                        DeviceKind::Vram => config.vram.label = toggled,
-                        DeviceKind::GpuTemp => config.temp.label = toggled,
+                        DeviceKind::Gpu => config.usage.show_label(toggled),
+                        DeviceKind::Vram => config.vram.show_label(toggled),
+                        DeviceKind::GpuTemp => config.temp.show_label(toggled),
                         _ => error!("GpuToggleLabel: wrong kind {device:?}"),
                     },
                 );
@@ -1179,9 +1180,9 @@ impl cosmic::Application for Minimon {
                 info!("Message::GpuSelectGraphType({id:?}, {device:?}, {kind:?})");
                 self.update_gpu_config(&id, "GpuSelectGraphType", device, |config, device| {
                     match device {
-                        DeviceKind::Gpu => config.usage.kind = kind,
-                        DeviceKind::Vram => config.vram.kind = kind,
-                        DeviceKind::GpuTemp => config.temp.kind = kind,
+                        DeviceKind::Gpu => config.usage.chart = kind,
+                        DeviceKind::Vram => config.vram.chart = kind,
+                        DeviceKind::GpuTemp => config.temp.chart = kind,
                         _ => error!("GpuSelectGraphType: wrong kind {device:?}"),
                     }
                 });
@@ -1249,15 +1250,15 @@ impl Minimon {
                 }
             }
 
-            if self.config.cpu.is_visible()
-                || self.config.cputemp.is_visible()
-                || self.config.memory.is_visible()
-                || self.config.network1.is_visible()
+            if self.config.cpu.visible()
+                || self.config.cputemp.visible()
+                || self.config.memory.visible()
+                || self.config.network1.visible()
                 || (self.config.network1.variant != NetworkVariant::Combined
-                    && self.config.network2.is_visible())
-                || self.config.disks1.is_visible()
+                    && self.config.network2.visible())
+                || self.config.disks1.visible()
                 || (self.config.disks1.variant != DisksVariant::Combined
-                    && self.config.disks2.is_visible())
+                    && self.config.disks2.visible())
             {
                 self.data_is_visible = true;
             }
@@ -1496,7 +1497,7 @@ impl Minimon {
         let mut elements: VecDeque<Element<Message>> = VecDeque::new();
 
         // Handle the symbols button if needed
-        if self.config.symbols && (self.config.cpu.label || self.config.cpu.chart) {
+        if self.config.symbols && (self.config.cpu.label_visible() || self.config.cpu.chart_visible()) {
             self.push_symbolic_icon(&mut elements, CPU_ICON, false);
         }
 
@@ -1511,14 +1512,14 @@ impl Minimon {
         };
 
         // Add the CPU label if needed
-        if self.config.cpu.label {
+        if self.config.cpu.label_visible() {
             elements.push_back(
                 self.figure_label(formatted_cpu, self.label_cpu_width)
                     .into(),
             );
         }
 
-        let width: u16 = if self.config.cpu.kind == GraphKind::StackedBars {
+        let width: u16 = if self.config.cpu.chart == ChartKind::StackedBars {
             StackedBarSvg::new(
                 self.config.cpu.bar_width,
                 size.0,
@@ -1529,7 +1530,7 @@ impl Minimon {
             size.1
         };
 
-        if self.config.cpu.chart {
+        if self.config.cpu.chart_visible() {
             elements.push_back(
                 self.cpu
                     .chart(size.0, width)
@@ -1542,24 +1543,27 @@ impl Minimon {
         elements
     }
 
-    fn cpu_temp_panel_ui(&'_ self, _horizontal: bool) -> VecDeque<Element<'_, crate::app::Message>> {
+    fn cpu_temp_panel_ui(
+        &'_ self,
+        _horizontal: bool,
+    ) -> VecDeque<Element<'_, crate::app::Message>> {
         let size = self.core.applet.suggested_size(false);
 
         let mut elements: VecDeque<Element<Message>> = VecDeque::new();
 
         if self.cputemp.is_found() {
             // Handle the symbols button if needed
-            if self.config.symbols && (self.config.cputemp.label || self.config.cputemp.chart) {
+            if self.config.symbols && (self.config.cputemp.label_visible() || self.config.cputemp.chart_visible()) {
                 self.push_symbolic_icon(&mut elements, TEMP_ICON, false);
             }
 
             // Add the CPU label if needed
-            if self.config.cputemp.label {
+            if self.config.cputemp.label_visible() {
                 elements.push_back(self.figure_label(self.cputemp.to_string(), None).into());
             }
 
             // Add the CPU chart if needed
-            if self.config.cputemp.chart {
+            if self.config.cputemp.chart_visible() {
                 elements.push_back(
                     self.cputemp
                         .chart(size.0, size.1)
@@ -1579,18 +1583,18 @@ impl Minimon {
         let mut elements: VecDeque<Element<Message>> = VecDeque::new();
 
         // Handle the symbols button if needed
-        if self.config.symbols && (self.config.memory.label || self.config.memory.chart) {
+        if self.config.symbols && (self.config.memory.label_visible() || self.config.memory.chart_visible()) {
             self.push_symbolic_icon(&mut elements, RAM_ICON, false);
         }
 
         // Label section
-        if self.config.memory.label {
+        if self.config.memory.label_visible() {
             let formatted_mem = self.memory.to_string(!horizontal);
             elements.push_back(self.figure_label(formatted_mem, None).into());
         }
 
         // Chart section
-        if self.config.memory.chart {
+        if self.config.memory.chart_visible() {
             elements.push_back(
                 self.memory
                     .chart(size.0, size.1)
@@ -1618,7 +1622,7 @@ impl Minimon {
             network::UnitVariant::Short
         };
 
-        if self.config.network1.label {
+        if self.config.network1.label_visible() {
             let mut network_labels = Vec::new();
             let mut dl_row = Vec::new();
 
@@ -1651,7 +1655,7 @@ impl Minimon {
             elements.push_back(Column::from_vec(network_labels).into());
         }
 
-        if self.config.network1.chart {
+        if self.config.network1.chart_visible() {
             elements.push_back(
                 self.network1
                     .chart(size.0, size.1)
@@ -1661,7 +1665,7 @@ impl Minimon {
             );
         }
 
-        if self.config.network2.label && !nw_combined {
+        if self.config.network2.label_visible() && !nw_combined {
             let mut network_labels = Vec::new();
 
             let mut ul_row = Vec::new();
@@ -1676,7 +1680,7 @@ impl Minimon {
             elements.push_back(Column::from_vec(network_labels).into());
         }
 
-        if self.config.network2.chart && !nw_combined {
+        if self.config.network2.chart_visible() && !nw_combined {
             elements.push_back(
                 self.network2
                     .chart(size.0, size.1)
@@ -1708,7 +1712,7 @@ impl Minimon {
             disks::UnitVariant::Short
         };
 
-        if self.config.disks1.label {
+        if self.config.disks1.label_visible() {
             let mut disks_labels = Vec::new();
 
             let mut wr_row = Vec::new();
@@ -1737,7 +1741,7 @@ impl Minimon {
             elements.push_back(Column::from_vec(disks_labels).into());
         }
 
-        if self.config.disks1.chart {
+        if self.config.disks1.chart_visible() {
             elements.push_back(
                 self.disks1
                     .chart(size.0, size.1)
@@ -1747,7 +1751,7 @@ impl Minimon {
             );
         }
 
-        if self.config.disks2.label && !disks_combined {
+        if self.config.disks2.label_visible() && !disks_combined {
             let mut disks_labels = Vec::new();
 
             let mut rd_row = Vec::new();
@@ -1760,7 +1764,7 @@ impl Minimon {
             elements.push_back(Column::from_vec(disks_labels).into());
         }
 
-        if self.config.disks2.chart && !disks_combined {
+        if self.config.disks2.chart_visible() && !disks_combined {
             elements.push_back(
                 self.disks2
                     .chart(size.0, size.1)
@@ -1789,7 +1793,7 @@ impl Minimon {
         if let Some(config) = self.config.gpus.get(&gpu.id()) {
             let formatted_gpu = gpu.gpu.to_string();
             let formatted_vram = gpu.vram.string(!horizontal);
-            let stacked_labels = config.stack_labels && config.usage.label && config.vram.label;
+            let stacked_labels = config.stack_labels && config.usage.label_visible() && config.vram.label_visible();
 
             if stacked_labels {
                 let gpu_labels = vec![
@@ -1800,29 +1804,29 @@ impl Minimon {
                     widget::vertical_space().into(),
                 ];
                 elements.push_back(Column::from_vec(gpu_labels).into());
-            } else if config.usage.label {
+            } else if config.usage.label_visible() {
                 elements.push_back(
                     self.figure_label(formatted_gpu, self.label_gpu_width)
                         .into(),
                 );
             }
 
-            if config.usage.chart {
+            if config.usage.chart_visible() {
                 elements.push_back(gpu.gpu.chart().height(size.0).width(size.1).into());
             }
-            if config.temp.label {
+            if config.temp.label_visible() {
                 elements.push_back(self.figure_label(gpu.temp.to_string(), None).into());
             }
 
-            if config.temp.chart {
+            if config.temp.chart_visible() {
                 elements.push_back(gpu.temp.chart().height(size.0).width(size.1).into());
             }
 
-            if config.vram.label && !stacked_labels {
+            if config.vram.label_visible() && !stacked_labels {
                 elements.push_back(self.figure_label(formatted_vram, None).into());
             }
 
-            if config.vram.chart {
+            if config.vram.chart_visible() {
                 elements.push_back(gpu.vram.chart().height(size.0).width(size.1).into());
             }
         }
@@ -1859,33 +1863,29 @@ impl Minimon {
         }
     }
 
-    fn save_colors(&mut self, colors: GraphColors, kind: DeviceKind, id: Option<String>) {
+    fn save_colors(&mut self, colors: &ChartColors, kind: DeviceKind, id: Option<String>) {
         match kind {
             DeviceKind::Cpu => {
-                if self.config.cpu.kind == GraphKind::StackedBars {
-                    self.config.cpu.bar_colors = colors;
-                } else {
-                    self.config.cpu.colors = colors;
-                }
+                *self.config.cpu.colors_mut() = *colors;
             }
             DeviceKind::CpuTemp => {
-                self.config.cputemp.colors = colors;
+                *self.config.cputemp.colors_mut() = *colors;
             }
             DeviceKind::Memory => {
-                self.config.memory.colors = colors;
+                *self.config.memory.colors_mut() = *colors;
             }
             DeviceKind::Network(variant) => {
                 let (_, config) = network_select!(self, variant);
-                config.colors = colors;
+                *config.colors_mut() = *colors;
             }
             DeviceKind::Disks(variant) => {
                 let (_, config) = disks_select!(self, variant);
-                config.colors = colors;
+                *config.colors_mut() = *colors;
             }
             DeviceKind::Gpu => {
                 if let Some(id) = id {
                     if let Some(config) = self.config.gpus.get_mut(&id) {
-                        config.usage.colors = colors;
+                        *config.usage.colors_mut() = *colors;
                     } else {
                         error!("No config for selected GPU {id}");
                     }
@@ -1894,7 +1894,7 @@ impl Minimon {
             DeviceKind::Vram => {
                 if let Some(id) = id {
                     if let Some(config) = self.config.gpus.get_mut(&id) {
-                        config.vram.colors = colors;
+                        *config.vram.colors_mut() = *colors;
                     } else {
                         error!("No config for selected GPU {id}");
                     }
@@ -1903,7 +1903,7 @@ impl Minimon {
             DeviceKind::GpuTemp => {
                 if let Some(id) = id {
                     if let Some(config) = self.config.gpus.get_mut(&id) {
-                        config.temp.colors = colors;
+                        *config.temp.colors_mut() = *colors;
                     } else {
                         error!("No config for selected GPU {id}");
                     }
@@ -1916,23 +1916,23 @@ impl Minimon {
         // Update everything if popup open
         let all = self.popup.is_some();
 
-        if all || self.config.cpu.is_visible() {
+        if all || self.config.cpu.visible() {
             self.cpu.update();
         }
 
-        if all || self.config.cputemp.is_visible() {
+        if all || self.config.cputemp.visible() {
             self.cputemp.update();
         }
 
-        if all || self.config.memory.is_visible() {
+        if all || self.config.memory.visible() {
             self.memory.update();
         }
 
         let combined_network = self.config.network1.variant == NetworkVariant::Combined;
         if all
-            || (combined_network && self.config.network1.is_visible())
+            || (combined_network && self.config.network1.visible())
             || (!combined_network
-                && (self.config.network1.is_visible() || self.config.network1.is_visible()))
+                && (self.config.network1.visible() || self.config.network1.visible()))
         {
             self.network1.update();
             self.network2.update();
@@ -1941,9 +1941,9 @@ impl Minimon {
         let combined_disks = self.config.disks1.variant == DisksVariant::Combined;
 
         if all
-            || (combined_disks && self.config.disks1.is_visible())
+            || (combined_disks && self.config.disks1.visible())
             || (!combined_disks
-                && (self.config.disks1.is_visible() || self.config.disks2.is_visible()))
+                && (self.config.disks1.visible() || self.config.disks2.visible()))
         {
             self.disks1.update();
             self.disks2.update();

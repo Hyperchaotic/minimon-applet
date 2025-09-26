@@ -7,9 +7,9 @@ use cosmic::theme;
 use std::collections::VecDeque;
 
 use crate::app::Message;
-use crate::config::GraphColors;
+use crate::config::ChartColors;
 
-use super::GraphColorsIced;
+use super::ChartColorsIced;
 
 // Trait for numeric sample types
 pub trait SampleValue: Copy + PartialOrd {
@@ -39,7 +39,7 @@ pub struct LineChart<T: SampleValue> {
     pub samples1: VecDeque<T>,
     pub samples2: VecDeque<T>,
     pub max_y: Option<T>,
-    pub colors: GraphColorsIced,
+    pub colors: ChartColorsIced,
 }
 
 impl<T: SampleValue> LineChart<T> {
@@ -48,7 +48,7 @@ impl<T: SampleValue> LineChart<T> {
         samples1: &VecDeque<T>,
         samples2: &VecDeque<T>,
         max: Option<T>,
-        colors: &GraphColors,
+        colors: &ChartColors,
     ) -> Self {
         Self {
             steps,

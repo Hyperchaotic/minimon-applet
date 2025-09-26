@@ -1,7 +1,7 @@
 use crate::{
     barchart::StackedBarSvg,
     colorpicker::DemoGraph,
-    config::{ColorVariant, CpuConfig, DeviceKind, GraphColors, GraphKind},
+    config::{ColorVariant, CpuConfig, DeviceKind, ChartColors, ChartKind},
     fl,
     sensors::INVALID_IMG,
     svg_graph::SvgColors,
@@ -89,14 +89,13 @@ pub struct Cpu {
     graph_options: Vec<&'static str>,
     /// colors cached so we don't need to convert to string every time
     svg_colors: SvgColors,
-    bar_svg_colors: SvgColors,
     config: CpuConfig,
 }
 
 impl DemoGraph for Cpu {
     fn demo(&self) -> String {
-        match self.config.kind {
-            GraphKind::Ring => {
+        match self.config.chart {
+            ChartKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
                 let percentage: u64 = 40;
@@ -106,16 +105,16 @@ impl DemoGraph for Cpu {
                     &self.svg_colors,
                 )
             }
-            GraphKind::Line => crate::svg_graph::line(
+            ChartKind::Line => crate::svg_graph::line(
                 &std::collections::VecDeque::from(DEMO_SAMPLES),
                 100.0,
                 &self.svg_colors,
             ),
-            GraphKind::Heat => {
+            ChartKind::Heat => {
                 log::error!("Wrong graph choice!");
                 INVALID_IMG.to_string()
             }
-            GraphKind::StackedBars => {
+            ChartKind::StackedBars => {
                 let mut map = HashMap::new();
                 map.insert(
                     0,
@@ -145,40 +144,35 @@ impl DemoGraph for Cpu {
                         system_pct: 5.4,
                     },
                 );
-                StackedBarSvg::default().svg(&map, &self.bar_svg_colors)
+                StackedBarSvg::default().svg(&map, &self.svg_colors)
             }
         }
     }
 
-    fn colors(&self) -> GraphColors {
-        if self.config.kind == GraphKind::StackedBars {
-            self.config.bar_colors
-        } else {
-            self.config.colors
-        }
+    fn colors(&self) -> &ChartColors {
+        self.config.colors()
     }
 
-    fn set_colors(&mut self, colors: GraphColors) {
-        if self.config.kind == GraphKind::StackedBars {
-            self.config.bar_colors = colors;
-            self.bar_svg_colors.set_colors(&colors);
-        } else {
-            self.config.colors = colors;
-            self.svg_colors.set_colors(&colors);
-        }
+    fn set_colors(&mut self, colors: &ChartColors) {
+        *self.config.colors_mut() = *colors;
+        self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        match self.config.kind {
-            GraphKind::Line => (*super::COLOR_CHOICES_LINE).into(),
-            GraphKind::Ring => (*super::COLOR_CHOICES_RING).into(),
-            GraphKind::StackedBars => (*COLOR_CHOICES_BARS).into(),
-            _ => panic!("CPU color_choices {:?} wrong chart type!", self.config.kind),
+        match self.config.chart {
+            ChartKind::Line => (*super::COLOR_CHOICES_LINE).into(),
+            ChartKind::Ring => (*super::COLOR_CHOICES_RING).into(),
+            ChartKind::StackedBars => (*COLOR_CHOICES_BARS).into(),
+            _ => panic!("CPU color_choices {:?} wrong chart type!", self.config.chart),
         }
     }
 
     fn id(&self) -> Option<String> {
         None
+    }
+
+    fn kind(&self) -> ChartKind {
+        self.config.chart
     }
 }
 
@@ -186,20 +180,19 @@ impl Sensor for Cpu {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<CpuConfig>() {
             self.config = cfg.clone();
-            self.svg_colors.set_colors(&cfg.colors);
-            self.bar_svg_colors.set_colors(&cfg.bar_colors);
+            self.svg_colors.set_colors(cfg.colors());
         }
     }
 
-    fn graph_kind(&self) -> GraphKind {
-        self.config.kind
+    fn graph_kind(&self) -> ChartKind {
+        self.config.chart
     }
 
-    fn set_graph_kind(&mut self, kind: GraphKind) {
+    fn set_graph_kind(&mut self, kind: ChartKind) {
         assert!(
-            kind == GraphKind::Line || kind == GraphKind::Ring || kind == GraphKind::StackedBars
+            kind == ChartKind::Line || kind == ChartKind::Ring || kind == ChartKind::StackedBars
         );
-        self.config.kind = kind;
+        self.config.chart = kind;
     }
 
     fn update(&mut self) {
@@ -217,7 +210,7 @@ impl Sensor for Cpu {
 
     #[cfg(feature = "lyon_charts")]
     fn chart<'a>(&self) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
-        if self.config.kind == GraphKind::Ring {
+        if self.config.kind == ChartKind::Ring {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
 
@@ -252,8 +245,8 @@ impl Sensor for Cpu {
         height_hint: u16,
         _width_hint: u16,
     ) -> cosmic::widget::Container<'_, crate::app::Message, Theme, Renderer> {
-        let svg = match self.config.kind {
-            GraphKind::Ring => {
+        let svg = match self.config.chart {
+            ChartKind::Ring => {
                 let latest = self.latest_sample();
                 let mut value = String::with_capacity(10);
                 let mut percentage = String::with_capacity(10);
@@ -272,12 +265,12 @@ impl Sensor for Cpu {
 
                 crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
             }
-            GraphKind::Line => crate::svg_graph::line(&self.samples_sum, 100.0, &self.svg_colors),
-            GraphKind::StackedBars => {
+            ChartKind::Line => crate::svg_graph::line(&self.samples_sum, 100.0, &self.svg_colors),
+            ChartKind::StackedBars => {
                 StackedBarSvg::new(self.config.bar_width, height_hint, self.config.bar_spacing)
-                    .svg(&self.core_loads, &self.bar_svg_colors)
+                    .svg(&self.core_loads, &self.svg_colors)
             }
-            GraphKind::Heat => {
+            ChartKind::Heat => {
                 log::error!("Heat not supported!");
                 INVALID_IMG.to_string()
             }
@@ -298,7 +291,7 @@ impl Sensor for Cpu {
         let mut cpu_elements = Vec::new();
         let mut cpu_column = Vec::new();
 
-        if self.graph_kind() != GraphKind::StackedBars {
+        if self.graph_kind() != ChartKind::StackedBars {
             let cpu = self.to_string();
             cpu_elements.push(Element::from(
                 column!(
@@ -324,7 +317,7 @@ impl Sensor for Cpu {
 
         // A bit ugly and error prone, the Heat type is not supported here so bars takes its place
         // in numbering for the dropdown
-        let selected: Option<usize> = if self.graph_kind() == GraphKind::StackedBars {
+        let selected: Option<usize> = if self.graph_kind() == ChartKind::StackedBars {
             Some(2)
         } else {
             Some(self.graph_kind().into())
@@ -336,12 +329,12 @@ impl Sensor for Cpu {
         cpu_column.push(
             settings::item(
                 fl!("enable-chart"),
-                toggler(config.chart).on_toggle(Message::ToggleCpuChart),
+                toggler(config.chart_visible()).on_toggle(Message::ToggleCpuChart),
             )
             .into(),
         );
 
-        if self.graph_kind() == GraphKind::StackedBars {
+        if self.graph_kind() == ChartKind::StackedBars {
             cpu_column.push(
                 settings::item(
                     fl!("graph-bar-width"),
@@ -370,11 +363,11 @@ impl Sensor for Cpu {
         cpu_column.push(
             settings::item(
                 fl!("enable-label"),
-                toggler(config.label).on_toggle(Message::ToggleCpuLabel),
+                toggler(config.label_visible()).on_toggle(Message::ToggleCpuLabel),
             )
             .into(),
         );
-        if self.config.label {
+        if self.config.label_visible() {
             cpu_column.push(
                 settings::item(
                     fl!("cpu-no-decimals"),
@@ -390,9 +383,9 @@ impl Sensor for Cpu {
             row!(
                 widget::text::body(fl!("chart-type")),
                 widget::dropdown(&self.graph_options, selected, move |m| {
-                    let mut choice: GraphKind = m.into();
-                    if choice != GraphKind::Ring && choice != GraphKind::Line {
-                        choice = GraphKind::StackedBars
+                    let mut choice: ChartKind = m.into();
+                    if choice != ChartKind::Ring && choice != ChartKind::Line {
+                        choice = ChartKind::StackedBars
                     };
                     Message::SelectGraphType(DeviceKind::Cpu, choice)
                 })
@@ -465,11 +458,10 @@ impl Cpu {
                 MAX_SAMPLES,
             ),
             graph_options: graph_opts.to_vec(),
-            svg_colors: SvgColors::new(&GraphColors::default()),
-            bar_svg_colors: SvgColors::new(&GraphColors::default()),
+            svg_colors: SvgColors::new(&ChartColors::default()),
             config: CpuConfig::default(),
         };
-        cpu.set_colors(GraphColors::default());
+        cpu.set_colors(&ChartColors::default());
         cpu
     }
 

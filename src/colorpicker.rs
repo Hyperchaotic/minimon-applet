@@ -21,7 +21,7 @@ use cosmic::{
 use theme::iced::Slider;
 
 use crate::app::Message;
-use crate::config::{ColorVariant, DeviceKind, GraphColors};
+use crate::config::{ChartColors, ChartKind, ColorVariant, DeviceKind};
 use crate::fl;
 use log::info;
 
@@ -120,8 +120,9 @@ const ERROR: &str = "<svg width=\"800px\" height=\"800px\" viewBox=\"0 0 25 25\"
 
 pub trait DemoGraph {
     fn demo(&self) -> String;
-    fn colors(&self) -> GraphColors;
-    fn set_colors(&mut self, colors: GraphColors);
+    fn kind(&self) -> ChartKind;
+    fn colors(&self) -> &ChartColors;
+    fn set_colors(&mut self, colors: &ChartColors);
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)>;
     fn id(&self) -> Option<String>;
 }
@@ -282,9 +283,9 @@ impl ColorPicker {
         self.slider_alpha_val = color.alpha;
 
         if let Some(dmo) = self.demo_chart.as_mut() {
-            let mut col = dmo.colors();
+            let mut col = *dmo.colors();
             col.set_color(color, self.color_variant);
-            dmo.set_colors(col);
+            dmo.set_colors(&col);
 
             // Set the shading for sliders, this is required to be static lifetime
             COLOR_STOPS_RED_LOW.lock().unwrap()[1].color =
@@ -307,9 +308,9 @@ impl ColorPicker {
     }
 
     pub fn default_colors(&mut self) {
-        let colors = GraphColors::new(self.device);
         if let Some(dmo) = self.demo_chart.as_mut() {
-            dmo.set_colors(colors);
+            let colors = ChartColors::new(self.device, dmo.kind());
+            dmo.set_colors(&colors);
             self.update_color(colors.get_color(self.color_variant));
         } else {
             log::error!("Colorpicker::default_colors() No demo graph object!");
@@ -330,12 +331,12 @@ impl ColorPicker {
         }
     }
 
-    pub fn colors(&self) -> GraphColors {
+    pub fn colors(&self) -> &ChartColors {
         if let Some(dmo) = self.demo_chart.as_ref() {
             dmo.colors()
         } else {
             log::error!("Colorpicker::set_color_variant() No demo graph object!");
-            GraphColors::default()
+            panic!();
         }
     }
 

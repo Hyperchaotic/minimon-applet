@@ -14,9 +14,9 @@ use cosmic::widget::canvas::path::Arc;
 use std::f32::consts::PI;
 
 use crate::app::Message;
-use crate::config::GraphColors;
+use crate::config::ChartColors;
 
-use super::GraphColorsIced;
+use super::ChartColorsIced;
 
 #[derive(Debug)]
 pub struct RingChart {
@@ -25,11 +25,11 @@ pub struct RingChart {
 
     //Text to display inside, if any
     pub text: String,
-    pub colors: GraphColorsIced,
+    pub colors: ChartColorsIced,
 }
 
 impl RingChart {
-    pub fn new(percent: f32, text: &str, colors: &GraphColors) -> Self {
+    pub fn new(percent: f32, text: &str, colors: &ChartColors) -> Self {
         RingChart {
             percent: if percent <= 100.0 { percent } else { 100.0 },
             text: text.to_string(),

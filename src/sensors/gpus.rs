@@ -20,7 +20,7 @@ use crate::app::Message;
 use crate::colorpicker::DemoGraph;
 use crate::config::DeviceKind;
 use crate::{
-    config::{ColorVariant, GpuTempConfig, GpuUsageConfig, GpuVramConfig, GraphColors, GraphKind},
+    config::{ChartColors, ChartKind, ColorVariant, GpuTempConfig, GpuUsageConfig, GpuVramConfig},
     fl,
     svg_graph::SvgColors,
 };
@@ -35,7 +35,7 @@ const MAX_SAMPLES: usize = 21;
 #[cfg(feature = "lyon_charts")]
 use std::sync::LazyLock;
 #[cfg(feature = "lyon_charts")]
-static DISABLED_COLORS: LazyLock<GraphColors> = LazyLock::new(|| GraphColors {
+static DISABLED_COLORS: LazyLock<ChartColors> = LazyLock::new(|| ChartColors {
     color1: cosmic::cosmic_theme::palette::Srgba::from_components((0xFF, 0xFF, 0xFF, 0x20)),
     color2: cosmic::cosmic_theme::palette::Srgba::from_components((0x72, 0x72, 0x72, 0xFF)),
     color3: cosmic::cosmic_theme::palette::Srgba::from_components((0x72, 0x72, 0x72, 0xFF)),
@@ -67,7 +67,7 @@ impl GpuGraph {
                 MAX_SAMPLES,
             ),
             graph_options: super::GRAPH_OPTIONS_RING_LINE.to_vec(),
-            svg_colors: SvgColors::new(&GraphColors::default()),
+            svg_colors: SvgColors::new(&ChartColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
                 color1: String::from("#FFFFFF20"),
@@ -82,7 +82,7 @@ impl GpuGraph {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<GpuUsageConfig>() {
             self.config = cfg.clone();
-            self.svg_colors = SvgColors::new(&cfg.colors);
+            self.svg_colors = SvgColors::new(&cfg.colors());
         }
     }
 
@@ -94,7 +94,7 @@ impl GpuGraph {
 
     #[cfg(feature = "lyon_charts")]
     pub fn chart<'a>(&self) -> cosmic::widget::Container<crate::app::Message, Theme, Renderer> {
-        if self.config.kind == GraphKind::Ring {
+        if self.config.kind == ChartKind::Ring {
             let mut latest = self.latest_sample();
             let mut text = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
@@ -134,7 +134,7 @@ impl GpuGraph {
     pub fn chart(
         &'_ self,
     ) -> cosmic::widget::Container<'_, crate::app::Message, cosmic::Theme, cosmic::Renderer> {
-        let svg = if self.config.kind == GraphKind::Ring {
+        let svg = if self.config.chart == ChartKind::Ring {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
@@ -186,12 +186,12 @@ impl GpuGraph {
         *self.samples.back().unwrap_or(&0f64)
     }
 
-    pub fn graph_kind(&self) -> crate::config::GraphKind {
-        self.config.kind
+    pub fn graph_kind(&self) -> crate::config::ChartKind {
+        self.config.chart
     }
 
-    pub fn set_graph_kind(&mut self, kind: crate::config::GraphKind) {
-        self.config.kind = kind;
+    pub fn set_graph_kind(&mut self, kind: crate::config::ChartKind) {
+        self.config.chart = kind;
     }
 
     pub fn update(&mut self, sample: u32) {
@@ -218,8 +218,8 @@ impl fmt::Display for GpuGraph {
 
 impl DemoGraph for GpuGraph {
     fn demo(&self) -> String {
-        match self.config.kind {
-            GraphKind::Ring => {
+        match self.config.chart {
+            ChartKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
                 let percentage = 40.0;
@@ -229,29 +229,29 @@ impl DemoGraph for GpuGraph {
                     &self.svg_colors,
                 )
             }
-            GraphKind::Line => crate::svg_graph::line(
+            ChartKind::Line => crate::svg_graph::line(
                 &std::collections::VecDeque::from(DEMO_SAMPLES),
                 100.0,
                 &self.svg_colors,
             ),
             _ => {
-                log::error!("GPUGraph type not supported {:?}", self.config.kind);
+                log::error!("GPUGraph type not supported {:?}", self.config.chart);
                 INVALID_IMG.to_string()
             }
         }
     }
 
-    fn colors(&self) -> GraphColors {
-        self.config.colors
+    fn colors(&self) -> &ChartColors {
+        self.config.colors()
     }
 
-    fn set_colors(&mut self, colors: GraphColors) {
-        self.config.colors = colors;
+    fn set_colors(&mut self, colors: &ChartColors) {
+        *self.config.colors_mut() = *colors;
         self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        if self.config.kind == GraphKind::Line {
+        if self.config.chart == ChartKind::Line {
             (*super::COLOR_CHOICES_LINE).into()
         } else {
             (*super::COLOR_CHOICES_RING).into()
@@ -260,6 +260,10 @@ impl DemoGraph for GpuGraph {
 
     fn id(&self) -> Option<String> {
         Some(self.id.clone())
+    }
+
+    fn kind(&self) -> ChartKind {
+        self.config.chart
     }
 }
 
@@ -285,7 +289,7 @@ impl VramGraph {
             ),
             graph_options: super::GRAPH_OPTIONS_RING_LINE.to_vec(),
             total,
-            svg_colors: SvgColors::new(&GraphColors::default()),
+            svg_colors: SvgColors::new(&ChartColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
                 color1: String::from("#FFFFFF20"),
@@ -300,7 +304,7 @@ impl VramGraph {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<GpuVramConfig>() {
             self.config = cfg.clone();
-            self.svg_colors = SvgColors::new(&cfg.colors);
+            self.svg_colors = SvgColors::new(&cfg.colors());
         }
     }
 
@@ -314,7 +318,7 @@ impl VramGraph {
     pub fn chart<'a>(
         &self,
     ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
-        if self.config.kind == GraphKind::Ring {
+        if self.config.kind == ChartKind::Ring {
             let latest = self.latest_sample();
             let mut text = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
@@ -356,7 +360,7 @@ impl VramGraph {
 
     #[cfg(not(feature = "lyon_charts"))]
     pub fn chart(&'_ self) -> cosmic::widget::Container<'_, crate::app::Message, Theme, Renderer> {
-        let svg = if self.config.kind == GraphKind::Ring {
+        let svg = if self.config.chart == ChartKind::Ring {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
@@ -409,12 +413,12 @@ impl VramGraph {
         *self.samples.back().unwrap_or(&0f64)
     }
 
-    pub fn graph_kind(&self) -> crate::config::GraphKind {
-        self.config.kind
+    pub fn graph_kind(&self) -> crate::config::ChartKind {
+        self.config.chart
     }
 
-    pub fn set_graph_kind(&mut self, kind: crate::config::GraphKind) {
-        self.config.kind = kind;
+    pub fn set_graph_kind(&mut self, kind: crate::config::ChartKind) {
+        self.config.chart = kind;
     }
 
     pub fn string(&self, vertical_panel: bool) -> String {
@@ -466,7 +470,7 @@ impl TempGraph {
             unit_options: super::UNIT_OPTIONS.to_vec(),
             graph_options: super::GRAPH_OPTIONS_RING_LINE_HEAT.to_vec(),
             max_temp: 100.0,
-            svg_colors: SvgColors::new(&GraphColors::default()),
+            svg_colors: SvgColors::new(&ChartColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
                 color1: String::from("#FFFFFF20"),
@@ -481,7 +485,7 @@ impl TempGraph {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<GpuTempConfig>() {
             self.config = cfg.clone();
-            self.svg_colors = SvgColors::new(&cfg.colors);
+            self.svg_colors = SvgColors::new(&cfg.colors());
         }
     }
 
@@ -496,7 +500,7 @@ impl TempGraph {
         &self,
     ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
         match self.config.kind {
-            GraphKind::Ring => {
+            ChartKind::Ring => {
                 let mut latest = self.latest_sample();
                 let mut text = self.to_string();
 
@@ -522,7 +526,7 @@ impl TempGraph {
                     },
                 ))
             }
-            GraphKind::Line => chart_container!(crate::charts::line::LineChart::new(
+            ChartKind::Line => chart_container!(crate::charts::line::LineChart::new(
                 MAX_SAMPLES,
                 &self.samples,
                 &VecDeque::new(),
@@ -533,7 +537,7 @@ impl TempGraph {
                     &self.config.colors
                 },
             )),
-            GraphKind::Heat => chart_container!(crate::charts::heat::HeatChart::new(
+            ChartKind::Heat => chart_container!(crate::charts::heat::HeatChart::new(
                 MAX_SAMPLES,
                 &self.samples,
                 Some(self.max_temp),
@@ -548,8 +552,8 @@ impl TempGraph {
 
     #[cfg(not(feature = "lyon_charts"))]
     pub fn chart(&'_ self) -> cosmic::widget::Container<'_, crate::app::Message, Theme, Renderer> {
-        let svg = match self.config.kind {
-            GraphKind::Ring => {
+        let svg = match self.config.chart {
+            ChartKind::Ring => {
                 let latest = self.latest_sample();
                 let mut value = self.to_string();
 
@@ -571,7 +575,7 @@ impl TempGraph {
                     },
                 )
             }
-            GraphKind::Line => crate::svg_graph::line(
+            ChartKind::Line => crate::svg_graph::line(
                 &self.samples,
                 self.max_temp,
                 if self.disabled {
@@ -580,10 +584,10 @@ impl TempGraph {
                     &self.svg_colors
                 },
             ),
-            GraphKind::Heat => {
+            ChartKind::Heat => {
                 crate::svg_graph::heat(&self.samples, self.max_temp as u64, &self.svg_colors)
             }
-            GraphKind::StackedBars => {
+            ChartKind::StackedBars => {
                 log::error!("StackedBars not supported for GpuTemp");
                 INVALID_IMG.to_string()
             }
@@ -601,12 +605,12 @@ impl TempGraph {
         *self.samples.back().unwrap_or(&0f64)
     }
 
-    pub fn graph_kind(&self) -> crate::config::GraphKind {
-        self.config.kind
+    pub fn graph_kind(&self) -> crate::config::ChartKind {
+        self.config.chart
     }
 
-    pub fn set_graph_kind(&mut self, kind: crate::config::GraphKind) {
-        self.config.kind = kind;
+    pub fn set_graph_kind(&mut self, kind: crate::config::ChartKind) {
+        self.config.chart = kind;
     }
 
     pub fn update(&mut self, sample: u32) {
@@ -617,8 +621,8 @@ impl TempGraph {
 
 impl DemoGraph for TempGraph {
     fn demo(&self) -> String {
-        match self.config.kind {
-            GraphKind::Ring => {
+        match self.config.chart {
+            ChartKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
                 let percentage: u64 = 40;
@@ -628,43 +632,47 @@ impl DemoGraph for TempGraph {
                     &self.svg_colors,
                 )
             }
-            GraphKind::Line => crate::svg_graph::line(
+            ChartKind::Line => crate::svg_graph::line(
                 &std::collections::VecDeque::from(DEMO_SAMPLES),
                 100.0,
                 &self.svg_colors,
             ),
-            GraphKind::Heat => crate::svg_graph::heat(
+            ChartKind::Heat => crate::svg_graph::heat(
                 &std::collections::VecDeque::from(HEAT_DEMO_SAMPLES),
                 100,
                 &self.svg_colors,
             ),
-            GraphKind::StackedBars => {
+            ChartKind::StackedBars => {
                 log::error!("StackedBars not supported for GpuTemp");
                 INVALID_IMG.to_string()
             }
         }
     }
 
-    fn colors(&self) -> GraphColors {
-        self.config.colors
+    fn colors(&self) -> &ChartColors {
+        self.config.colors()
     }
 
-    fn set_colors(&mut self, colors: GraphColors) {
-        self.config.colors = colors;
+    fn set_colors(&mut self, colors: &ChartColors) {
+        *self.config.colors_mut() = *colors;
         self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        match self.config.kind {
-            GraphKind::Line => (*super::COLOR_CHOICES_LINE).into(),
-            GraphKind::Ring => (*super::COLOR_CHOICES_RING).into(),
-            GraphKind::Heat => (*super::COLOR_CHOICES_HEAT).into(),
-            GraphKind::StackedBars => panic!("StackedBars not supported for GpuTemp"),
+        match self.config.chart {
+            ChartKind::Line => (*super::COLOR_CHOICES_LINE).into(),
+            ChartKind::Ring => (*super::COLOR_CHOICES_RING).into(),
+            ChartKind::Heat => (*super::COLOR_CHOICES_HEAT).into(),
+            ChartKind::StackedBars => panic!("StackedBars not supported for GpuTemp"),
         }
     }
 
     fn id(&self) -> Option<String> {
         Some(self.id.clone())
+    }
+
+    fn kind(&self) -> ChartKind {
+        self.config.chart
     }
 }
 
@@ -693,8 +701,8 @@ impl fmt::Display for TempGraph {
 
 impl DemoGraph for VramGraph {
     fn demo(&self) -> String {
-        match self.config.kind {
-            GraphKind::Ring => {
+        match self.config.chart {
+            ChartKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
                 let percentage = 40.0;
@@ -704,29 +712,29 @@ impl DemoGraph for VramGraph {
                     &self.svg_colors,
                 )
             }
-            GraphKind::Line => crate::svg_graph::line(
+            ChartKind::Line => crate::svg_graph::line(
                 &std::collections::VecDeque::from(DEMO_SAMPLES),
                 32.0,
                 &self.svg_colors,
             ),
             _ => {
-                log::error!("VRAM Graph type not supported {:?}", self.config.kind);
+                log::error!("VRAM Graph type not supported {:?}", self.config.chart);
                 INVALID_IMG.to_string()
             }
         }
     }
 
-    fn colors(&self) -> GraphColors {
-        self.config.colors
+    fn colors(&self) -> &ChartColors {
+        self.config.colors()
     }
 
-    fn set_colors(&mut self, colors: GraphColors) {
-        self.config.colors = colors;
-        self.svg_colors.set_colors(&colors);
+    fn set_colors(&mut self, colors: &ChartColors) {
+        *self.config.colors_mut() = *colors;
+        self.svg_colors.set_colors(colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        if self.config.kind == GraphKind::Line {
+        if self.config.chart == ChartKind::Line {
             (*super::COLOR_CHOICES_LINE).into()
         } else {
             (*super::COLOR_CHOICES_RING).into()
@@ -735,6 +743,10 @@ impl DemoGraph for VramGraph {
 
     fn id(&self) -> Option<String> {
         Some(self.id.clone())
+    }
+
+    fn kind(&self) -> ChartKind {
+        self.config.chart
     }
 }
 
@@ -874,13 +886,13 @@ impl Gpu {
             column!(
                 settings::item(
                     fl!("enable-chart"),
-                    toggler(config.chart).on_toggle(move |value| {
+                    toggler(config.chart_visible()).on_toggle(move |value| {
                         Message::GpuToggleChart(self.id(), DeviceKind::Gpu, value)
                     }),
                 ),
                 settings::item(
                     fl!("enable-label"),
-                    toggler(config.label).on_toggle(move |value| {
+                    toggler(config.label_visible()).on_toggle(move |value| {
                         Message::GpuToggleLabel(self.id(), DeviceKind::Gpu, value)
                     }),
                 ),
@@ -940,13 +952,13 @@ impl Gpu {
             column!(
                 settings::item(
                     fl!("enable-chart"),
-                    toggler(config.chart).on_toggle(|value| {
+                    toggler(config.chart_visible()).on_toggle(|value| {
                         Message::GpuToggleChart(self.id(), DeviceKind::Vram, value)
                     }),
                 ),
                 settings::item(
                     fl!("enable-label"),
-                    toggler(config.label).on_toggle(|value| {
+                    toggler(config.label_visible()).on_toggle(|value| {
                         Message::GpuToggleLabel(self.id(), DeviceKind::Vram, value)
                     }),
                 ),
@@ -1008,13 +1020,13 @@ impl Gpu {
             column!(
                 settings::item(
                     fl!("enable-chart"),
-                    toggler(config.chart).on_toggle(|value| {
+                    toggler(config.chart_visible()).on_toggle(|value| {
                         Message::GpuToggleChart(self.id(), DeviceKind::GpuTemp, value)
                     }),
                 ),
                 settings::item(
                     fl!("enable-label"),
-                    toggler(config.label).on_toggle(|value| {
+                    toggler(config.label_visible()).on_toggle(|value| {
                         Message::GpuToggleLabel(self.id(), DeviceKind::GpuTemp, value)
                     }),
                 ),
@@ -1074,7 +1086,7 @@ impl Gpu {
         let usage = self.settings_usage_ui(&config.usage);
         let vram = self.settings_vram_ui(&config.vram);
 
-        let stacked = if config.vram.label && config.usage.label {
+        let stacked = if config.vram.label_visible() && config.usage.label_visible() {
             Some(settings::item(
                 fl!("settings-gpu-stack-labels"),
                 row!(

@@ -4,7 +4,7 @@ use sysinfo::{DiskRefreshKind, Disks as DisksInfo};
 
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, DisksConfig, GraphColors, GraphKind},
+    config::{ChartColors, ChartKind, ColorVariant, DeviceKind, DisksConfig},
     fl,
     svg_graph::SvgColors,
 };
@@ -100,12 +100,12 @@ impl DemoGraph for Disks {
         }
     }
 
-    fn colors(&self) -> GraphColors {
-        self.config.colors
+    fn colors(&self) -> &ChartColors {
+        self.config.colors()
     }
 
-    fn set_colors(&mut self, colors: GraphColors) {
-        self.config.colors = colors;
+    fn set_colors(&mut self, colors: &ChartColors) {
+        *self.config.colors_mut() = *colors;
         self.svg_colors.set_colors(&colors);
     }
 
@@ -120,23 +120,27 @@ impl DemoGraph for Disks {
     fn id(&self) -> Option<String> {
         None
     }
+
+    fn kind(&self) -> ChartKind {
+        self.config.chart
+    }
 }
 
 impl Sensor for Disks {
     fn update_config(&mut self, config: &dyn Any, refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<DisksConfig>() {
             self.config = cfg.clone();
-            self.svg_colors.set_colors(&cfg.colors);
+            self.svg_colors.set_colors(&cfg.colors());
             self.refresh_rate = refresh_rate;
         }
     }
 
-    fn graph_kind(&self) -> GraphKind {
-        GraphKind::Line
+    fn graph_kind(&self) -> ChartKind {
+        ChartKind::Line
     }
 
-    fn set_graph_kind(&mut self, kind: GraphKind) {
-        assert!(kind == GraphKind::Line);
+    fn set_graph_kind(&mut self, kind: ChartKind) {
+        assert!(kind == ChartKind::Line);
     }
 
     /// Retrieve the amount of data transmitted since last update.
@@ -297,14 +301,16 @@ impl Sensor for Disks {
         disk_bandwidth_items.push(
             settings::item(
                 fl!("enable-chart"),
-                widget::toggler(config.chart).on_toggle(move |t| Message::ToggleDisksChart(k, t)),
+                widget::toggler(config.chart_visible())
+                    .on_toggle(move |t| Message::ToggleDisksChart(k, t)),
             )
             .into(),
         );
         disk_bandwidth_items.push(
             settings::item(
                 fl!("enable-label"),
-                widget::toggler(config.label).on_toggle(move |t| Message::ToggleDisksLabel(k, t)),
+                widget::toggler(config.label_visible())
+                    .on_toggle(move |t| Message::ToggleDisksLabel(k, t)),
             )
             .into(),
         );
@@ -314,7 +320,7 @@ impl Sensor for Disks {
                 widget::horizontal_space(),
                 widget::button::standard(fl!("change-colors")).on_press(Message::ColorPickerOpen(
                     DeviceKind::Disks(self.config.variant),
-                    GraphKind::Line,
+                    ChartKind::Line,
                     None
                 )),
                 widget::horizontal_space()
@@ -350,7 +356,7 @@ impl Default for Disks {
             write: BoundedVecDeque::from_iter(std::iter::repeat(0).take(MAX_SAMPLES), MAX_SAMPLES),
             read: BoundedVecDeque::from_iter(std::iter::repeat(0).take(MAX_SAMPLES), MAX_SAMPLES),
             max_y: None,
-            svg_colors: SvgColors::new(&GraphColors::default()),
+            svg_colors: SvgColors::new(&ChartColors::default()),
             config: DisksConfig::default(),
             refresh_rate: 1000,
         }
