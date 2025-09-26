@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use cosmic::cosmic_theme::palette::Srgba;
 
-use crate::config::GraphColors;
+use crate::config::ChartColors;
 
 use std::fmt::Write;
 
@@ -14,8 +14,8 @@ pub struct SvgColors {
     pub color4: String,
 }
 
-impl From<GraphColors> for SvgColors {
-    fn from(graph_colors: GraphColors) -> Self {
+impl From<ChartColors> for SvgColors {
+    fn from(graph_colors: ChartColors) -> Self {
         fn to_hex(color: Srgba<u8>) -> String {
             format!(
                 "#{:02X}{:02X}{:02X}{:02X}",
@@ -33,11 +33,11 @@ impl From<GraphColors> for SvgColors {
 }
 
 impl SvgColors {
-    pub fn new(colors: &GraphColors) -> SvgColors {
+    pub fn new(colors: &ChartColors) -> SvgColors {
         (*colors).into()
     }
 
-    pub fn set_colors(&mut self, colors: &GraphColors) {
+    pub fn set_colors(&mut self, colors: &ChartColors) {
         *self = (*colors).into();
     }
 }

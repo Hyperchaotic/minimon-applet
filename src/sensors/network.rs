@@ -6,7 +6,7 @@ use sysinfo::Networks;
 
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, GraphColors, GraphKind, NetworkConfig, NetworkVariant},
+    config::{ColorVariant, DeviceKind, ChartColors, ChartKind, NetworkConfig, NetworkVariant},
     fl,
     svg_graph::SvgColors,
 };
@@ -103,13 +103,13 @@ impl DemoGraph for Network {
         }
     }
 
-    fn colors(&self) -> GraphColors {
-        *self.config.colors()
+    fn colors(&self) -> &ChartColors {
+        self.config.colors()
     }
 
-    fn set_colors(&mut self, colors: GraphColors) {
-        *self.config.colors_mut() = colors;
-        self.svg_colors.set_colors(&colors);
+    fn set_colors(&mut self, colors: &ChartColors) {
+        *self.config.colors_mut() = *colors;
+        self.svg_colors.set_colors(colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
@@ -150,12 +150,12 @@ impl Sensor for Network {
         }
     }
 
-    fn graph_kind(&self) -> GraphKind {
-        GraphKind::Line
+    fn graph_kind(&self) -> ChartKind {
+        ChartKind::Line
     }
 
-    fn set_graph_kind(&mut self, kind: GraphKind) {
-        assert!(kind == GraphKind::Line);
+    fn set_graph_kind(&mut self, kind: ChartKind) {
+        assert!(kind == ChartKind::Line);
     }
 
     /// Retrieve the amount of data transmitted since last update.
@@ -365,7 +365,7 @@ impl Sensor for Network {
                 widget::horizontal_space(),
                 widget::button::standard(fl!("change-colors")).on_press(Message::ColorPickerOpen(
                     DeviceKind::Network(self.config.variant),
-                    GraphKind::Line,
+                    ChartKind::Line,
                     None
                 )),
                 widget::horizontal_space()
@@ -409,7 +409,7 @@ impl Default for Network {
             upload: BoundedVecDeque::from_iter(std::iter::repeat(0).take(MAX_SAMPLES), MAX_SAMPLES),
             max_y: None,
             dropdown_options: ["b", "Kb", "Mb", "Gb", "Tb"].into(),
-            svg_colors: SvgColors::new(&GraphColors::default()),
+            svg_colors: SvgColors::new(&ChartColors::default()),
             config: NetworkConfig::default(),
             refresh_rate: 1000,
         }

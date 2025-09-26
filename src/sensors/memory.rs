@@ -3,7 +3,7 @@ use sysinfo::{MemoryRefreshKind, System};
 
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, GraphColors, GraphKind, MemoryConfig},
+    config::{ColorVariant, DeviceKind, ChartColors, ChartKind, MemoryConfig},
     fl,
     sensors::INVALID_IMG,
     svg_graph::SvgColors,
@@ -43,8 +43,8 @@ pub struct Memory {
 
 impl DemoGraph for Memory {
     fn demo(&self) -> String {
-        match self.config.kind {
-            GraphKind::Ring => {
+        match self.config.chart {
+            ChartKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
                 let percentage = 40.0;
@@ -54,29 +54,29 @@ impl DemoGraph for Memory {
                     &self.svg_colors,
                 )
             }
-            GraphKind::Line => crate::svg_graph::line(
+            ChartKind::Line => crate::svg_graph::line(
                 &std::collections::VecDeque::from(DEMO_SAMPLES),
                 self.max_val,
                 &self.svg_colors,
             ),
             _ => {
-                log::error!("Graph type {:?} not supported for memory", self.config.kind);
+                log::error!("Graph type {:?} not supported for memory", self.config.chart);
                 INVALID_IMG.to_string()
             }
         }
     }
 
-    fn colors(&self) -> GraphColors {
-        *self.config.colors()
+    fn colors(&self) -> &ChartColors {
+        self.config.colors()
     }
 
-    fn set_colors(&mut self, colors: GraphColors) {
-        *self.config.colors_mut() = colors;
+    fn set_colors(&mut self, colors: &ChartColors) {
+        *self.config.colors_mut() = *colors;
         self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        if self.config.kind == GraphKind::Line {
+        if self.config.chart == ChartKind::Line {
             (*super::COLOR_CHOICES_LINE).into()
         } else {
             (*super::COLOR_CHOICES_RING).into()
@@ -96,13 +96,13 @@ impl Sensor for Memory {
         }
     }
 
-    fn graph_kind(&self) -> GraphKind {
-        self.config.kind
+    fn graph_kind(&self) -> ChartKind {
+        self.config.chart
     }
 
-    fn set_graph_kind(&mut self, kind: GraphKind) {
-        assert!(kind == GraphKind::Line || kind == GraphKind::Ring);
-        self.config.kind = kind;
+    fn set_graph_kind(&mut self, kind: ChartKind) {
+        assert!(kind == ChartKind::Line || kind == ChartKind::Ring);
+        self.config.chart = kind;
     }
 
     fn update(&mut self) {
@@ -123,7 +123,7 @@ impl Sensor for Memory {
     fn chart<'a>(
         &self,
     ) -> cosmic::widget::Container<crate::app::Message, cosmic::Theme, cosmic::Renderer> {
-        if self.config.kind == GraphKind::Ring {
+        if self.config.kind == ChartKind::Ring {
             let mut latest = self.latest_sample();
             let mut text = String::with_capacity(10);
 
@@ -167,7 +167,7 @@ impl Sensor for Memory {
         _height_hint: u16,
         _width_hint: u16,
     ) -> cosmic::widget::Container<'_, crate::app::Message, cosmic::Theme, cosmic::Renderer> {
-        let svg = if self.config.kind == GraphKind::Ring {
+        let svg = if self.config.chart == ChartKind::Ring {
             let mut latest = self.latest_sample();
             let mut value = String::with_capacity(10);
             let mut percentage = String::with_capacity(10);
@@ -291,9 +291,9 @@ impl Default for Memory {
             system,
             config: MemoryConfig::default(),
             graph_options: super::GRAPH_OPTIONS_RING_LINE.to_vec(),
-            svg_colors: SvgColors::new(&GraphColors::default()),
+            svg_colors: SvgColors::new(&ChartColors::default()),
         };
-        memory.set_colors(GraphColors::default());
+        memory.set_colors(&ChartColors::default());
         memory
     }
 }

@@ -38,7 +38,7 @@ use log::{error, info};
 use crate::barchart::StackedBarSvg;
 use crate::colorpicker::ColorPicker;
 use crate::config::{
-    ColorVariant, ContentType, DeviceKind, DisksVariant, GpuConfig, GraphColors, GraphKind,
+    ColorVariant, ContentType, DeviceKind, DisksVariant, GpuConfig, ChartColors, ChartKind,
     NetworkVariant,
 };
 use crate::sensors::cpu::Cpu;
@@ -205,7 +205,7 @@ pub struct ContentOrderChange {
 pub enum Message {
     TogglePopup,
 
-    ColorPickerOpen(DeviceKind, GraphKind, Option<String>),
+    ColorPickerOpen(DeviceKind, ChartKind, Option<String>),
     ColorPickerClose(bool, Option<String>),
     ColorPickerDefaults,
     ColorPickerAccent,
@@ -233,7 +233,7 @@ pub enum Message {
     ToggleDisksChart(DisksVariant, bool),
     ToggleDisksLabel(DisksVariant, bool),
 
-    SelectGraphType(DeviceKind, GraphKind),
+    SelectGraphType(DeviceKind, ChartKind),
     Tick,
     SlowTimer,
     PopupClosed(Id),
@@ -262,7 +262,7 @@ pub enum Message {
     GpuToggleChart(String, DeviceKind, bool),
     GpuToggleLabel(String, DeviceKind, bool),
     GpuToggleStackLabels(String, bool),
-    GpuSelectGraphType(String, DeviceKind, GraphKind),
+    GpuSelectGraphType(String, DeviceKind, ChartKind),
     SelectGpuTempUnit(String, TempUnit),
     ToggleDisableOnBattery(String, bool),
     ToggleSymbols(bool),
@@ -798,8 +798,9 @@ impl cosmic::Application for Minimon {
             Message::ColorPickerClose(save, maybe_gpu_id) => {
                 info!("Message::ColorPickerClose({save},{maybe_gpu_id:?})");
                 if save {
+                    let cols = *self.colorpicker.colors();
                     self.save_colors(
-                        self.colorpicker.colors(),
+                        &cols,
                         self.colorpicker.device(),
                         maybe_gpu_id,
                     );
@@ -912,15 +913,15 @@ impl cosmic::Application for Minimon {
                 match dev {
                     DeviceKind::Cpu => {
                         self.cpu.set_graph_kind(kind);
-                        self.config.cpu.kind = kind;
+                        self.config.cpu.chart = kind;
                     }
                     DeviceKind::CpuTemp => {
                         self.cputemp.set_graph_kind(kind);
-                        self.config.cputemp.kind = kind;
+                        self.config.cputemp.chart = kind;
                     }
                     DeviceKind::Memory => {
                         self.memory.set_graph_kind(kind);
-                        self.config.memory.kind = kind;
+                        self.config.memory.chart = kind;
                     }
                     _ => error!("Message::SelectGraphType unsupported kind/device combination."), // Disks and Network don't have graph selection
                 }
@@ -1179,9 +1180,9 @@ impl cosmic::Application for Minimon {
                 info!("Message::GpuSelectGraphType({id:?}, {device:?}, {kind:?})");
                 self.update_gpu_config(&id, "GpuSelectGraphType", device, |config, device| {
                     match device {
-                        DeviceKind::Gpu => config.usage.kind = kind,
-                        DeviceKind::Vram => config.vram.kind = kind,
-                        DeviceKind::GpuTemp => config.temp.kind = kind,
+                        DeviceKind::Gpu => config.usage.chart = kind,
+                        DeviceKind::Vram => config.vram.chart = kind,
+                        DeviceKind::GpuTemp => config.temp.chart = kind,
                         _ => error!("GpuSelectGraphType: wrong kind {device:?}"),
                     }
                 });
@@ -1518,7 +1519,7 @@ impl Minimon {
             );
         }
 
-        let width: u16 = if self.config.cpu.kind == GraphKind::StackedBars {
+        let width: u16 = if self.config.cpu.chart == ChartKind::StackedBars {
             StackedBarSvg::new(
                 self.config.cpu.bar_width,
                 size.0,
@@ -1862,29 +1863,29 @@ impl Minimon {
         }
     }
 
-    fn save_colors(&mut self, colors: GraphColors, kind: DeviceKind, id: Option<String>) {
+    fn save_colors(&mut self, colors: &ChartColors, kind: DeviceKind, id: Option<String>) {
         match kind {
             DeviceKind::Cpu => {
-                *self.config.cpu.colors_mut() = colors;
+                *self.config.cpu.colors_mut() = *colors;
             }
             DeviceKind::CpuTemp => {
-                *self.config.cputemp.colors_mut() = colors;
+                *self.config.cputemp.colors_mut() = *colors;
             }
             DeviceKind::Memory => {
-                *self.config.memory.colors_mut() = colors;
+                *self.config.memory.colors_mut() = *colors;
             }
             DeviceKind::Network(variant) => {
                 let (_, config) = network_select!(self, variant);
-                *config.colors_mut() = colors;
+                *config.colors_mut() = *colors;
             }
             DeviceKind::Disks(variant) => {
                 let (_, config) = disks_select!(self, variant);
-                *config.colors_mut() = colors;
+                *config.colors_mut() = *colors;
             }
             DeviceKind::Gpu => {
                 if let Some(id) = id {
                     if let Some(config) = self.config.gpus.get_mut(&id) {
-                        *config.usage.colors_mut() = colors;
+                        *config.usage.colors_mut() = *colors;
                     } else {
                         error!("No config for selected GPU {id}");
                     }
@@ -1893,7 +1894,7 @@ impl Minimon {
             DeviceKind::Vram => {
                 if let Some(id) = id {
                     if let Some(config) = self.config.gpus.get_mut(&id) {
-                        *config.vram.colors_mut() = colors;
+                        *config.vram.colors_mut() = *colors;
                     } else {
                         error!("No config for selected GPU {id}");
                     }
@@ -1902,7 +1903,7 @@ impl Minimon {
             DeviceKind::GpuTemp => {
                 if let Some(id) = id {
                     if let Some(config) = self.config.gpus.get_mut(&id) {
-                        *config.temp.colors_mut() = colors;
+                        *config.temp.colors_mut() = *colors;
                     } else {
                         error!("No config for selected GPU {id}");
                     }

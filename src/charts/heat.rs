@@ -9,16 +9,16 @@ use std::collections::VecDeque;
 use cosmic::iced::Color;
 
 use crate::app::Message;
-use crate::config::GraphColors;
+use crate::config::ChartColors;
 
-use super::GraphColorsIced;
+use super::ChartColorsIced;
 
 #[derive(Debug)]
 pub struct HeatChart {
     pub steps: usize,
     pub samples: VecDeque<f64>,
     pub max_y: Option<f64>,
-    pub colors: GraphColorsIced,
+    pub colors: ChartColorsIced,
 }
 
 impl HeatChart {
@@ -26,7 +26,7 @@ impl HeatChart {
         steps: usize,
         samples: &VecDeque<f64>,
         max: Option<f64>,
-        colors: &GraphColors,
+        colors: &ChartColors,
     ) -> Self {
         HeatChart {
             steps,

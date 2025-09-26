@@ -1,6 +1,6 @@
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, CpuTempConfig, DeviceKind, GraphColors, GraphKind},
+    config::{ColorVariant, CpuTempConfig, DeviceKind, ChartColors, ChartKind},
     fl,
     sensors::INVALID_IMG,
     svg_graph::SvgColors,
@@ -150,8 +150,8 @@ pub struct CpuTemp {
 
 impl DemoGraph for CpuTemp {
     fn demo(&self) -> String {
-        match self.config.kind {
-            GraphKind::Ring => {
+        match self.config.chart {
+            ChartKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
                 let percentage: u64 = 40;
@@ -161,38 +161,38 @@ impl DemoGraph for CpuTemp {
                     &self.svg_colors,
                 )
             }
-            GraphKind::Line => crate::svg_graph::line(
+            ChartKind::Line => crate::svg_graph::line(
                 &std::collections::VecDeque::from(DEMO_SAMPLES),
                 100.0,
                 &self.svg_colors,
             ),
-            GraphKind::Heat => crate::svg_graph::heat(
+            ChartKind::Heat => crate::svg_graph::heat(
                 &std::collections::VecDeque::from(DEMO_SAMPLES),
                 100,
                 &self.svg_colors,
             ),
-            GraphKind::StackedBars => {
+            ChartKind::StackedBars => {
                 log::error!("StackedBars not supported for CpuTemp");
                 INVALID_IMG.to_string()
             }
         }
     }
 
-    fn colors(&self) -> GraphColors {
-        *self.config.colors()
+    fn colors(&self) -> &ChartColors {
+        self.config.colors()
     }
 
-    fn set_colors(&mut self, colors: GraphColors) {
-        *self.config.colors_mut() = colors;
+    fn set_colors(&mut self, colors: &ChartColors) {
+        *self.config.colors_mut() = *colors;
         self.svg_colors.set_colors(&colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
-        match self.config.kind {
-            GraphKind::Line => (*super::COLOR_CHOICES_LINE).into(),
-            GraphKind::Ring => (*super::COLOR_CHOICES_RING).into(),
-            GraphKind::Heat => (*super::COLOR_CHOICES_HEAT).into(),
-            GraphKind::StackedBars => panic!("StackedBars not supported for CpuTemp"),
+        match self.config.chart {
+            ChartKind::Line => (*super::COLOR_CHOICES_LINE).into(),
+            ChartKind::Ring => (*super::COLOR_CHOICES_RING).into(),
+            ChartKind::Heat => (*super::COLOR_CHOICES_HEAT).into(),
+            ChartKind::StackedBars => panic!("StackedBars not supported for CpuTemp"),
         }
     }
 
@@ -209,13 +209,13 @@ impl Sensor for CpuTemp {
         }
     }
 
-    fn graph_kind(&self) -> GraphKind {
-        self.config.kind
+    fn graph_kind(&self) -> ChartKind {
+        self.config.chart
     }
 
-    fn set_graph_kind(&mut self, kind: GraphKind) {
-        assert!(kind == GraphKind::Line || kind == GraphKind::Ring || kind == GraphKind::Heat);
-        self.config.kind = kind;
+    fn set_graph_kind(&mut self, kind: ChartKind) {
+        assert!(kind == ChartKind::Line || kind == ChartKind::Ring || kind == ChartKind::Heat);
+        self.config.chart = kind;
     }
 
     fn update(&mut self) {
@@ -244,7 +244,7 @@ impl Sensor for CpuTemp {
             max = hwmon.crit_temp;
         }
         match self.config.kind {
-            GraphKind::Ring => {
+            ChartKind::Ring => {
                 let latest = self.latest_sample();
                 let mut value = self.to_string();
 
@@ -258,14 +258,14 @@ impl Sensor for CpuTemp {
                     &self.config.colors,
                 ))
             }
-            GraphKind::Line => chart_container!(crate::charts::line::LineChart::new(
+            ChartKind::Line => chart_container!(crate::charts::line::LineChart::new(
                 MAX_SAMPLES,
                 &self.samples,
                 &VecDeque::new(),
                 Some(max),
                 &self.config.colors,
             )),
-            GraphKind::Heat => chart_container!(crate::charts::heat::HeatChart::new(
+            ChartKind::Heat => chart_container!(crate::charts::heat::HeatChart::new(
                 MAX_SAMPLES,
                 &self.samples,
                 Some(max),
@@ -284,8 +284,8 @@ impl Sensor for CpuTemp {
         if let Some(hwmon) = &self.hwmon_temp {
             max = hwmon.crit_temp;
         }
-        let svg = match self.config.kind {
-            GraphKind::Ring => {
+        let svg = match self.config.chart {
+            ChartKind::Ring => {
                 let latest = self.latest_sample();
                 let mut value = self.to_string();
 
@@ -298,9 +298,9 @@ impl Sensor for CpuTemp {
 
                 crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
             }
-            GraphKind::Line => crate::svg_graph::line(&self.samples, max, &self.svg_colors),
-            GraphKind::Heat => crate::svg_graph::heat(&self.samples, max as u64, &self.svg_colors),
-            GraphKind::StackedBars => {
+            ChartKind::Line => crate::svg_graph::line(&self.samples, max, &self.svg_colors),
+            ChartKind::Heat => crate::svg_graph::heat(&self.samples, max as u64, &self.svg_colors),
+            ChartKind::StackedBars => {
                 log::error!("StackedBars not supported for CpuTemp");
                 INVALID_IMG.to_string()
             }
@@ -415,11 +415,11 @@ impl Default for CpuTemp {
                 MAX_SAMPLES,
             ),
             graph_options: super::GRAPH_OPTIONS_RING_LINE_HEAT.to_vec(),
-            svg_colors: SvgColors::new(&GraphColors::default()),
+            svg_colors: SvgColors::new(&ChartColors::default()),
             unit_options: super::UNIT_OPTIONS.to_vec(),
             config: CpuTempConfig::default(),
         };
-        cpu.set_colors(GraphColors::default());
+        cpu.set_colors(&ChartColors::default());
         cpu
     }
 }

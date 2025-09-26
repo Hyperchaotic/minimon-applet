@@ -17,35 +17,35 @@ pub enum ColorVariant {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum GraphKind {
+pub enum ChartKind {
     Ring,
     Line,
     Heat,
     StackedBars,
 }
 
-impl From<usize> for GraphKind {
+impl From<usize> for ChartKind {
     fn from(index: usize) -> Self {
         match index {
-            0 => GraphKind::Ring,
-            1 => GraphKind::Line,
-            2 => GraphKind::Heat,
-            3 => GraphKind::StackedBars,
+            0 => ChartKind::Ring,
+            1 => ChartKind::Line,
+            2 => ChartKind::Heat,
+            3 => ChartKind::StackedBars,
             _ => {
-                log::error!("GrapKind::From({}) Invalid index for GraphKind", index);
-                GraphKind::Line
+                log::error!("GrapKind::From({}) Invalid index for ChartKind", index);
+                ChartKind::Line
             }
         }
     }
 }
 
-impl From<GraphKind> for usize {
-    fn from(kind: GraphKind) -> Self {
+impl From<ChartKind> for usize {
+    fn from(kind: ChartKind) -> Self {
         match kind {
-            GraphKind::Ring => 0,
-            GraphKind::Line => 1,
-            GraphKind::Heat => 2,
-            GraphKind::StackedBars => 3,
+            ChartKind::Ring => 0,
+            ChartKind::Line => 1,
+            ChartKind::Heat => 2,
+            ChartKind::StackedBars => 3,
         }
     }
 }
@@ -79,14 +79,14 @@ impl std::fmt::Display for DeviceKind {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
 #[version = 1]
-pub struct GraphColors {
+pub struct ChartColors {
     pub color1: Srgba<u8>,
     pub color2: Srgba<u8>,
     pub color3: Srgba<u8>,
     pub color4: Srgba<u8>,
 }
 
-impl Default for GraphColors {
+impl Default for ChartColors {
     fn default() -> Self {
         Self {
             color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 0xff)),
@@ -97,39 +97,39 @@ impl Default for GraphColors {
     }
 }
 
-impl GraphColors {
+impl ChartColors {
     pub fn new(kind: DeviceKind) -> Self {
         match kind {
-            DeviceKind::Cpu => GraphColors::default(),
-            DeviceKind::CpuTemp => GraphColors::default(),
+            DeviceKind::Cpu => ChartColors::default(),
+            DeviceKind::CpuTemp => ChartColors::default(),
 
-            DeviceKind::Memory => GraphColors {
+            DeviceKind::Memory => ChartColors {
                 color4: Srgba::from_components((187, 41, 187, 255)),
                 ..Default::default()
             },
 
-            DeviceKind::Network(_) => GraphColors {
+            DeviceKind::Network(_) => ChartColors {
                 color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
                 color2: Srgba::from_components((47, 141, 255, 255)),
                 color3: Srgba::from_components((0, 255, 0, 255)),
                 color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
             },
 
-            DeviceKind::Disks(_) => GraphColors {
+            DeviceKind::Disks(_) => ChartColors {
                 color1: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
                 color2: Srgba::from_components((255, 102, 0, 255)),
                 color3: Srgba::from_components((255, 255, 0, 255)),
                 color4: Srgba::from_components((0x2b, 0x2b, 0x2b, 255)),
             },
-            DeviceKind::Gpu => GraphColors {
+            DeviceKind::Gpu => ChartColors {
                 color4: Srgba::from_components((0, 255, 0, 255)),
                 ..Default::default()
             },
-            DeviceKind::Vram => GraphColors {
+            DeviceKind::Vram => ChartColors {
                 color4: Srgba::from_components((0, 255, 0, 255)),
                 ..Default::default()
             },
-            DeviceKind::GpuTemp => GraphColors {
+            DeviceKind::GpuTemp => ChartColors {
                 color4: Srgba::from_components((255, 95, 31, 255)),
                 ..Default::default()
             },
@@ -158,46 +158,42 @@ impl GraphColors {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
 #[version = 1]
 pub struct Colors {
-    ring: GraphColors,
-    line: GraphColors,
-    heat: GraphColors,
-    stackedbars: GraphColors,
+    ring: ChartColors,
+    line: ChartColors,
+    heat: ChartColors,
+    stackedbars: ChartColors,
 }
 
 impl Colors {
     pub fn new(kind: DeviceKind) -> Self {
-        let def = GraphColors::new(kind);
+        let def = ChartColors::new(kind);
         Colors {
             ring: def,
             line: def,
             heat: def,
-            stackedbars: GraphColors {
+            stackedbars: ChartColors {
                 color3: Srgba::from_components((80, 80, 255, 255)),
                 ..Default::default()
             },
         }
     }
 
-    pub fn get(&self, kind: GraphKind) -> &GraphColors {
+    pub fn get(&self, kind: ChartKind) -> &ChartColors {
         match kind {
-            GraphKind::Ring => &self.ring,
-            GraphKind::Line => &self.line,
-            GraphKind::Heat => &self.heat,
-            GraphKind::StackedBars => &self.stackedbars,
+            ChartKind::Ring => &self.ring,
+            ChartKind::Line => &self.line,
+            ChartKind::Heat => &self.heat,
+            ChartKind::StackedBars => &self.stackedbars,
         }
     }
 
-    pub fn get_mut(&mut self, kind: GraphKind) -> &mut GraphColors {
+    pub fn get_mut(&mut self, kind: ChartKind) -> &mut ChartColors {
         match kind {
-            GraphKind::Ring => &mut self.ring,
-            GraphKind::Line => &mut self.line,
-            GraphKind::Heat => &mut self.heat,
-            GraphKind::StackedBars => &mut self.stackedbars,
+            ChartKind::Ring => &mut self.ring,
+            ChartKind::Line => &mut self.line,
+            ChartKind::Heat => &mut self.heat,
+            ChartKind::StackedBars => &mut self.stackedbars,
         }
-    }
-
-    pub fn set(&mut self, kind: GraphKind, colors: GraphColors) {
-        *self.get_mut(kind) = colors;
     }
 }
 
@@ -217,37 +213,34 @@ macro_rules! make_config {
         #[derive(Debug, Clone, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
         #[version = 1]
         pub struct $name {
-            chart: bool,
-            label: bool,
-            pub kind: GraphKind,
+            chart_visible: bool,
+            label_visible: bool,
+            pub chart: ChartKind,
             colors: Colors,
             $($extra)*
         }
 
        impl $name {
-            pub fn kind(&self) -> GraphKind {
-                self.kind
-            }
-            pub fn visible(&self) -> bool {
-                self.chart || self.label
+              pub fn visible(&self) -> bool {
+                self.chart_visible() || self.label_visible()
             }
             pub fn chart_visible(&self) -> bool {
-                self.chart
+                self.chart_visible
             }
             pub fn label_visible(&self) -> bool {
-                self.label
+                self.label_visible
             }
             pub fn show_chart(&mut self, visible: bool) {
-                self.chart = visible;
+                self.chart_visible = visible;
             }
             pub fn show_label(&mut self, visible: bool) {
-                self.label = visible;
+                self.label_visible = visible;
             }
-            pub fn colors(&self) -> &GraphColors {
-                self.colors.get(self.kind)
+            pub fn colors(&self) -> &ChartColors {
+                self.colors.get(self.chart)
             }
-            pub fn colors_mut(&mut self) -> &mut GraphColors {
-                self.colors.get_mut(self.kind)
+            pub fn colors_mut(&mut self) -> &mut ChartColors {
+                self.colors.get_mut(self.chart)
             }
         }
     };
@@ -262,9 +255,9 @@ make_config!(CpuConfig {
 impl Default for CpuConfig {
     fn default() -> Self {
         Self {
-            chart: true,
-            label: false,
-            kind: GraphKind::Ring,
+            chart_visible: true,
+            label_visible: false,
+            chart: ChartKind::Ring,
             colors: Colors::new(DeviceKind::Cpu),
             no_decimals: false,
             bar_width: 4,
@@ -280,9 +273,9 @@ make_config!(CpuTempConfig {
 impl Default for CpuTempConfig {
     fn default() -> Self {
         Self {
-            chart: false,
-            label: false,
-            kind: GraphKind::Heat,
+            chart_visible: false,
+            label_visible: false,
+            chart: ChartKind::Heat,
             colors: Colors::new(DeviceKind::CpuTemp),
             unit: TempUnit::Celcius,
         }
@@ -296,9 +289,9 @@ make_config!(MemoryConfig {
 impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
-            chart: true,
-            label: false,
-            kind: GraphKind::Ring,
+            chart_visible: true,
+            label_visible: false,
+            chart: ChartKind::Ring,
             colors: Colors::new(DeviceKind::Memory),
             percentage: false,
         }
@@ -323,12 +316,12 @@ make_config!(NetworkConfig {
 impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
-            chart: true,
-            label: false,
-            kind: GraphKind::Line,
+            chart_visible: true,
+            label_visible: false,
+            chart: ChartKind::Line,
             colors: Colors::new(DeviceKind::Network(NetworkVariant::Combined)),
             adaptive: true,
-            bandwidth: 62_500_000, // 500Mbit/s
+            bandwidth: 62_500_000, 
             unit: Some(0),
             variant: NetworkVariant::Combined,
             show_bytes: false,
@@ -350,9 +343,9 @@ make_config!(DisksConfig {
 impl Default for DisksConfig {
     fn default() -> Self {
         Self {
-            chart: false,
-            label: false,
-            kind: GraphKind::Line,
+            chart_visible: false,
+            label_visible: false,
+            chart: ChartKind::Line,
             colors: Colors::new(DeviceKind::Disks(DisksVariant::Combined)),
             variant: DisksVariant::Combined,
         }
@@ -364,9 +357,9 @@ make_config!(GpuUsageConfig {});
 impl Default for GpuUsageConfig {
     fn default() -> Self {
         Self {
-            chart: true,
-            label: false,
-            kind: GraphKind::Ring,
+            chart_visible: true,
+            label_visible: false,
+            chart: ChartKind::Ring,
             colors: Colors::new(DeviceKind::Gpu),
         }
     }
@@ -377,9 +370,9 @@ make_config!(GpuVramConfig {});
 impl Default for GpuVramConfig {
     fn default() -> Self {
         Self {
-            chart: true,
-            label: false,
-            kind: GraphKind::Ring,
+            chart_visible: true,
+            label_visible: false,
+            chart: ChartKind::Ring,
             colors: Colors::new(DeviceKind::Vram),
         }
     }
@@ -392,9 +385,9 @@ make_config!(GpuTempConfig {
 impl Default for GpuTempConfig {
     fn default() -> Self {
         Self {
-            chart: false,
-            label: false,
-            kind: GraphKind::Ring,
+            chart_visible: false,
+            label_visible: false,
+            chart: ChartKind::Ring,
             colors: Colors::new(DeviceKind::GpuTemp),
             unit: TempUnit::Celcius,
         }

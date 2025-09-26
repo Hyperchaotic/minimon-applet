@@ -4,7 +4,7 @@ use sysinfo::{DiskRefreshKind, Disks as DisksInfo};
 
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, DisksConfig, GraphColors, GraphKind},
+    config::{ColorVariant, DeviceKind, DisksConfig, ChartColors, ChartKind},
     fl,
     svg_graph::SvgColors,
 };
@@ -100,12 +100,12 @@ impl DemoGraph for Disks {
         }
     }
 
-    fn colors(&self) -> GraphColors {
-        *self.config.colors()
+    fn colors(&self) -> &ChartColors {
+        self.config.colors()
     }
 
-    fn set_colors(&mut self, colors: GraphColors) {
-        *self.config.colors_mut() = colors;
+    fn set_colors(&mut self, colors: &ChartColors) {
+        *self.config.colors_mut() = *colors;
         self.svg_colors.set_colors(&colors);
     }
 
@@ -131,12 +131,12 @@ impl Sensor for Disks {
         }
     }
 
-    fn graph_kind(&self) -> GraphKind {
-        GraphKind::Line
+    fn graph_kind(&self) -> ChartKind {
+        ChartKind::Line
     }
 
-    fn set_graph_kind(&mut self, kind: GraphKind) {
-        assert!(kind == GraphKind::Line);
+    fn set_graph_kind(&mut self, kind: ChartKind) {
+        assert!(kind == ChartKind::Line);
     }
 
     /// Retrieve the amount of data transmitted since last update.
@@ -314,7 +314,7 @@ impl Sensor for Disks {
                 widget::horizontal_space(),
                 widget::button::standard(fl!("change-colors")).on_press(Message::ColorPickerOpen(
                     DeviceKind::Disks(self.config.variant),
-                    GraphKind::Line,
+                    ChartKind::Line,
                     None
                 )),
                 widget::horizontal_space()
@@ -350,7 +350,7 @@ impl Default for Disks {
             write: BoundedVecDeque::from_iter(std::iter::repeat(0).take(MAX_SAMPLES), MAX_SAMPLES),
             read: BoundedVecDeque::from_iter(std::iter::repeat(0).take(MAX_SAMPLES), MAX_SAMPLES),
             max_y: None,
-            svg_colors: SvgColors::new(&GraphColors::default()),
+            svg_colors: SvgColors::new(&ChartColors::default()),
             config: DisksConfig::default(),
             refresh_rate: 1000,
         }
