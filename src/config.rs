@@ -102,12 +102,12 @@ impl Default for ChartColors {
 
 impl ChartColors {
     pub fn new(device: DeviceKind, chart: ChartKind) -> Self {
-        let default = ChartColors::default();
         match device {
             DeviceKind::Cpu => {
                 if chart == ChartKind::StackedBars {
                     ChartColors {
                         graph1: Srgba::from_components((80, 80, 255, 255)),
+                        graph2: Srgba::from_components((255, 6, 0, 255)),
                         ..Default::default()
                     }
                 } else {
