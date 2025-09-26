@@ -38,26 +38,26 @@ use std::sync::LazyLock;
 pub static COLOR_CHOICES_COMBINED: LazyLock<[(&'static str, ColorVariant); 4]> =
     LazyLock::new(|| {
         [
-            (fl!("graph-network-download").leak(), ColorVariant::Color2),
-            (fl!("graph-network-upload").leak(), ColorVariant::Color3),
-            (fl!("graph-network-back").leak(), ColorVariant::Color1),
-            (fl!("graph-network-frame").leak(), ColorVariant::Color4),
+            (fl!("graph-network-download").leak(), ColorVariant::Graph1),
+            (fl!("graph-network-upload").leak(), ColorVariant::Graph2),
+            (fl!("graph-network-back").leak(), ColorVariant::Background),
+            (fl!("graph-network-frame").leak(), ColorVariant::Frame),
         ]
     });
 
 pub static COLOR_CHOICES_DL: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
     [
-        (fl!("graph-network-download").leak(), ColorVariant::Color2),
-        (fl!("graph-network-back").leak(), ColorVariant::Color1),
-        (fl!("graph-network-frame").leak(), ColorVariant::Color4),
+        (fl!("graph-network-download").leak(), ColorVariant::Graph1),
+        (fl!("graph-network-back").leak(), ColorVariant::Background),
+        (fl!("graph-network-frame").leak(), ColorVariant::Frame),
     ]
 });
 
 pub static COLOR_CHOICES_UL: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
     [
-        (fl!("graph-network-upload").leak(), ColorVariant::Color3),
-        (fl!("graph-network-back").leak(), ColorVariant::Color1),
-        (fl!("graph-network-frame").leak(), ColorVariant::Color4),
+        (fl!("graph-network-upload").leak(), ColorVariant::Graph2),
+        (fl!("graph-network-back").leak(), ColorVariant::Background),
+        (fl!("graph-network-frame").leak(), ColorVariant::Frame),
     ]
 });
 
@@ -97,7 +97,7 @@ impl DemoGraph for Network {
             }
             NetworkVariant::Upload => {
                 let mut cols = self.svg_colors.clone();
-                cols.color2 = cols.color3.clone();
+                cols.graph1 = cols.graph2.clone();
                 crate::svg_graph::line_adaptive(&upload, GRAPH_SAMPLES, &cols, None)
             }
         }
@@ -249,7 +249,7 @@ impl Sensor for Network {
             ),
             NetworkVariant::Upload => {
                 let mut cols = self.svg_colors.clone();
-                cols.color2 = cols.color3.clone();
+                cols.graph1 = cols.graph2.clone();
                 crate::svg_graph::line_adaptive(&self.upload, GRAPH_SAMPLES, &cols, self.max_y)
             }
         };

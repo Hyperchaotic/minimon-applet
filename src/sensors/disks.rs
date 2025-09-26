@@ -40,26 +40,26 @@ use std::sync::LazyLock;
 pub static COLOR_CHOICES_COMBINED: LazyLock<[(&'static str, ColorVariant); 4]> =
     LazyLock::new(|| {
         [
-            (fl!("graph-disks-write").leak(), ColorVariant::Color2),
-            (fl!("graph-disks-read").leak(), ColorVariant::Color3),
-            (fl!("graph-disks-back").leak(), ColorVariant::Color1),
-            (fl!("graph-disks-frame").leak(), ColorVariant::Color4),
+            (fl!("graph-disks-write").leak(), ColorVariant::Graph1),
+            (fl!("graph-disks-read").leak(), ColorVariant::Graph2),
+            (fl!("graph-disks-back").leak(), ColorVariant::Background),
+            (fl!("graph-disks-frame").leak(), ColorVariant::Frame),
         ]
     });
 
 pub static COLOR_CHOICES_WRITE: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
     [
-        (fl!("graph-disks-write").leak(), ColorVariant::Color2),
-        (fl!("graph-disks-back").leak(), ColorVariant::Color1),
-        (fl!("graph-disks-frame").leak(), ColorVariant::Color4),
+        (fl!("graph-disks-write").leak(), ColorVariant::Graph1),
+        (fl!("graph-disks-back").leak(), ColorVariant::Background),
+        (fl!("graph-disks-frame").leak(), ColorVariant::Frame),
     ]
 });
 
 pub static COLOR_CHOICES_READ: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
     [
-        (fl!("graph-disks-read").leak(), ColorVariant::Color3),
-        (fl!("graph-disks-back").leak(), ColorVariant::Color1),
-        (fl!("graph-disks-frame").leak(), ColorVariant::Color4),
+        (fl!("graph-disks-read").leak(), ColorVariant::Graph2),
+        (fl!("graph-disks-back").leak(), ColorVariant::Background),
+        (fl!("graph-disks-frame").leak(), ColorVariant::Frame),
     ]
 });
 
@@ -94,7 +94,7 @@ impl DemoGraph for Disks {
             }
             DisksVariant::Read => {
                 let mut cols = self.svg_colors.clone();
-                cols.color2 = cols.color3.clone();
+                cols.graph1 = cols.graph2.clone();
                 crate::svg_graph::line_adaptive(&read, GRAPH_SAMPLES, &cols, None)
             }
         }
@@ -232,7 +232,7 @@ impl Sensor for Disks {
             ),
             DisksVariant::Read => {
                 let mut cols = self.svg_colors.clone();
-                cols.color2 = cols.color3.clone();
+                cols.graph1 = cols.graph2.clone();
                 crate::svg_graph::line_adaptive(&self.read, GRAPH_SAMPLES, &cols, self.max_y)
             }
         };

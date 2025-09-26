@@ -70,10 +70,11 @@ impl GpuGraph {
             svg_colors: SvgColors::new(&ChartColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
-                color1: String::from("#FFFFFF20"),
-                color2: String::from("#727272FF"),
-                color3: String::from("#727272FF"),
-                color4: String::from("#727272FF"),
+                background: String::from("#FFFFFF20"),
+                frame: String::from("#727272FF"),
+                text: String::from("#727272FF"),
+                graph1: String::from("#727272FF"),
+                graph2: String::from("#727272FF"),
             },
             config: GpuUsageConfig::default(),
         }
@@ -292,10 +293,11 @@ impl VramGraph {
             svg_colors: SvgColors::new(&ChartColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
-                color1: String::from("#FFFFFF20"),
-                color2: String::from("#727272FF"),
-                color3: String::from("#727272FF"),
-                color4: String::from("#727272FF"),
+                background: String::from("#FFFFFF20"),
+                frame: String::from("#727272FF"),
+                text: String::from("#727272FF"),
+                graph1: String::from("#727272FF"),
+                graph2: String::from("#727272FF"),
             },
             config: GpuVramConfig::default(),
         }
@@ -473,10 +475,11 @@ impl TempGraph {
             svg_colors: SvgColors::new(&ChartColors::default()),
             disabled: false,
             disabled_colors: SvgColors {
-                color1: String::from("#FFFFFF20"),
-                color2: String::from("#727272FF"),
-                color3: String::from("#727272FF"),
-                color4: String::from("#727272FF"),
+                background: String::from("#FFFFFF20"),
+                frame: String::from("#727272FF"),
+                text: String::from("#727272FF"),
+                graph1: String::from("#727272FF"),
+                graph2: String::from("#727272FF"),
             },
             config: GpuTempConfig::default(),
         }

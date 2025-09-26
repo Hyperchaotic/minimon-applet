@@ -47,10 +47,10 @@ static GRAPH_OPTIONS_RING_LINE_BARS: LazyLock<[&'static str; 3]> = LazyLock::new
 
 pub static COLOR_CHOICES_BARS: LazyLock<[(&'static str, ColorVariant); 4]> = LazyLock::new(|| {
     [
-        (fl!("graph-bars-system").leak(), ColorVariant::Color4),
-        (fl!("graph-bars-user").leak(), ColorVariant::Color3),
-        (fl!("graph-line-back").leak(), ColorVariant::Color1),
-        (fl!("graph-line-frame").leak(), ColorVariant::Color2),
+        (fl!("graph-bars-system").leak(), ColorVariant::Graph2),
+        (fl!("graph-bars-user").leak(), ColorVariant::Graph1),
+        (fl!("graph-line-back").leak(), ColorVariant::Background),
+        (fl!("graph-line-frame").leak(), ColorVariant::Frame),
     ]
 });
 

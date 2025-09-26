@@ -792,7 +792,7 @@ impl cosmic::Application for Minimon {
                         }
                     }
                 }
-                self.colorpicker.set_color_variant(ColorVariant::Color1);
+                self.colorpicker.set_color_variant(ColorVariant::Background);
             }
 
             Message::ColorPickerClose(save, maybe_gpu_id) => {

@@ -8,10 +8,11 @@ use std::fmt::Write;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SvgColors {
-    pub color1: String,
-    pub color2: String,
-    pub color3: String,
-    pub color4: String,
+    pub background: String,
+    pub frame: String,
+    pub text: String,
+    pub graph1: String,
+    pub graph2: String,
 }
 
 impl From<ChartColors> for SvgColors {
@@ -24,10 +25,11 @@ impl From<ChartColors> for SvgColors {
         }
 
         SvgColors {
-            color1: to_hex(graph_colors.color1),
-            color2: to_hex(graph_colors.color2),
-            color3: to_hex(graph_colors.color3),
-            color4: to_hex(graph_colors.color4),
+            background: to_hex(graph_colors.background),
+            frame: to_hex(graph_colors.frame),
+            text: to_hex(graph_colors.text),
+            graph1: to_hex(graph_colors.graph1),
+            graph2: to_hex(graph_colors.graph2),
         }
     }
 }
@@ -45,15 +47,15 @@ impl SvgColors {
 pub fn ring(value: &str, percentage: &str, color: &SvgColors) -> String {
     let mut svg = String::with_capacity(RINGSVG_LEN);
     svg.push_str(RINGSVG_1);
-    svg.push_str(&color.color1);
+    svg.push_str(&color.background);
     svg.push_str(RINGSVG_1_1);
-    svg.push_str(&color.color3);
+    svg.push_str(&color.graph2);
     svg.push_str(RINGSVG_2);
-    svg.push_str(&color.color4);
+    svg.push_str(&color.graph1);
     svg.push_str(RINGSVG_3);
     svg.push_str(percentage);
     svg.push_str(RINGSVG_4);
-    svg.push_str(&color.color2);
+    svg.push_str(&color.text);
     svg.push_str(RINGSVG_5);
     svg.push_str(value);
     svg.push_str(RINGSVG_6);
@@ -81,16 +83,16 @@ pub fn line(samples: &VecDeque<f64>, max_y: f64, colors: &SvgColors) -> String {
 
     let mut svg = String::with_capacity(LINE_LEN);
     svg.push_str(LINESVG_1);
-    svg.push_str(&colors.color1);
+    svg.push_str(&colors.background);
     svg.push_str(LINESVG_2);
-    svg.push_str(&colors.color2);
+    svg.push_str(&colors.frame);
     svg.push_str(LINESVG_3);
     svg.push_str(LINESVG_4);
-    svg.push_str(&colors.color4);
+    svg.push_str(&colors.graph1);
     svg.push_str(LINESVG_5);
     svg.push_str(&indexed_string);
     svg.push_str(LINESVG_6);
-    svg.push_str(&colors.color4);
+    svg.push_str(&colors.graph1);
     svg.push_str(LINESVG_7);
     svg.push_str(&indexed_string);
     svg.push_str(LINESVG_8);
@@ -147,29 +149,29 @@ pub fn double_line(
 
     let mut svg = String::with_capacity(DBLLINESVG_LEN);
     svg.push_str(DBLLINESVG_1);
-    svg.push_str(&colors.color1);
+    svg.push_str(&colors.background);
     svg.push_str(DBLLINESVG_2);
-    svg.push_str(&colors.color4);
+    svg.push_str(&colors.frame);
     svg.push_str(DBLLINESVG_3);
 
     //First graph and polygon
     svg.push_str(DBLLINESVG_4);
-    svg.push_str(&colors.color2);
+    svg.push_str(&colors.graph1);
     svg.push_str(DBLLINESVG_5);
     svg.push_str(&indexed_string);
     svg.push_str(DBLLINESVG_6);
-    svg.push_str(&colors.color2);
+    svg.push_str(&colors.graph1);
     svg.push_str(DBLLINESVG_7);
     svg.push_str(&indexed_string);
     svg.push_str(DBLLINESVG_8);
 
     //Second graph and polygon
     svg.push_str(DBLLINESVG_4);
-    svg.push_str(&colors.color3);
+    svg.push_str(&colors.graph2);
     svg.push_str(DBLLINESVG_5);
     svg.push_str(&indexed_string2);
     svg.push_str(DBLLINESVG_6);
-    svg.push_str(&colors.color3);
+    svg.push_str(&colors.graph2);
     svg.push_str(DBLLINESVG_7);
     svg.push_str(&indexed_string2);
     svg.push_str(DBLLINESVG_8);
@@ -208,18 +210,18 @@ pub fn line_adaptive(
 
     let mut svg = String::with_capacity(DBLLINESVG_LEN);
     svg.push_str(DBLLINESVG_1);
-    svg.push_str(&colors.color1);
+    svg.push_str(&colors.background);
     svg.push_str(DBLLINESVG_2);
-    svg.push_str(&colors.color4);
+    svg.push_str(&colors.frame);
     svg.push_str(DBLLINESVG_3);
 
     //First graph and polygon
     svg.push_str(DBLLINESVG_4);
-    svg.push_str(&colors.color2);
+    svg.push_str(&colors.graph1);
     svg.push_str(DBLLINESVG_5);
     svg.push_str(&indexed_string);
     svg.push_str(DBLLINESVG_6);
-    svg.push_str(&colors.color2);
+    svg.push_str(&colors.graph1);
     svg.push_str(DBLLINESVG_7);
     svg.push_str(&indexed_string);
     svg.push_str(DBLLINESVG_8);
@@ -250,13 +252,13 @@ pub fn heat(samples: &VecDeque<f64>, max_y: u64, colors: &SvgColors) -> String {
 
     let mut svg = String::with_capacity(LINE_LEN);
     svg.push_str(HEATSVG_1);
-    svg.push_str(&colors.color1);
+    svg.push_str(&colors.background);
     svg.push_str(HEATSVG_2);
-    svg.push_str(&colors.color2);
+    svg.push_str(&colors.frame);
     svg.push_str(HEATSVG_3);
     svg.push_str(&indexed_string);
     svg.push_str(HEATSVG_8);
-    svg.push_str(&colors.color2);
+    svg.push_str(&colors.frame);
     svg.push_str(HEATSVG_9);
 
     svg
