@@ -4,7 +4,7 @@ use sysinfo::{DiskRefreshKind, Disks as DisksInfo};
 
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, DisksConfig, ChartColors, ChartKind},
+    config::{ChartColors, ChartKind, ColorVariant, DeviceKind, DisksConfig},
     fl,
     svg_graph::SvgColors,
 };
@@ -119,6 +119,10 @@ impl DemoGraph for Disks {
 
     fn id(&self) -> Option<String> {
         None
+    }
+
+    fn kind(&self) -> ChartKind {
+        self.config.chart
     }
 }
 
@@ -297,14 +301,16 @@ impl Sensor for Disks {
         disk_bandwidth_items.push(
             settings::item(
                 fl!("enable-chart"),
-                widget::toggler(config.chart_visible()).on_toggle(move |t| Message::ToggleDisksChart(k, t)),
+                widget::toggler(config.chart_visible())
+                    .on_toggle(move |t| Message::ToggleDisksChart(k, t)),
             )
             .into(),
         );
         disk_bandwidth_items.push(
             settings::item(
                 fl!("enable-label"),
-                widget::toggler(config.label_visible()).on_toggle(move |t| Message::ToggleDisksLabel(k, t)),
+                widget::toggler(config.label_visible())
+                    .on_toggle(move |t| Message::ToggleDisksLabel(k, t)),
             )
             .into(),
         );

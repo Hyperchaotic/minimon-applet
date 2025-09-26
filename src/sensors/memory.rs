@@ -86,6 +86,10 @@ impl DemoGraph for Memory {
     fn id(&self) -> Option<String> {
         None
     }
+
+    fn kind(&self) -> ChartKind {
+        self.config.chart
+    }
 }
 
 impl Sensor for Memory {

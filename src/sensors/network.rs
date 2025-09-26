@@ -6,7 +6,7 @@ use sysinfo::Networks;
 
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, ChartColors, ChartKind, NetworkConfig, NetworkVariant},
+    config::{ChartColors, ChartKind, ColorVariant, DeviceKind, NetworkConfig, NetworkVariant},
     fl,
     svg_graph::SvgColors,
 };
@@ -122,6 +122,10 @@ impl DemoGraph for Network {
 
     fn id(&self) -> Option<String> {
         None
+    }
+
+    fn kind(&self) -> ChartKind {
+        self.config.chart
     }
 }
 
@@ -320,14 +324,16 @@ impl Sensor for Network {
         net_bandwidth_items.push(
             settings::item(
                 fl!("enable-chart"),
-                widget::toggler(config.chart_visible()).on_toggle(move |t| Message::ToggleNetChart(k, t)),
+                widget::toggler(config.chart_visible())
+                    .on_toggle(move |t| Message::ToggleNetChart(k, t)),
             )
             .into(),
         );
         net_bandwidth_items.push(
             settings::item(
                 fl!("enable-label"),
-                widget::toggler(config.label_visible()).on_toggle(move |t| Message::ToggleNetLabel(k, t)),
+                widget::toggler(config.label_visible())
+                    .on_toggle(move |t| Message::ToggleNetLabel(k, t)),
             )
             .into(),
         );

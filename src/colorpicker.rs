@@ -21,7 +21,7 @@ use cosmic::{
 use theme::iced::Slider;
 
 use crate::app::Message;
-use crate::config::{ColorVariant, DeviceKind, ChartColors};
+use crate::config::{ChartColors, ChartKind, ColorVariant, DeviceKind};
 use crate::fl;
 use log::info;
 
@@ -120,6 +120,7 @@ const ERROR: &str = "<svg width=\"800px\" height=\"800px\" viewBox=\"0 0 25 25\"
 
 pub trait DemoGraph {
     fn demo(&self) -> String;
+    fn kind(&self) -> ChartKind;
     fn colors(&self) -> &ChartColors;
     fn set_colors(&mut self, colors: &ChartColors);
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)>;
@@ -307,8 +308,8 @@ impl ColorPicker {
     }
 
     pub fn default_colors(&mut self) {
-        let colors = ChartColors::new(self.device);
         if let Some(dmo) = self.demo_chart.as_mut() {
+            let colors = ChartColors::new(self.device, dmo.kind());
             dmo.set_colors(&colors);
             self.update_color(colors.get_color(self.color_variant));
         } else {

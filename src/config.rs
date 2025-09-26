@@ -98,9 +98,18 @@ impl Default for ChartColors {
 }
 
 impl ChartColors {
-    pub fn new(kind: DeviceKind) -> Self {
-        match kind {
-            DeviceKind::Cpu => ChartColors::default(),
+    pub fn new(device: DeviceKind, chart: ChartKind) -> Self {
+        match device {
+            DeviceKind::Cpu => {
+                if chart == ChartKind::StackedBars {
+                    ChartColors {
+                        color3: Srgba::from_components((80, 80, 255, 255)),
+                        ..Default::default()
+                    }
+                } else {
+                    ChartColors::default()
+                }
+            }
             DeviceKind::CpuTemp => ChartColors::default(),
 
             DeviceKind::Memory => ChartColors {
@@ -165,21 +174,17 @@ pub struct Colors {
 }
 
 impl Colors {
-    pub fn new(kind: DeviceKind) -> Self {
-        let def = ChartColors::new(kind);
+    pub fn new(device: DeviceKind) -> Self {
         Colors {
-            ring: def,
-            line: def,
-            heat: def,
-            stackedbars: ChartColors {
-                color3: Srgba::from_components((80, 80, 255, 255)),
-                ..Default::default()
-            },
+            ring: ChartColors::new(device, ChartKind::Ring),
+            line: ChartColors::new(device, ChartKind::Line),
+            heat: ChartColors::new(device, ChartKind::Heat),
+            stackedbars: ChartColors::new(device, ChartKind::StackedBars),
         }
     }
 
-    pub fn get(&self, kind: ChartKind) -> &ChartColors {
-        match kind {
+    pub fn get(&self, chart: ChartKind) -> &ChartColors {
+        match chart {
             ChartKind::Ring => &self.ring,
             ChartKind::Line => &self.line,
             ChartKind::Heat => &self.heat,
@@ -187,8 +192,8 @@ impl Colors {
         }
     }
 
-    pub fn get_mut(&mut self, kind: ChartKind) -> &mut ChartColors {
-        match kind {
+    pub fn get_mut(&mut self, chart: ChartKind) -> &mut ChartColors {
+        match chart {
             ChartKind::Ring => &mut self.ring,
             ChartKind::Line => &mut self.line,
             ChartKind::Heat => &mut self.heat,
@@ -321,7 +326,7 @@ impl Default for NetworkConfig {
             chart: ChartKind::Line,
             colors: Colors::new(DeviceKind::Network(NetworkVariant::Combined)),
             adaptive: true,
-            bandwidth: 62_500_000, 
+            bandwidth: 62_500_000,
             unit: Some(0),
             variant: NetworkVariant::Combined,
             show_bytes: false,

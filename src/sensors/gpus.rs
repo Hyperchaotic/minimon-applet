@@ -20,7 +20,7 @@ use crate::app::Message;
 use crate::colorpicker::DemoGraph;
 use crate::config::DeviceKind;
 use crate::{
-    config::{ColorVariant, GpuTempConfig, GpuUsageConfig, GpuVramConfig, ChartColors, ChartKind},
+    config::{ChartColors, ChartKind, ColorVariant, GpuTempConfig, GpuUsageConfig, GpuVramConfig},
     fl,
     svg_graph::SvgColors,
 };
@@ -260,6 +260,10 @@ impl DemoGraph for GpuGraph {
 
     fn id(&self) -> Option<String> {
         Some(self.id.clone())
+    }
+
+    fn kind(&self) -> ChartKind {
+        self.config.chart
     }
 }
 
@@ -666,6 +670,10 @@ impl DemoGraph for TempGraph {
     fn id(&self) -> Option<String> {
         Some(self.id.clone())
     }
+
+    fn kind(&self) -> ChartKind {
+        self.config.chart
+    }
 }
 
 use std::fmt;
@@ -735,6 +743,10 @@ impl DemoGraph for VramGraph {
 
     fn id(&self) -> Option<String> {
         Some(self.id.clone())
+    }
+
+    fn kind(&self) -> ChartKind {
+        self.config.chart
     }
 }
 
