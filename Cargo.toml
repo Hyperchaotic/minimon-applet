@@ -15,11 +15,11 @@ debug = false
 
 [dependencies]
 systemd-journal-logger = "2.2"
-i18n-embed-fl = "0.8"
+i18n-embed-fl = "0.10"
 rust-embed = "8.3.0"
-sysinfo = "0.34"
+sysinfo = "0.37"
 serde = { version = "1.0.219", features = ["derive"] }
-nvml-wrapper = "0.10.0"
+nvml-wrapper = "0.11.0"
 log = "0.4.27"
 anyhow = { version = "1.0.97", features = ["backtrace"] }
 zbus = { version = "5.7.1" }
@@ -36,5 +36,5 @@ default-features = false
 features = ["applet", "applet-token"]
 
 [dependencies.i18n-embed]
-version = "0.14"
+version = "0.16"
 features = ["fluent-system", "desktop-requester"]

@@ -3,7 +3,7 @@ use sysinfo::{MemoryRefreshKind, System};
 
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, DeviceKind, ChartColors, ChartKind, MemoryConfig},
+    config::{ChartColors, ChartKind, ColorVariant, DeviceKind, MemoryConfig},
     fl,
     sensors::INVALID_IMG,
     svg_graph::SvgColors,
@@ -30,10 +30,32 @@ use super::Sensor;
 
 const MAX_SAMPLES: usize = 21;
 
+pub static COLOR_CHOICES_DBL_RING: std::sync::LazyLock<[(&'static str, ColorVariant); 5]> =
+    std::sync::LazyLock::new(|| {
+        [
+            (fl!("graph-memory-used").leak(), ColorVariant::Graph1),
+            (fl!("graph-memory-allocated").leak(), ColorVariant::Graph3),
+            (fl!("graph-ring-unused").leak(), ColorVariant::Graph2),
+            (fl!("graph-ring-back").leak(), ColorVariant::Background),
+            (fl!("graph-ring-text").leak(), ColorVariant::Text),
+        ]
+    });
+
+pub static COLOR_CHOICES_LINE_STACKED: std::sync::LazyLock<[(&'static str, ColorVariant); 4]> =
+    std::sync::LazyLock::new(|| {
+        [
+            (fl!("graph-memory-used").leak(), ColorVariant::Graph1),
+            (fl!("graph-memory-allocated").leak(), ColorVariant::Graph3),
+            (fl!("graph-line-back").leak(), ColorVariant::Background),
+            (fl!("graph-line-frame").leak(), ColorVariant::Frame),
+        ]
+    });
+
 #[derive(Debug)]
 pub struct Memory {
-    samples: BoundedVecDeque<f64>,
-    max_val: f64,
+    samples_used: BoundedVecDeque<f64>,
+    samples_allocated: BoundedVecDeque<f64>,
+    total_memory: f64,
     system: System,
     graph_options: Vec<&'static str>,
     /// colors cached so we don't need to convert to string every time
@@ -47,20 +69,41 @@ impl DemoGraph for Memory {
             ChartKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
-                let percentage = 40.0;
-                crate::svg_graph::ring(
-                    &format!("{val}"),
-                    &format!("{percentage}"),
-                    &self.svg_colors,
-                )
+                let percentage: u8 = 40;
+
+                if self.config.show_allocated {
+                    let percentage2: u8 = 80;
+                    crate::svg_graph::ring(
+                        &format!("{val}"),
+                        percentage,
+                        Some(percentage2),
+                        &self.svg_colors,
+                    )
+                } else {
+                    crate::svg_graph::ring(&format!("{val}"), percentage, None, &self.svg_colors)
+                }
             }
-            ChartKind::Line => crate::svg_graph::line(
-                &std::collections::VecDeque::from(DEMO_SAMPLES),
-                self.max_val,
-                &self.svg_colors,
-            ),
+            ChartKind::Line => {
+                if self.config.show_allocated {
+                    crate::svg_graph::line_stacked(
+                        &std::collections::VecDeque::from(DEMO_SAMPLES),
+                        &std::collections::VecDeque::from(DEMO_SAMPLES_ALLOCATED),
+                        38.0,
+                        &self.svg_colors,
+                    )
+                } else {
+                    crate::svg_graph::line(
+                        &std::collections::VecDeque::from(DEMO_SAMPLES),
+                        38.0,
+                        &self.svg_colors,
+                    )
+                }
+            }
             _ => {
-                log::error!("Graph type {:?} not supported for memory", self.config.chart);
+                log::error!(
+                    "Graph type {:?} not supported for memory",
+                    self.config.chart
+                );
                 INVALID_IMG.to_string()
             }
         }
@@ -72,12 +115,18 @@ impl DemoGraph for Memory {
 
     fn set_colors(&mut self, colors: &ChartColors) {
         *self.config.colors_mut() = *colors;
-        self.svg_colors.set_colors(&colors);
+        self.svg_colors.set_colors(colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
         if self.config.chart == ChartKind::Line {
-            (*super::COLOR_CHOICES_LINE).into()
+            if self.config.show_allocated {
+                (*COLOR_CHOICES_LINE_STACKED).into()
+            } else {
+                (*super::COLOR_CHOICES_LINE).into()
+            }
+        } else if self.config.show_allocated {
+            (*COLOR_CHOICES_DBL_RING).into()
         } else {
             (*super::COLOR_CHOICES_RING).into()
         }
@@ -96,7 +145,7 @@ impl Sensor for Memory {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<MemoryConfig>() {
             self.config = cfg.clone();
-            self.svg_colors.set_colors(&cfg.colors());
+            self.svg_colors.set_colors(cfg.colors());
         }
     }
 
@@ -113,8 +162,11 @@ impl Sensor for Memory {
         let r = MemoryRefreshKind::nothing().with_ram();
 
         self.system.refresh_memory_specifics(r);
-        let new_val: f64 = self.system.used_memory() as f64 / 1_073_741_824.0;
-        self.samples.push_back(new_val);
+        let new_val_used: f64 = self.system.used_memory() as f64 / 1_073_741_824.0;
+        let new_val_allocated: f64 =
+            self.total_memory - (self.system.free_memory() as f64 / 1_073_741_824.0);
+        self.samples_used.push_back(new_val_used);
+        self.samples_allocated.push_back(new_val_allocated);
     }
 
     fn demo_graph(&self) -> Box<dyn DemoGraph> {
@@ -131,14 +183,14 @@ impl Sensor for Memory {
             let mut latest = self.latest_sample();
             let mut text = String::with_capacity(10);
 
-            let mut pct: u64 = ((latest / self.max_val) * 100.0) as u64;
+            let mut pct: u64 = ((latest / self.total_memory) * 100.0) as u64;
             if pct > 100 {
                 pct = 100;
             }
 
             // If set, convert to percentage
             if self.config.percentage {
-                latest = (latest * 100.0) / self.max_val;
+                latest = (latest * 100.0) / self.total_memory;
             }
 
             if latest < 10.0 {
@@ -159,7 +211,7 @@ impl Sensor for Memory {
                 MAX_SAMPLES,
                 &self.samples,
                 &VecDeque::new(),
-                Some(self.max_val),
+                Some(self.total_memory),
                 &self.config.colors,
             ))
         }
@@ -174,18 +226,15 @@ impl Sensor for Memory {
         let svg = if self.config.chart == ChartKind::Ring {
             let mut latest = self.latest_sample();
             let mut value = String::with_capacity(10);
-            let mut percentage = String::with_capacity(10);
 
-            let mut pct: u64 = ((latest / self.max_val) * 100.0) as u64;
+            let mut pct: u64 = ((latest / self.total_memory) * 100.0) as u64;
             if pct > 100 {
                 pct = 100;
             }
 
-            percentage.push_str(&pct.to_string());
-
             // If set, convert to percentage
             if self.config.percentage {
-                latest = (latest * 100.0) / self.max_val;
+                latest = (latest * 100.0) / self.total_memory;
             }
 
             if latest < 10.0 {
@@ -196,9 +245,30 @@ impl Sensor for Memory {
                 let _ = write!(value, "100");
             }
 
-            crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
+            if self.config.show_allocated {
+                let mut pct_allocated: u64 =
+                    ((self.latest_sample_allocated() / self.total_memory) * 100.0) as u64;
+                if pct_allocated > 100 {
+                    pct_allocated = 100;
+                }
+                crate::svg_graph::ring(
+                    &value,
+                    pct as u8,
+                    Some(pct_allocated as u8),
+                    &self.svg_colors,
+                )
+            } else {
+                crate::svg_graph::ring(&value, pct as u8, None, &self.svg_colors)
+            }
+        } else if self.config.show_allocated {
+            crate::svg_graph::line_stacked(
+                &self.samples_used,
+                &self.samples_allocated,
+                self.total_memory,
+                &self.svg_colors,
+            )
         } else {
-            crate::svg_graph::line(&self.samples, self.max_val, &self.svg_colors)
+            crate::svg_graph::line(&self.samples_used, self.total_memory, &self.svg_colors)
         };
 
         let icon = cosmic::widget::icon::from_svg_bytes(svg.into_bytes());
@@ -213,16 +283,30 @@ impl Sensor for Memory {
         let theme = cosmic::theme::active();
         let cosmic = theme.cosmic();
 
-        let mut mem_elements = Vec::new();
         let mem = self.to_string(false);
+
+        let mut text = column!(
+            cosmic::widget::text::body(mem)
+                .width(90)
+                .align_x(Alignment::Center)
+        );
+
+        if self.config.show_allocated {
+            let allocated = format!("{:.1} GB", self.latest_sample_allocated());
+            text = text.push(
+                cosmic::widget::text::body(allocated)
+                    .width(90)
+                    .align_x(Alignment::Center),
+            );
+        }
+
+        let mut mem_elements = Vec::new();
         mem_elements.push(Element::from(
             column!(
                 Container::new(self.chart(60, 60).width(60).height(60))
                     .width(90)
                     .align_x(Alignment::Center),
-                cosmic::widget::text::body(mem.to_string())
-                    .width(90)
-                    .align_x(Alignment::Center)
+                text
             )
             .padding(5)
             .align_x(Alignment::Center),
@@ -235,11 +319,17 @@ impl Sensor for Memory {
             column!(
                 settings::item(
                     fl!("enable-chart"),
-                    toggler(config.chart_visible()).on_toggle(|value| { Message::ToggleMemoryChart(value) }),
+                    toggler(config.chart_visible())
+                        .on_toggle(|value| { Message::ToggleMemoryChart(value) }),
+                ),
+                settings::item(
+                    fl!("memory-show-allocated"),
+                    toggler(config.show_allocated).on_toggle(Message::ToggleMemoryAllocated),
                 ),
                 settings::item(
                     fl!("enable-label"),
-                    toggler(config.label_visible()).on_toggle(|value| { Message::ToggleMemoryLabel(value) }),
+                    toggler(config.label_visible())
+                        .on_toggle(|value| { Message::ToggleMemoryLabel(value) }),
                 ),
                 settings::item(
                     fl!("memory-as-percentage"),
@@ -272,11 +362,11 @@ impl Default for Memory {
         let mut system = System::new();
         system.refresh_memory();
 
-        let max_val: f64 = system.total_memory() as f64 / 1_073_741_824.0;
+        let total_memory: f64 = system.total_memory() as f64 / 1_073_741_824.0;
         log::info!(
             "System memory: {} / {:.2} GB",
             system.total_memory(),
-            max_val
+            total_memory
         );
 
         // value and percentage are pre-allocated and reused as they're changed often.
@@ -287,11 +377,15 @@ impl Default for Memory {
         value.push('0');
 
         let mut memory = Memory {
-            samples: BoundedVecDeque::from_iter(
-                std::iter::repeat(0.0).take(MAX_SAMPLES),
+            samples_used: BoundedVecDeque::from_iter(
+                std::iter::repeat_n(0.0, MAX_SAMPLES),
                 MAX_SAMPLES,
             ),
-            max_val,
+            samples_allocated: BoundedVecDeque::from_iter(
+                std::iter::repeat_n(0.0, MAX_SAMPLES),
+                MAX_SAMPLES,
+            ),
+            total_memory,
             system,
             config: MemoryConfig::default(),
             graph_options: super::GRAPH_OPTIONS_RING_LINE.to_vec(),
@@ -303,16 +397,16 @@ impl Default for Memory {
 }
 
 impl Memory {
-    pub fn set_percentage(&mut self, percentage: bool) {
-        self.config.percentage = percentage;
+    pub fn latest_sample(&self) -> f64 {
+        *self.samples_used.back().unwrap_or(&0f64)
     }
 
-    pub fn latest_sample(&self) -> f64 {
-        *self.samples.back().unwrap_or(&0f64)
+    pub fn latest_sample_allocated(&self) -> f64 {
+        *self.samples_allocated.back().unwrap_or(&0f64)
     }
 
     pub fn total(&self) -> f64 {
-        self.max_val
+        self.total_memory
     }
 
     pub fn to_string(&self, vertical_panel: bool) -> String {
@@ -320,7 +414,7 @@ impl Memory {
         let unit: &str;
 
         if self.config.percentage {
-            current_val = (current_val * 100.0) / self.max_val;
+            current_val = (current_val * 100.0) / self.total_memory;
             unit = "%";
         } else if !vertical_panel {
             unit = " GB";
@@ -339,25 +433,11 @@ impl Memory {
 }
 
 const DEMO_SAMPLES: [f64; 21] = [
-    0.0,
-    12.689857482910156,
-    12.642768859863281,
-    12.615306854248047,
-    12.658184051513672,
-    12.65273666381836,
-    12.626102447509766,
-    12.624862670898438,
-    12.613967895507813,
-    12.619949340820313,
-    19.061111450195313,
-    21.691085815429688,
-    21.810935974121094,
-    21.28915786743164,
-    22.041973114013672,
-    21.764171600341797,
-    21.89263916015625,
-    15.258216857910156,
-    14.770732879638672,
-    14.496528625488281,
-    13.892818450927734,
+    0.00, 12.69, 12.64, 12.62, 12.66, 12.65, 12.63, 12.62, 12.61, 12.62, 19.06, 21.69, 21.81,
+    21.29, 22.04, 21.76, 21.89, 15.26, 14.77, 14.50, 13.89,
+];
+
+const DEMO_SAMPLES_ALLOCATED: [f64; 21] = [
+    15.27, 27.33, 27.29, 27.26, 27.29, 27.25, 27.26, 27.21, 27.20, 27.18, 29.90, 31.67, 31.72,
+    31.20, 31.99, 31.69, 31.77, 26.15, 25.65, 25.42, 24.85,
 ];

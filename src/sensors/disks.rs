@@ -106,7 +106,7 @@ impl DemoGraph for Disks {
 
     fn set_colors(&mut self, colors: &ChartColors) {
         *self.config.colors_mut() = *colors;
-        self.svg_colors.set_colors(&colors);
+        self.svg_colors.set_colors(colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
@@ -130,7 +130,7 @@ impl Sensor for Disks {
     fn update_config(&mut self, config: &dyn Any, refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<DisksConfig>() {
             self.config = cfg.clone();
-            self.svg_colors.set_colors(&cfg.colors());
+            self.svg_colors.set_colors(cfg.colors());
             self.refresh_rate = refresh_rate;
         }
     }
@@ -353,8 +353,8 @@ impl Default for Disks {
         let disks = DisksInfo::new_with_refreshed_list();
         Disks {
             disks,
-            write: BoundedVecDeque::from_iter(std::iter::repeat(0).take(MAX_SAMPLES), MAX_SAMPLES),
-            read: BoundedVecDeque::from_iter(std::iter::repeat(0).take(MAX_SAMPLES), MAX_SAMPLES),
+            write: BoundedVecDeque::from_iter(std::iter::repeat_n(0, MAX_SAMPLES), MAX_SAMPLES),
+            read: BoundedVecDeque::from_iter(std::iter::repeat_n(0, MAX_SAMPLES), MAX_SAMPLES),
             max_y: None,
             svg_colors: SvgColors::new(&ChartColors::default()),
             config: DisksConfig::default(),

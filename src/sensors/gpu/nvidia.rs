@@ -31,13 +31,12 @@ impl NvidiaGpu<'_> {
         let mut device = None;
         let mut vram = 0;
 
-        if let Ok(nvml) = NVML.as_ref() {
-            if let Ok(dev) = nvml.device_by_index(index) {
-                if let Ok(mem) = dev.memory_info() {
-                    vram = mem.total;
-                    device = Some(dev);
-                }
-            }
+        if let Ok(nvml) = NVML.as_ref()
+            && let Ok(dev) = nvml.device_by_index(index)
+            && let Ok(mem) = dev.memory_info()
+        {
+            vram = mem.total;
+            device = Some(dev);
         }
 
         NvidiaGpu {
@@ -52,12 +51,11 @@ impl NvidiaGpu<'_> {
 
 impl super::GpuIf for NvidiaGpu<'_> {
     fn restart(&mut self) {
-        if self.device.is_none() {
-            if let Ok(nvml) = NVML.as_ref() {
-                if let Ok(dev) = nvml.device_by_index(self.index) {
-                    self.device = Some(dev);
-                }
-            }
+        if self.device.is_none()
+            && let Ok(nvml) = NVML.as_ref()
+            && let Ok(dev) = nvml.device_by_index(self.index)
+        {
+            self.device = Some(dev);
         }
     }
 

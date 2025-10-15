@@ -1,7 +1,7 @@
 use crate::{
     barchart::StackedBarSvg,
     colorpicker::DemoGraph,
-    config::{ColorVariant, CpuConfig, DeviceKind, ChartColors, ChartKind},
+    config::{ChartColors, ChartKind, ColorVariant, CpuConfig, DeviceKind},
     fl,
     sensors::INVALID_IMG,
     svg_graph::SvgColors,
@@ -36,6 +36,23 @@ use std::{
 use super::Sensor;
 
 const MAX_SAMPLES: usize = 21;
+
+pub static COLOR_CHOICES_RING: LazyLock<[(&'static str, ColorVariant); 4]> = LazyLock::new(|| {
+    [
+        (fl!("graph-cpu-load").leak(), ColorVariant::Graph1),
+        (fl!("graph-cpu-idle").leak(), ColorVariant::Graph2),
+        (fl!("graph-ring-back").leak(), ColorVariant::Background),
+        (fl!("graph-ring-text").leak(), ColorVariant::Text),
+    ]
+});
+
+pub static COLOR_CHOICES_LINE: LazyLock<[(&'static str, ColorVariant); 3]> = LazyLock::new(|| {
+    [
+        (fl!("graph-cpu-load").leak(), ColorVariant::Graph1),
+        (fl!("graph-line-back").leak(), ColorVariant::Background),
+        (fl!("graph-line-frame").leak(), ColorVariant::Frame),
+    ]
+});
 
 static GRAPH_OPTIONS_RING_LINE_BARS: LazyLock<[&'static str; 3]> = LazyLock::new(|| {
     [
@@ -98,12 +115,8 @@ impl DemoGraph for Cpu {
             ChartKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
-                let percentage: u64 = 40;
-                crate::svg_graph::ring(
-                    &format!("{val}"),
-                    &format!("{percentage}"),
-                    &self.svg_colors,
-                )
+                let percentage: u8 = 40;
+                crate::svg_graph::ring(&format!("{val}"), percentage, None, &self.svg_colors)
             }
             ChartKind::Line => crate::svg_graph::line(
                 &std::collections::VecDeque::from(DEMO_SAMPLES),
@@ -155,15 +168,18 @@ impl DemoGraph for Cpu {
 
     fn set_colors(&mut self, colors: &ChartColors) {
         *self.config.colors_mut() = *colors;
-        self.svg_colors.set_colors(&colors);
+        self.svg_colors.set_colors(colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
         match self.config.chart {
-            ChartKind::Line => (*super::COLOR_CHOICES_LINE).into(),
-            ChartKind::Ring => (*super::COLOR_CHOICES_RING).into(),
+            ChartKind::Line => (*COLOR_CHOICES_LINE).into(),
+            ChartKind::Ring => (*COLOR_CHOICES_RING).into(),
             ChartKind::StackedBars => (*COLOR_CHOICES_BARS).into(),
-            _ => panic!("CPU color_choices {:?} wrong chart type!", self.config.chart),
+            _ => panic!(
+                "CPU color_choices {:?} wrong chart type!",
+                self.config.chart
+            ),
         }
     }
 
@@ -249,7 +265,6 @@ impl Sensor for Cpu {
             ChartKind::Ring => {
                 let latest = self.latest_sample();
                 let mut value = String::with_capacity(10);
-                let mut percentage = String::with_capacity(10);
 
                 if self.config.no_decimals {
                     let _ = write!(value, "{}%", latest.round());
@@ -261,9 +276,9 @@ impl Sensor for Cpu {
                     let _ = write!(value, "100");
                 }
 
-                percentage.push_str(&latest.to_string());
+                let percentage: u8 = latest.round().clamp(0.0, 100.0) as u8;
 
-                crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
+                crate::svg_graph::ring(&value, percentage, None, &self.svg_colors)
             }
             ChartKind::Line => crate::svg_graph::line(&self.samples_sum, 100.0, &self.svg_colors),
             ChartKind::StackedBars => {
@@ -443,18 +458,20 @@ impl Cpu {
                 system_pct: 0.,
             },
             core_loads,
-            current_core_stats: HashMap::from(core_stats.clone()),
+            current_core_stats: core_stats.clone(),
             prev_core_stats: core_stats,
             samples_sum: BoundedVecDeque::from_iter(
-                std::iter::repeat(0.0).take(MAX_SAMPLES),
+                std::iter::repeat_n(0.0, MAX_SAMPLES),
                 MAX_SAMPLES,
             ),
             samples_split: BoundedVecDeque::from_iter(
-                std::iter::repeat(CpuLoad {
-                    user_pct: 0.,
-                    system_pct: 0.,
-                })
-                .take(MAX_SAMPLES),
+                std::iter::repeat_n(
+                    CpuLoad {
+                        user_pct: 0.,
+                        system_pct: 0.,
+                    },
+                    MAX_SAMPLES,
+                ),
                 MAX_SAMPLES,
             ),
             graph_options: graph_opts.to_vec(),

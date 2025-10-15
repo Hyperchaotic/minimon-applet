@@ -133,7 +133,7 @@ impl Sensor for Network {
     fn update_config(&mut self, config: &dyn Any, refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<NetworkConfig>() {
             self.config = cfg.clone();
-            self.svg_colors.set_colors(&cfg.colors());
+            self.svg_colors.set_colors(cfg.colors());
             self.refresh_rate = refresh_rate;
 
             if self.config.show_bytes {
@@ -408,11 +408,8 @@ impl Default for Network {
         let networks = Networks::new_with_refreshed_list();
         Network {
             networks,
-            download: BoundedVecDeque::from_iter(
-                std::iter::repeat(0).take(MAX_SAMPLES),
-                MAX_SAMPLES,
-            ),
-            upload: BoundedVecDeque::from_iter(std::iter::repeat(0).take(MAX_SAMPLES), MAX_SAMPLES),
+            download: BoundedVecDeque::from_iter(std::iter::repeat_n(0, MAX_SAMPLES), MAX_SAMPLES),
+            upload: BoundedVecDeque::from_iter(std::iter::repeat_n(0, MAX_SAMPLES), MAX_SAMPLES),
             max_y: None,
             dropdown_options: ["b", "Kb", "Mb", "Gb", "Tb"].into(),
             svg_colors: SvgColors::new(&ChartColors::default()),

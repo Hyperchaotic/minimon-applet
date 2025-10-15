@@ -15,6 +15,7 @@ pub enum ColorVariant {
     Text,
     Graph1,
     Graph2,
+    Graph3,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -86,16 +87,24 @@ pub struct ChartColors {
     pub text: Srgba<u8>,
     pub graph1: Srgba<u8>,
     pub graph2: Srgba<u8>,
+    pub graph3: Srgba<u8>,
+}
+
+macro_rules! rgba {
+    ($r:expr, $g:expr, $b:expr, $a:expr) => {
+        Srgba::from_components(($r as u8, $g as u8, $b as u8, $a as u8))
+    };
 }
 
 impl Default for ChartColors {
     fn default() -> Self {
         Self {
-            background: Srgba::from_components((0x2b, 0x2b, 0x2b, 0xff)),
-            frame: Srgba::from_components((255, 255, 255, 255)),
-            text: Srgba::from_components((255, 255, 255, 255)),
-            graph1: Srgba::from_components((255, 6, 0, 255)),
-            graph2: Srgba::from_components((85, 85, 85, 255)),
+            background: rgba!(0x2b, 0x2b, 0x2b, 0xff),
+            frame: rgba!(255, 255, 255, 255),
+            text: rgba!(255, 255, 255, 255),
+            graph1: rgba!(255, 6, 0, 255),
+            graph2: rgba!(85, 85, 85, 255),
+            graph3: rgba!(255, 165, 0, 255),
         }
     }
 }
@@ -103,45 +112,92 @@ impl Default for ChartColors {
 impl ChartColors {
     pub fn new(device: DeviceKind, chart: ChartKind) -> Self {
         match device {
-            DeviceKind::Cpu => {
-                if chart == ChartKind::StackedBars {
-                    ChartColors {
-                        graph1: Srgba::from_components((80, 80, 255, 255)),
-                        graph2: Srgba::from_components((255, 6, 0, 255)),
-                        ..Default::default()
-                    }
-                } else {
-                    ChartColors::default()
-                }
-            }
-            DeviceKind::CpuTemp => ChartColors::default(),
+            DeviceKind::Cpu => match chart {
+                ChartKind::Ring => ChartColors {
+                    graph1: rgba!(255, 6, 0, 255),
+                    ..Default::default()
+                },
+                ChartKind::Line => ChartColors {
+                    graph1: rgba!(255, 6, 0, 85),
+                    ..Default::default()
+                },
+                ChartKind::StackedBars => ChartColors {
+                    graph1: rgba!(80, 80, 255, 255),
+                    graph2: rgba!(255, 0, 0, 255),
+                    ..Default::default()
+                },
+                ChartKind::Heat => ChartColors::default(),
+            },
 
-            DeviceKind::Memory => ChartColors {
-                graph1: Srgba::from_components((187, 41, 187, 255)),
-                ..Default::default()
+            DeviceKind::CpuTemp => match chart {
+                ChartKind::Ring => ChartColors {
+                    graph1: rgba!(255, 6, 0, 255),
+                    ..Default::default()
+                },
+                ChartKind::Line => ChartColors {
+                    graph1: rgba!(255, 90, 0, 85),
+                    ..Default::default()
+                },
+                _ => ChartColors::default(),
+            },
+
+            DeviceKind::Memory => match chart {
+                ChartKind::Ring => ChartColors {
+                    graph1: rgba!(29, 172, 214, 255),
+                    graph3: rgba!(44, 87, 101, 255),
+                    ..Default::default()
+                },
+                ChartKind::Line => ChartColors {
+                    graph1: rgba!(29, 172, 214, 140),
+                    graph3: rgba!(44, 87, 101, 140),
+                    ..Default::default()
+                },
+                _ => ChartColors::default(),
             },
 
             DeviceKind::Network(_) => ChartColors {
-                graph1: Srgba::from_components((47, 141, 255, 255)),
-                graph2: Srgba::from_components((0, 255, 0, 255)),
+                graph1: rgba!(47, 141, 255, 85),
+                graph2: rgba!(0, 255, 0, 85),
                 ..Default::default()
             },
 
             DeviceKind::Disks(_) => ChartColors {
-                graph1: Srgba::from_components((255, 102, 0, 255)),
-                graph2: Srgba::from_components((255, 255, 0, 255)),
+                graph1: rgba!(255, 102, 0, 85),
+                graph2: rgba!(255, 255, 0, 85),
                 ..Default::default()
             },
-            DeviceKind::Gpu => ChartColors {
-                graph1: Srgba::from_components((0, 255, 0, 255)),
-                ..Default::default()
+            DeviceKind::Gpu => match chart {
+                ChartKind::Ring => ChartColors {
+                    graph1: rgba!(0, 255, 0, 255),
+                    ..Default::default()
+                },
+                ChartKind::Line => ChartColors {
+                    graph1: rgba!(0, 255, 0, 85),
+                    ..Default::default()
+                },
+                _ => ChartColors::default(),
             },
-            DeviceKind::Vram => ChartColors {
-                graph1: Srgba::from_components((0, 255, 0, 255)),
-                ..Default::default()
+            DeviceKind::Vram => match chart {
+                ChartKind::Ring => ChartColors {
+                    graph1: rgba!(0, 255, 0, 255),
+                    ..Default::default()
+                },
+                ChartKind::Line => ChartColors {
+                    graph1: rgba!(0, 255, 0, 85),
+                    ..Default::default()
+                },
+                _ => ChartColors::default(),
             },
-            DeviceKind::GpuTemp => ChartColors {
-                ..Default::default()
+            DeviceKind::GpuTemp => match chart {
+                ChartKind::Ring => ChartColors {
+                    graph1: rgba!(255, 6, 0, 255),
+                    ..Default::default()
+                },
+                ChartKind::Line => ChartColors {
+                    graph1: rgba!(255, 6, 0, 85),
+                    ..Default::default()
+                },
+                _ => ChartColors::default(),
             },
         }
     }
@@ -153,6 +209,7 @@ impl ChartColors {
             ColorVariant::Text => self.text = srgb,
             ColorVariant::Graph1 => self.graph1 = srgb,
             ColorVariant::Graph2 => self.graph2 = srgb,
+            ColorVariant::Graph3 => self.graph3 = srgb,
         }
     }
 
@@ -163,11 +220,12 @@ impl ChartColors {
             ColorVariant::Text => self.text,
             ColorVariant::Graph1 => self.graph1,
             ColorVariant::Graph2 => self.graph2,
+            ColorVariant::Graph3 => self.graph3,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, CosmicConfigEntry, PartialEq, Eq)]
 #[version = 1]
 pub struct Colors {
     ring: ChartColors,
@@ -201,17 +259,6 @@ impl Colors {
             ChartKind::Line => &mut self.line,
             ChartKind::Heat => &mut self.heat,
             ChartKind::StackedBars => &mut self.stackedbars,
-        }
-    }
-}
-
-impl Default for Colors {
-    fn default() -> Self {
-        Self {
-            ring: Default::default(),
-            line: Default::default(),
-            heat: Default::default(),
-            stackedbars: Default::default(),
         }
     }
 }
@@ -292,6 +339,7 @@ impl Default for CpuTempConfig {
 
 make_config!(MemoryConfig {
     pub percentage: bool,
+    pub show_allocated: bool,
 });
 
 impl Default for MemoryConfig {
@@ -302,6 +350,7 @@ impl Default for MemoryConfig {
             chart: ChartKind::Ring,
             colors: Colors::new(DeviceKind::Memory),
             percentage: false,
+            show_allocated: false,
         }
     }
 }

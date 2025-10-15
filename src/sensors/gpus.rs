@@ -62,10 +62,7 @@ impl GpuGraph {
 
         GpuGraph {
             id: id.to_owned(),
-            samples: BoundedVecDeque::from_iter(
-                std::iter::repeat(0.0).take(MAX_SAMPLES),
-                MAX_SAMPLES,
-            ),
+            samples: BoundedVecDeque::from_iter(std::iter::repeat_n(0.0, MAX_SAMPLES), MAX_SAMPLES),
             graph_options: super::GRAPH_OPTIONS_RING_LINE.to_vec(),
             svg_colors: SvgColors::new(&ChartColors::default()),
             disabled: false,
@@ -75,6 +72,7 @@ impl GpuGraph {
                 text: String::from("#727272FF"),
                 graph1: String::from("#727272FF"),
                 graph2: String::from("#727272FF"),
+                graph3: String::from("#727272FF"),
             },
             config: GpuUsageConfig::default(),
         }
@@ -83,7 +81,7 @@ impl GpuGraph {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<GpuUsageConfig>() {
             self.config = cfg.clone();
-            self.svg_colors = SvgColors::new(&cfg.colors());
+            self.svg_colors = SvgColors::new(cfg.colors());
         }
     }
 
@@ -138,10 +136,9 @@ impl GpuGraph {
         let svg = if self.config.chart == ChartKind::Ring {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
-            let mut percentage = String::with_capacity(10);
+            let mut percentage: u8 = 0;
 
             if self.disabled {
-                percentage.push('0');
                 value.push('-');
             } else {
                 if latest < 10.0 {
@@ -151,12 +148,13 @@ impl GpuGraph {
                 } else {
                     let _ = write!(value, "{latest}");
                 }
-                percentage.push_str(&latest.to_string());
+                percentage = latest.round().clamp(0.0, 100.0) as u8;
             }
 
             crate::svg_graph::ring(
                 &value,
-                &percentage,
+                percentage,
+                None,
                 if self.disabled {
                     &self.disabled_colors
                 } else {
@@ -223,12 +221,8 @@ impl DemoGraph for GpuGraph {
             ChartKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
-                let percentage = 40.0;
-                crate::svg_graph::ring(
-                    &format!("{val}"),
-                    &format!("{percentage}"),
-                    &self.svg_colors,
-                )
+                let percentage: u8 = 40;
+                crate::svg_graph::ring(&format!("{val}"), percentage, None, &self.svg_colors)
             }
             ChartKind::Line => crate::svg_graph::line(
                 &std::collections::VecDeque::from(DEMO_SAMPLES),
@@ -248,7 +242,7 @@ impl DemoGraph for GpuGraph {
 
     fn set_colors(&mut self, colors: &ChartColors) {
         *self.config.colors_mut() = *colors;
-        self.svg_colors.set_colors(&colors);
+        self.svg_colors.set_colors(colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
@@ -284,10 +278,7 @@ impl VramGraph {
     fn new(id: &str, total: f64) -> Self {
         VramGraph {
             id: id.to_owned(),
-            samples: BoundedVecDeque::from_iter(
-                std::iter::repeat(0.0).take(MAX_SAMPLES),
-                MAX_SAMPLES,
-            ),
+            samples: BoundedVecDeque::from_iter(std::iter::repeat_n(0.0, MAX_SAMPLES), MAX_SAMPLES),
             graph_options: super::GRAPH_OPTIONS_RING_LINE.to_vec(),
             total,
             svg_colors: SvgColors::new(&ChartColors::default()),
@@ -298,6 +289,7 @@ impl VramGraph {
                 text: String::from("#727272FF"),
                 graph1: String::from("#727272FF"),
                 graph2: String::from("#727272FF"),
+                graph3: String::from("#727272FF"),
             },
             config: GpuVramConfig::default(),
         }
@@ -306,7 +298,7 @@ impl VramGraph {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<GpuVramConfig>() {
             self.config = cfg.clone();
-            self.svg_colors = SvgColors::new(&cfg.colors());
+            self.svg_colors = SvgColors::new(cfg.colors());
         }
     }
 
@@ -365,16 +357,11 @@ impl VramGraph {
         let svg = if self.config.chart == ChartKind::Ring {
             let latest = self.latest_sample();
             let mut value = String::with_capacity(10);
-            let mut percentage = String::with_capacity(10);
+            let mut percentage: u8 = 0;
 
             if self.disabled {
-                percentage.push('0');
                 value.push('-');
             } else {
-                let pct: u64 = ((latest / self.total) * 100.0) as u64;
-
-                percentage.push_str(&pct.to_string());
-
                 if latest < 10.0 {
                     let _ = write!(value, "{:.2}", (latest * 100.0).trunc() / 100.0);
                 } else if latest < 100.0 {
@@ -382,10 +369,12 @@ impl VramGraph {
                 } else {
                     let _ = write!(value, "{}", latest.round());
                 }
+                percentage = ((latest / self.total) * 100.0).round().clamp(0.0, 100.0) as u8;
             }
             crate::svg_graph::ring(
                 &value,
-                &percentage,
+                percentage,
+                None,
                 if self.disabled {
                     &self.disabled_colors
                 } else {
@@ -465,10 +454,7 @@ impl TempGraph {
     fn new(id: &str) -> Self {
         TempGraph {
             id: id.to_owned(),
-            samples: BoundedVecDeque::from_iter(
-                std::iter::repeat(0.0).take(MAX_SAMPLES),
-                MAX_SAMPLES,
-            ),
+            samples: BoundedVecDeque::from_iter(std::iter::repeat_n(0.0, MAX_SAMPLES), MAX_SAMPLES),
             unit_options: super::UNIT_OPTIONS.to_vec(),
             graph_options: super::GRAPH_OPTIONS_RING_LINE_HEAT.to_vec(),
             max_temp: 100.0,
@@ -480,6 +466,7 @@ impl TempGraph {
                 text: String::from("#727272FF"),
                 graph1: String::from("#727272FF"),
                 graph2: String::from("#727272FF"),
+                graph3: String::from("#727272FF"),
             },
             config: GpuTempConfig::default(),
         }
@@ -488,7 +475,7 @@ impl TempGraph {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<GpuTempConfig>() {
             self.config = cfg.clone();
-            self.svg_colors = SvgColors::new(&cfg.colors());
+            self.svg_colors = SvgColors::new(cfg.colors());
         }
     }
 
@@ -564,13 +551,12 @@ impl TempGraph {
                 if value.len() > 3 {
                     let _ = value.pop();
                 }
-                let mut percentage = String::with_capacity(10);
-
-                percentage.push_str(&latest.to_string());
+                let percentage: u8 = latest.round().clamp(0.0, 100.0) as u8;
 
                 crate::svg_graph::ring(
                     &value,
-                    &percentage,
+                    percentage,
+                    None,
                     if self.disabled {
                         &self.disabled_colors
                     } else {
@@ -628,12 +614,8 @@ impl DemoGraph for TempGraph {
             ChartKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
-                let percentage: u64 = 40;
-                crate::svg_graph::ring(
-                    &format!("{val}"),
-                    &format!("{percentage}"),
-                    &self.svg_colors,
-                )
+                let percentage: u8 = 40;
+                crate::svg_graph::ring(&format!("{val}"), percentage, None, &self.svg_colors)
             }
             ChartKind::Line => crate::svg_graph::line(
                 &std::collections::VecDeque::from(DEMO_SAMPLES),
@@ -658,7 +640,7 @@ impl DemoGraph for TempGraph {
 
     fn set_colors(&mut self, colors: &ChartColors) {
         *self.config.colors_mut() = *colors;
-        self.svg_colors.set_colors(&colors);
+        self.svg_colors.set_colors(colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
@@ -708,12 +690,8 @@ impl DemoGraph for VramGraph {
             ChartKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
-                let percentage = 40.0;
-                crate::svg_graph::ring(
-                    &format!("{val}"),
-                    &format!("{percentage}"),
-                    &self.svg_colors,
-                )
+                let percentage: u8 = 40;
+                crate::svg_graph::ring(&format!("{val}"), percentage, None, &self.svg_colors)
             }
             ChartKind::Line => crate::svg_graph::line(
                 &std::collections::VecDeque::from(DEMO_SAMPLES),

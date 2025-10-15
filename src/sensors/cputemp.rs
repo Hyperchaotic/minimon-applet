@@ -1,6 +1,6 @@
 use crate::{
     colorpicker::DemoGraph,
-    config::{ColorVariant, CpuTempConfig, DeviceKind, ChartColors, ChartKind},
+    config::{ChartColors, ChartKind, ColorVariant, CpuTempConfig, DeviceKind},
     fl,
     sensors::INVALID_IMG,
     svg_graph::SvgColors,
@@ -154,12 +154,8 @@ impl DemoGraph for CpuTemp {
             ChartKind::Ring => {
                 // show a number of 40% of max
                 let val = 40;
-                let percentage: u64 = 40;
-                crate::svg_graph::ring(
-                    &format!("{val}"),
-                    &format!("{percentage}"),
-                    &self.svg_colors,
-                )
+                let percentage: u8 = 40;
+                crate::svg_graph::ring(&format!("{val}"), percentage, None, &self.svg_colors)
             }
             ChartKind::Line => crate::svg_graph::line(
                 &std::collections::VecDeque::from(DEMO_SAMPLES),
@@ -184,7 +180,7 @@ impl DemoGraph for CpuTemp {
 
     fn set_colors(&mut self, colors: &ChartColors) {
         *self.config.colors_mut() = *colors;
-        self.svg_colors.set_colors(&colors);
+        self.svg_colors.set_colors(colors);
     }
 
     fn color_choices(&self) -> Vec<(&'static str, ColorVariant)> {
@@ -209,7 +205,7 @@ impl Sensor for CpuTemp {
     fn update_config(&mut self, config: &dyn Any, _refresh_rate: u32) {
         if let Some(cfg) = config.downcast_ref::<CpuTempConfig>() {
             self.config = cfg.clone();
-            self.svg_colors.set_colors(&cfg.colors());
+            self.svg_colors.set_colors(cfg.colors());
         }
     }
 
@@ -297,10 +293,10 @@ impl Sensor for CpuTemp {
                 if value.len() > 3 {
                     let _ = value.pop();
                 }
-                let mut percentage = String::with_capacity(10);
-                percentage.push_str(&latest.to_string());
 
-                crate::svg_graph::ring(&value, &percentage, &self.svg_colors)
+                let percentage: u8 = latest.round().clamp(0.0, 100.0) as u8;
+
+                crate::svg_graph::ring(&value, percentage, None, &self.svg_colors)
             }
             ChartKind::Line => crate::svg_graph::line(&self.samples, max, &self.svg_colors),
             ChartKind::Heat => crate::svg_graph::heat(&self.samples, max as u64, &self.svg_colors),
@@ -348,11 +344,13 @@ impl Sensor for CpuTemp {
             column!(
                 settings::item(
                     fl!("enable-chart"),
-                    toggler(config.chart_visible()).on_toggle(|value| { Message::ToggleCpuTempChart(value) }),
+                    toggler(config.chart_visible())
+                        .on_toggle(|value| { Message::ToggleCpuTempChart(value) }),
                 ),
                 settings::item(
                     fl!("enable-label"),
-                    toggler(config.label_visible()).on_toggle(|value| { Message::ToggleCpuTempLabel(value) }),
+                    toggler(config.label_visible())
+                        .on_toggle(|value| { Message::ToggleCpuTempLabel(value) }),
                 ),
                 settings::item(
                     fl!("temperature-unit"),
@@ -414,10 +412,7 @@ impl Default for CpuTemp {
 
         let mut cpu = CpuTemp {
             hwmon_temp: hwmon,
-            samples: BoundedVecDeque::from_iter(
-                std::iter::repeat(0.0).take(MAX_SAMPLES),
-                MAX_SAMPLES,
-            ),
+            samples: BoundedVecDeque::from_iter(std::iter::repeat_n(0.0, MAX_SAMPLES), MAX_SAMPLES),
             graph_options: super::GRAPH_OPTIONS_RING_LINE_HEAT.to_vec(),
             svg_colors: SvgColors::new(&ChartColors::default()),
             unit_options: super::UNIT_OPTIONS.to_vec(),

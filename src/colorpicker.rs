@@ -345,10 +345,11 @@ impl ColorPicker {
         let title = format!("{} {}", self.device, fl!("colorpicker-colors"));
 
         if let Some(dmo) = self.demo_chart.as_ref() {
-            let mut children = Vec::new();
-            children.push(widget::horizontal_space().into());
+            let mut children1 = Vec::new();
+            let mut children2 = Vec::new();
+
             for (s, c) in dmo.color_choices() {
-                children.push(Element::from(widget::radio(
+                let wgt = Element::from(widget::radio(
                     s,
                     c,
                     if self.color_variant() == c {
@@ -357,11 +358,20 @@ impl ColorPicker {
                         None
                     },
                     Message::ColorPickerSelectVariant,
-                )));
-                children.push(widget::horizontal_space().into());
+                ));
+                if children1.len() < 6 {
+                    children1.push(widget::horizontal_space().width(20).into());
+                    children1.push(wgt);
+                } else {
+                    children2.push(widget::horizontal_space().width(20).into());
+                    children2.push(wgt);
+                }
             }
 
-            let fields = cosmic::widget::row::with_children(children);
+            let fields = column!(
+                cosmic::widget::row::with_children(children1),
+                cosmic::widget::row::with_children(children2)
+            );
 
             let c = widget::list_column()
                 .padding(0)
@@ -483,11 +493,11 @@ impl ColorPicker {
                     .width(Length::Fill),
                 );
 
-            return c.into();
+            c.into()
         } else {
-            return widget::button::destructive(fl!("colorpicker-cancel"))
+            widget::button::destructive(fl!("colorpicker-cancel"))
                 .on_press(Message::ColorPickerClose(false, None))
-                .into();
+                .into()
         }
     }
 }

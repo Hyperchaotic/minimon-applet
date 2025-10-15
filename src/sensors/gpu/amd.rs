@@ -62,21 +62,21 @@ impl AmdGpu {
             for entry in entries.flatten() {
                 let path = entry.path();
                 debug!("                    entry {path:?}");
-                if path.join("device/vendor").exists() {
-                    if let Ok(vendor_id) = Self::read_file_to_string(path.join("device/vendor")) {
-                        if vendor_id == "0x1002" {
-                            debug!("                    AMD vendor ID");
-                            if let Some(card) = path.file_name().and_then(|n| n.to_str()) {
-                                if card.contains("card") {
-                                    debug!("                    phyical Card.");
-                                    cards.push(card.to_string());
-                                } else {
-                                    debug!("                    virtual card");
-                                }
+                if path.join("device/vendor").exists()
+                    && let Ok(vendor_id) = Self::read_file_to_string(path.join("device/vendor"))
+                {
+                    if vendor_id == "0x1002" {
+                        debug!("                    AMD vendor ID");
+                        if let Some(card) = path.file_name().and_then(|n| n.to_str()) {
+                            if card.contains("card") {
+                                debug!("                    phyical Card.");
+                                cards.push(card.to_string());
+                            } else {
+                                debug!("                    virtual card");
                             }
-                        } else {
-                            debug!("                    Not AMD");
                         }
+                    } else {
+                        debug!("                    Not AMD");
                     }
                 }
             }
@@ -147,12 +147,12 @@ impl AmdGpu {
         };
 
         for line in stdout.lines() {
-            if line.contains("VGA") || line.contains("Display") || line.contains("3D") {
-                if let Some((slot, rest)) = line.split_once(' ') {
-                    let model = rest.trim();
-                    let name = clean_gpu_name(model);
-                    map.push((slot.to_lowercase().to_string(), name));
-                }
+            if (line.contains("VGA") || line.contains("Display") || line.contains("3D"))
+                && let Some((slot, rest)) = line.split_once(' ')
+            {
+                let model = rest.trim();
+                let name = clean_gpu_name(model);
+                map.push((slot.to_lowercase().to_string(), name));
             }
         }
         map
