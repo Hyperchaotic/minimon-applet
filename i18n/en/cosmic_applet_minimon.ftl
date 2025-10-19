@@ -92,9 +92,10 @@ temperature-unit-celsius = Celsius
 temperature-unit-fahrenheit = Fahrenheit
 temperature-unit-kelvin = Kelvin
 temperature-unit-rankine = Rankine
-memory-show-allocated = Show allocated (incl. cache, etc.)
+memory-show-allocated = Show allocated on chart
 graph-memory-used = Used.
 graph-memory-allocated = Allocated.
 graph-ring-unused = Unused.
 graph-cpu-load = Load.
 graph-cpu-idle = Idle.
+allocated-explanation = Allocated = total minus free. Includes cache and buffers, which improve performance and are released as needed.

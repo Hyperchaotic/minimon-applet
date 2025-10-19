@@ -315,6 +315,9 @@ impl Sensor for Memory {
         let config = &self.config;
         let selected: Option<usize> = Some(self.graph_kind().into());
         let mem_kind = self.graph_kind();
+
+        let expl = widget::text::body(fl!("allocated-explanation"));
+
         mem_elements.push(Element::from(
             column!(
                 settings::item(
@@ -324,8 +327,9 @@ impl Sensor for Memory {
                 ),
                 settings::item(
                     fl!("memory-show-allocated"),
-                    toggler(config.show_allocated).on_toggle(Message::ToggleMemoryAllocated),
+                    toggler(config.show_allocated).on_toggle(Message::ToggleMemoryAllocated)
                 ),
+                row!(widget::Space::with_width(15), expl),
                 settings::item(
                     fl!("enable-label"),
                     toggler(config.label_visible())

@@ -1342,7 +1342,7 @@ impl Minimon {
             )),
             horizontal_space(),
             heart.on_press(Message::Tip)
-        );
+        ); 
         // Create settings rows
         let refresh_row = settings::item(
             fl!("refresh-rate"),
