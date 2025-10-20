@@ -316,7 +316,7 @@ impl Sensor for Memory {
         let selected: Option<usize> = Some(self.graph_kind().into());
         let mem_kind = self.graph_kind();
 
-        let expl = widget::text::body(fl!("allocated-explanation"));
+        let expl = widget::text::caption(fl!("allocated-explanation"));
 
         mem_elements.push(Element::from(
             column!(
