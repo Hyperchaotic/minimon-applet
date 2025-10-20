@@ -98,3 +98,4 @@ graph-memory-allocated = Zaalokowana.
 graph-ring-unused = Nieużywana.
 graph-cpu-load = Obciążenie.
 graph-cpu-idle = Bezczynny.
+allocated-explanation = Zaalokowana = całkowita minus wolna. Obejmuje pamięć podręczną systemu i bufory, które poprawiają wydajność i są dostosowywane lub zwalniane w razie potrzeby.

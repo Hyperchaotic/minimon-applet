@@ -98,3 +98,4 @@ graph-memory-allocated = 已分配。
 graph-ring-unused = 未使用。
 graph-cpu-load = 负载。
 graph-cpu-idle = 空闲。
+allocated-explanation = 已分配 = 总量减去空闲。包括系统缓存和缓冲区，它们可提升性能，并会根据需要调整大小或释放。

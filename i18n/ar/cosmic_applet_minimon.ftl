@@ -98,3 +98,4 @@ graph-memory-allocated = مخصص.
 graph-ring-unused = غير مستخدم.
 graph-cpu-load = الحمل.
 graph-cpu-idle = خامل.
+allocated-explanation = مخصص = الإجمالي مطروحًا منه الفارغ. يشمل ذاكرة النظام المؤقتة والمخازن المؤقتة التي تحسن الأداء ويتم تغيير حجمها أو تحريرها حسب الحاجة.

@@ -98,3 +98,4 @@ graph-memory-allocated = Allokerad.
 graph-ring-unused = Oanvänd.
 graph-cpu-load = Belastning.
 graph-cpu-idle = Overksam.
+allocated-explanation = Allokerad = totalt minus ledigt. Inkluderar systemcache och buffertar som förbättrar prestandan och justeras eller frigörs vid behov.

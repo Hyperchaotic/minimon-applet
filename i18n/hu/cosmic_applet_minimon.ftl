@@ -98,3 +98,4 @@ graph-memory-allocated = Lefoglalt.
 graph-ring-unused = Nem használt.
 graph-cpu-load = Terhelés.
 graph-cpu-idle = Üresjárat.
+allocated-explanation = Lefoglalt = összesen mínusz szabad. Tartalmazza a rendszer gyorsítótárát és puffereit, amelyek javítják a teljesítményt, és szükség esetén átméretezhetők vagy felszabadíthatók.

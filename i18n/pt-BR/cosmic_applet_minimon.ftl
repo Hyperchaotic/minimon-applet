@@ -98,3 +98,4 @@ graph-memory-allocated = Alocada.
 graph-ring-unused = N�o usada.
 graph-cpu-load = Carga.
 graph-cpu-idle = Inativo.
+allocated-explanation = Alocada = total menos livre. Inclui cache e buffers do sistema, que melhoram o desempenho e s�o redimensionados ou liberados conforme necess�rio.

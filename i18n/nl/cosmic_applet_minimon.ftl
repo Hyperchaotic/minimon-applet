@@ -98,3 +98,4 @@ graph-memory-allocated = Gealloceerd.
 graph-ring-unused = Ongebruikt.
 graph-cpu-load = Belasting.
 graph-cpu-idle = Inactief.
+allocated-explanation = Gealloceerd = totaal minus vrij. Omvat systeemcache en buffers die de prestaties verbeteren en worden aangepast of vrijgegeven indien nodig.
